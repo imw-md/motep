@@ -23,14 +23,22 @@ from mpi4py import MPI
 ## Big Question ?
 What This code do
 
--code loads CFG files and then calls write MTP file with random or custom unkown parameters and calculate energy,forces,stress
+- code can read atomic data file in ASE atom and then calls write MTP file with random or custom unkown parameters and calculate energy,forces,stress
 - write the function value (difference in weighted sum of energy,forces and stress between training set and current set based on current parameter)
 - Uses python based optimization code to reduce the function value (errors)
 - Can switch to different optimizer and any stage
 - Can provide configurational weight to each atomic configurations
+- You can optimize any force-field 
+
+````
+
+Input Parameter ----- [Black/graybox]------Energy,forces,stress
+   |                                              |
+   |                                              |
+   | -------------------|optimizer|---- Error compared to reference set
 
 
-
+````
 
 
 
