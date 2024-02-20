@@ -20,3 +20,4 @@ import numpy as np
 import copy
 from mpi4py import MPI
 ````
+**Optimization algorithm**
