@@ -4,6 +4,8 @@
 
 contact **Yuji Ikeda** and **Axel forslund**
 
+To run script
+
 **mpirun -np 4 python3 main.py**
 
 Require Module
