@@ -68,15 +68,15 @@ This class represents the Genetic Algorithm (GA) implementation. It has the foll
 
 *__init__:* Initializes the GA with various parameters such as fitness function, population size, mutation rate, elitism rate, crossover probability, bounds for parameters, etc.
 
-*initialize_population:* Generates an initial population of individuals with random parameters. 
+```initialize_population```: Generates an initial population of individuals with random parameters. 
 
-*generate_random_parameter:* Generates a random parameter within specified bounds.
+```generate_random_parameter```: Generates a random parameter within specified bounds.
 
-*crossover:* Performs crossover between two parents to generate offspring.
+```crossover```: Performs crossover between two parents to generate offspring.
 
-*mutate:* Performs mutation on an individual's parameter with a certain probability.
+```mutate```: Performs mutation on an individual's parameter with a certain probability.
 
-*select_elite:* Selects elite individuals based on their fitness scores.
+```select_elite```: Selects elite individuals based on their fitness scores.
 
 ```evolve_with_elites, evolve_with_common, evolve_with_mix, evolve_with_steady: Evolution methods using different strategies like elitism, common, mix, and steady-state.```
 
