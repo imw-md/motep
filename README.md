@@ -6,9 +6,8 @@ contact **Yuji Ikeda** and **Axel forslund**
 
 To run script
 
-**mpirun -np 4 python3 main.py**
-I
-````
+```mpirun -np 4 python3 main.py```
+
 ## Big Question ?
 What This code do
 
