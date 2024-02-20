@@ -1,8 +1,8 @@
 # MTP_train
 
-Installation of mlippy, ikdtools
+```Installation of mlippy, ikdtools```
 
-contact Yuji Ikeda and Axel forslund
+contact **Yuji Ikeda** and **Axel forslund**
 
 **mpirun -np 4 python3 main.py**
 
