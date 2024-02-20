@@ -80,10 +80,10 @@ This class represents the Genetic Algorithm (GA) implementation. It has the foll
 
 ```evolve_with_elites, evolve_with_common, evolve_with_mix, evolve_with_steady: Evolution methods using different strategies like elitism, common, mix, and steady-state.```
 
-*optimization_GA Function:* This function is a wrapper for using the GA to optimize a target function. It takes the target function, initial guess for parameters, and any additional arguments. It initializes the GA instance with provided parameters and then runs the GA evolution process using one of the evolution methods (evolve_with_elites in this case).
+```optimization_GA Function```: This function is a wrapper for using the GA to optimize a target function. It takes the target function, initial guess for parameters, and any additional arguments. It initializes the GA instance with provided parameters and then runs the GA evolution process using one of the evolution methods (evolve_with_elites in default case).
 
 
-*target_function:* This is an example of a target function that you would want to optimize. You need to define your own target function based on your optimization problem
+```target_function```: This is an example of a target function that you would want to optimize. You need to define your own target function based on your optimization problem
 
  ### Elitism Evolution
 - **Description**: This method preserves a certain percentage of the fittest individuals from each generation.
