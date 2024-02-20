@@ -47,10 +47,19 @@ Input Parameter ----- [Black/graybox]------Energy,forces,stress
 
 ### Optimization algorithm
 
-**Scipy modules :** ```BFGS, Nelder-mead, Differential evolution, Dual Annealing```
+**Scipy modules :** ```L-BFGS-B```, ```Nelder-mead```, ```Differential evolution```, ```Dual Annealing```
+
+
+
+
+
+
+
+### Additional Modules
+
 
 This repository also contains a Python implementation of a ```Genetic Algorithm (GA)``` for optimization problems. The GA is designed to find the optimal solution to a given problem by evolving a population of candidate solutions over multiple generations.
- #Genetic Algorithm Class
+ # Genetic Algorithm Class
 
 
 
