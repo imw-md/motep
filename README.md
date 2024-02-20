@@ -32,7 +32,7 @@ What This code do
 
 ````
 
-Input Parameter ----- [Black/graybox]------Energy,forces,stress
+Input Parameters ----- [Black/graybox]------Energy,forces,stress
    |                                              |
    |                                              |
    | -------------------|optimizer|---- Error compared to reference set
