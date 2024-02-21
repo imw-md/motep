@@ -8,7 +8,7 @@ import numpy as np
 import copy
 from mpi4py import MPI
 from pot import read_untrained_MTP, write_MTP, generate_random_numbers
-from opt import optimization_nelder, optimization_bfgs, optimization_DE, optimization_pymoo, optimization_sa
+from opt import optimization_nelder, optimization_bfgs, optimization_DE, optimization_sa
 from itertools import combinations_with_replacement
 from Moo import optimization_GA
 

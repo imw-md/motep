@@ -7,10 +7,6 @@ from scipy.optimize import minimize
 import mlippy
 
 from scipy.optimize import differential_evolution
-from pymoo.algorithms.soo.nonconvex.ga import GA
-from pymoo.optimize import minimize as minimize_GA
-from pymoo.core.problem import ElementwiseProblem
-from pymoo.termination import get_termination
 from mpi4py import MPI
 
 from scipy.optimize import dual_annealing
@@ -103,28 +99,3 @@ def optimization_DE(mytarget,initial_guess, *args):
     return result.x
 
 
-
-class MyProblem(ElementwiseProblem):
-    def __init__(self, mytarget, initial_guess,*args):
-        self.args = args
-        self.initial_guess= initial_guess  # initial guess is only for determining unknowns
-        self.mytarget = mytarget
-        super().__init__(n_var=len(self.initial_guess),
-                         n_obj=1,
-                         xl=np.array([-1000]+[-1]*(len(initial_guess)-1)),
-                         xu=np.array([-1000]+[1]*(len(initial_guess)-1)))
-    def _evaluate(self, x, out, *args, **kwargs):
-        out["F"]=self.mytarget(x, *self.args)
-
-def optimization_pymoo(mytarget,initial_guess, *args):
-    problem = MyProblem(mytarget,initial_guess,*args)
-    algorithm= GA(pop_size=50,eliminate_duplicates=True)
-    termination = get_termination("n_gen", 30)
-    res = minimize_GA(problem,
-               algorithm,
-               termination,
-               seed=1,
-               save_history=True,
-               verbose=True)
-    best_solution =res.X
-    return best_solution
