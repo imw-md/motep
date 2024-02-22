@@ -212,20 +212,29 @@ if __name__ == "__main__":
         # Rest of the code...
         os.chdir(folder_path) 
     #    for i in np.arange(1,100):
+	
         species_pairs = combinations_with_replacement(range(species_count), 2)
-        unknown = len(list(species_pairs)) * int(yaml_data['radial_funcs_count']) * int(
-            yaml_data['radial_basis_size']) + int(yaml_data['alpha_scalar_moments']) + species_count + 1
-        initial_guess = [10000]+generate_random_numbers(unknown-1, -0.1, 0.1, 10)
+        w_cheb = species_count+int(yaml_data['alpha_scalar_moments'])
+        cheb=len(list(species_pairs)) * int(yaml_data['radial_funcs_count']) * int(yaml_data['radial_basis_size'])
+        #global bounds
+       # global lower_bounds
+       # global upper_bounds
+        bounds=[(-1000,1000)]+[(-5,5)]*w_cheb+[(-0.1,0.1)]*cheb
+        #lower_bounds = [item[0] for item in bounds]
+        #upper_bounds = [item[1] for item in bounds]
+
+
+        initial_guess = [1000]+[5]*w_cheb +generate_random_numbers(cheb, -0.1, 0.1, 10)
         
 
 
 
-        optimized_parameters = optimization_GA(mytarget,initial_guess, Target_energies, Target_forces, Target_stress,global_weight, configuration_weight, current_set)
+        optimized_parameters = optimization_GA(mytarget,initial_guess,bounds,Target_energies, Target_forces, Target_stress,global_weight, configuration_weight, current_set)
         
 #==============================================================================================
         #initial_guess=[-7.54050095e+00,-1.92261361e-04,-1.68294883e+00,7.18632606e-01, -7.05708440e-01,1.23713720e+00,7.27847678e-02,2.29800048e-02,8.02591439e-01,-3.11064787e-01,-1.32991017e-01] 
         initial_guess=optimized_parameters
-        optimized_parameters = optimization_nelder(mytarget,initial_guess, Target_energies, Target_forces, Target_stress,
+        optimized_parameters = optimization_nelder(mytarget,initial_guess,bounds, Target_energies, Target_forces, Target_stress,
                        global_weight, configuration_weight, current_set)
  
         #initial_guess=optimized_parameters

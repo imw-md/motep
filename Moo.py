@@ -2,7 +2,7 @@ import random
 import numpy as np
 
 class GeneticAlgorithm:
-    def __init__(self, fitness_function, parameter, *args, population_size=15, mutation_rate=0.1, elitism_rate=0.1, crossover_probability=0.8, lower_bound=None, upper_bound=None):
+    def __init__(self, fitness_function, parameter, lower_bound, upper_bound,*args, population_size=15, mutation_rate=0.1, elitism_rate=0.1, crossover_probability=0.8):
         self.fitness_function = fitness_function
         self.population_size = population_size
         self.parameter_length = len(parameter)
@@ -10,8 +10,8 @@ class GeneticAlgorithm:
         self.elitism_rate = elitism_rate
         self.crossover_probability = crossover_probability
         self.args = args
-        self.lower_bound = lower_bound if lower_bound is not None else [-2] * self.parameter_length
-        self.upper_bound = upper_bound if upper_bound is not None else [2] * self.parameter_length
+        self.lower_bound = lower_bound 
+        self.upper_bound = upper_bound 
         self.population = []
 
     def initialize_population(self):
@@ -159,10 +159,10 @@ def elite_callback(gen, elite):
 
 
 
-def optimization_GA(mytarget,initial_guess, *args):
-    lower_bound =[-100,-2,-2] +[-1] * (len(initial_guess)-3)
-    upper_bound =[100,2,2] +[1] * (len(initial_guess)-3)
-    ga = GeneticAlgorithm(mytarget, initial_guess, *args, population_size=200, mutation_rate=0.1, elitism_rate=0.1, crossover_probability=0.8, lower_bound=lower_bound, upper_bound=upper_bound)
+def optimization_GA(mytarget,initial_guess,bounds, *args):
+    lower_bound = [item[0] for item in bounds]
+    upper_bound = [item[1] for item in bounds]
+    ga = GeneticAlgorithm(mytarget, initial_guess, lower_bound,upper_bound,*args, population_size=200, mutation_rate=0.1, elitism_rate=0.1, crossover_probability=0.8)
     ga.initialize_population()
     best_solution=ga.evolve_with_elites(mytarget, generations=100,elite_callback=elite_callback)
     return best_solution
