@@ -216,12 +216,7 @@ if __name__ == "__main__":
         species_pairs = combinations_with_replacement(range(species_count), 2)
         w_cheb = species_count+int(yaml_data['alpha_scalar_moments'])
         cheb=len(list(species_pairs)) * int(yaml_data['radial_funcs_count']) * int(yaml_data['radial_basis_size'])
-        #global bounds
-       # global lower_bounds
-       # global upper_bounds
         bounds=[(-1000,1000)]+[(-5,5)]*w_cheb+[(-0.1,0.1)]*cheb
-        #lower_bounds = [item[0] for item in bounds]
-        #upper_bounds = [item[1] for item in bounds]
 
 
         initial_guess = [1000]+[5]*w_cheb +generate_random_numbers(cheb, -0.1, 0.1, 10)
