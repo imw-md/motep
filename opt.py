@@ -12,7 +12,6 @@ from mpi4py import MPI
 from scipy.optimize import dual_annealing
 
 def optimization_sa(mytarget, initial_guess,bounds, *args):
-#    bounds = [(-1e6, 1e6)] + [(-10, 10)] * (len(initial_guess) - 1)
     
     def callback_print(params,f,context):
         func_value = mytarget(params, *args)
@@ -39,7 +38,6 @@ def optimization_sa(mytarget, initial_guess,bounds, *args):
 
 
 def optimization_nelder(mytarget,initial_guess,bounds,*args):
- #   bounds = [(-1e6, 1e6)] + [(-10, 10)] * (len(initial_guess) - 1)
     def callback_print(params):
         func_value = mytarget(params, *args)
         print("Function value:", func_value)
@@ -59,7 +57,6 @@ def optimization_nelder(mytarget,initial_guess,bounds,*args):
 
 
 def optimization_bfgs(mytarget,initial_guess,bounds,*args):
-  #  bounds = [(-1e6, 1e6)] + [(-0.1, 0.1)] * (len(initial_guess) - 1)
     def callback_print(params):
         func_value = mytarget(params, *args)
         print("Function value:", func_value)
@@ -82,7 +79,6 @@ def optimization_bfgs(mytarget,initial_guess,bounds,*args):
 
 
 def optimization_DE(mytarget,initial_guess,bounds, *args):
-   # bounds = [(-1e6, 1e6)] + [(-0.1, 0.1)] * (len(initial_guess) - 1)
 
     def callback_print(xk, convergence):
         print("Objective function values:", mytarget(xk, *args))
