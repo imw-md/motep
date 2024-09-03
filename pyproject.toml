@@ -1,0 +1,8 @@
+[tool.ruff.lint]
+preview = true  # necessary to activate many pycodestyle rules
+select = [
+    "F",  # Pyflakes
+    "E",  # pycodestyle
+    "W",  # pycodestyle
+    "I"   # isort
+]

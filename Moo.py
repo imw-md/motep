@@ -1,8 +1,10 @@
 import random
+
 import numpy as np
 
+
 class GeneticAlgorithm:
-    def __init__(self, fitness_function, parameter, lower_bound, upper_bound,*args, population_size=15, mutation_rate=0.1, elitism_rate=0.1, crossover_probability=0.8):
+    def __init__(self, fitness_function, parameter, lower_bound, upper_bound, *args, population_size=15, mutation_rate=0.1, elitism_rate=0.1, crossover_probability=0.8):
         self.fitness_function = fitness_function
         self.population_size = population_size
         self.parameter_length = len(parameter)
@@ -10,8 +12,8 @@ class GeneticAlgorithm:
         self.elitism_rate = elitism_rate
         self.crossover_probability = crossover_probability
         self.args = args
-        self.lower_bound = lower_bound 
-        self.upper_bound = upper_bound 
+        self.lower_bound = lower_bound
+        self.upper_bound = upper_bound
         self.population = []
 
     def initialize_population(self):
@@ -63,7 +65,7 @@ class GeneticAlgorithm:
             if elite_callback:
                 elite_callback(gen, fitness_function(elite[0], *self.args))
         return best_solution
-    
+
     def evolve_with_common(self, fitness_function, generations, elite_callback=None):
         best_solution = None
         best_fitness = float('inf')
@@ -83,7 +85,7 @@ class GeneticAlgorithm:
             if elite_callback:
                 elite_callback(gen, fitness_function(elite[0], *self.args))
         return best_solution
-    
+
     def evolve_with_mix(self, fitness_function, generations, elite_callback=None):
         best_solution = None
         best_fitness = float('inf')
@@ -147,29 +149,20 @@ class GeneticAlgorithm:
         return best_solution
 
 
-
-
-
-
 def elite_callback(gen, elite):
     print(f"Generation {gen}: Top Elite - {elite}")
 
 
-
-
-
-
-def optimization_GA(mytarget,initial_guess,bounds, *args):
+def optimization_GA(mytarget, initial_guess, bounds, *args):
     lower_bound = [item[0] for item in bounds]
     upper_bound = [item[1] for item in bounds]
-    ga = GeneticAlgorithm(mytarget, initial_guess, lower_bound,upper_bound,*args, population_size=200, mutation_rate=0.1, elitism_rate=0.1, crossover_probability=0.8)
+    ga = GeneticAlgorithm(mytarget, initial_guess, lower_bound, upper_bound, *args, population_size=200, mutation_rate=0.1, elitism_rate=0.1, crossover_probability=0.8)
     ga.initialize_population()
-    best_solution=ga.evolve_with_elites(mytarget, generations=100,elite_callback=elite_callback)
+    best_solution = ga.evolve_with_elites(mytarget, generations=100, elite_callback=elite_callback)
     return best_solution
 
 
-
-#def f(x):
+# def f(x):
 #    #return np.sum(np.array(X)**2)
 #    n = len(x)
 #    sum1 = np.sum(np.square(x))
@@ -178,23 +171,20 @@ def optimization_GA(mytarget,initial_guess,bounds, *args):
 #
 
 
-## Example usage
-#population_size = 100
-#initial_guess = [0] * 2
-#mutation_rate = 0.1
-#elitism_rate = 0.1
-#crossover_probability = 0.9
-#generations = 100
-#lower_bound = [0] * len(initial_guess)
-#upper_bound = [10] * len(initial_guess)
+# Example usage
+# population_size = 100
+# initial_guess = [0] * 2
+# mutation_rate = 0.1
+# elitism_rate = 0.1
+# crossover_probability = 0.9
+# generations = 100
+# lower_bound = [0] * len(initial_guess)
+# upper_bound = [10] * len(initial_guess)
 #
-#ga = GeneticAlgorithm(f,initial_guess, population_size=population_size, mutation_rate=mutation_rate, elitism_rate=elitism_rate, crossover_probability=crossover_probability, lower_bound=lower_bound, upper_bound=upper_bound)
-#ga.initialize_population()
-#best_solution=ga.evolve_with_elites(f, generations, elite_callback)
-##best_solution=ga.evolve_with_common(f, generations, elite_callback)
-##best_solution=ga.evolve_with_mix(f, generations, elite_callback)
-##best_solution=ga.evolve_with_steady(f, generations, elite_callback)
-#print("Best solution found:", best_solution)
-
-
-
+# ga = GeneticAlgorithm(f,initial_guess, population_size=population_size, mutation_rate=mutation_rate, elitism_rate=elitism_rate, crossover_probability=crossover_probability, lower_bound=lower_bound, upper_bound=upper_bound)
+# ga.initialize_population()
+# best_solution=ga.evolve_with_elites(f, generations, elite_callback)
+# best_solution=ga.evolve_with_common(f, generations, elite_callback)
+# best_solution=ga.evolve_with_mix(f, generations, elite_callback)
+# best_solution=ga.evolve_with_steady(f, generations, elite_callback)
+# print("Best solution found:", best_solution)
