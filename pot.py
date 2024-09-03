@@ -1,26 +1,22 @@
-from ikdtools.io.mlip.cfg import write_cfg
-from ikdtools.io.mlip.cfg import read_cfg
-import numpy as np
-from ase.calculators.morse import MorsePotential
-import copy
-from scipy.optimize import minimize
-import mlippy
 import random
+
+from ase.calculators.morse import MorsePotential
+
+
 def Morse_field(parameters):
     epsilon, rho0, r0, rcut1, rcut2 = parameters
     Potential = MorsePotential(epsilon=epsilon, rho0=rho0, r0=r0, rcut1=rcut1, rcut2=rcut2)
     return Potential
 
 
-def generate_random_numbers(n, lower_limit, upper_limit,seed):
+def generate_random_numbers(n, lower_limit, upper_limit, seed):
     random.seed(seed)
     random_numbers = [random.uniform(lower_limit, upper_limit) for _ in range(n)]
     return random_numbers
 
 
-
-
 from itertools import combinations_with_replacement
+
 
 def read_untrained_MTP(file_path):
     # Read lines from the file
@@ -36,7 +32,7 @@ def read_untrained_MTP(file_path):
             yaml_data[key] = value
         else:
             yaml_data[d[0]] = None
-    
+
     return yaml_data
 
 
@@ -47,9 +43,7 @@ def brac(input):
         return "{{{}}}".format(",".join(map(str, input)))
 
 
-
-
-def write_MTP(file,species_count,min_dist, max_dist, scaling, radial_coeffs, species_coeffs, moment_coeffs, yaml_data):
+def write_MTP(file, species_count, min_dist, max_dist, scaling, radial_coeffs, species_coeffs, moment_coeffs, yaml_data):
     version = yaml_data['version']
     potential_name = yaml_data['potential_name']
     potential_tag = ''
@@ -78,13 +72,13 @@ def write_MTP(file,species_count,min_dist, max_dist, scaling, radial_coeffs, spe
         f.write("\tradial_funcs_count = {}\n".format(radial_funcs_count))
         f.write("\tradial_coeffs\n")
         species_pairs = combinations_with_replacement(range(species_count), 2)
-        j=0
+        j = 0
         for pair in species_pairs:
             f.write("\t\t{}-{}\n".format(pair[0], pair[1]))
             for m in range(int(radial_funcs_count)):
-                #print((radial_coeffs[j]))
+                # print((radial_coeffs[j]))
                 f.write("\t\t\t{}\n".format(brac(radial_coeffs[j])))
-                j+=1
+                j += 1
         f.write("alpha_moments_count = {}\n".format(alpha_moments_count))
         f.write("alpha_index_basic_count = {}\n".format(alpha_index_basic_count))
         f.write("alpha_index_basic = {}\n".format(alpha_index_basic))
@@ -94,5 +88,3 @@ def write_MTP(file,species_count,min_dist, max_dist, scaling, radial_coeffs, spe
         f.write("alpha_moment_mapping = {}\n".format(alpha_moment_mapping))
         f.write("species_coeffs = {}\n".format(brac(species_coeffs)))
         f.write("moment_coeffs = {}\n".format(brac(moment_coeffs)))
-
-

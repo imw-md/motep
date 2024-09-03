@@ -1,16 +1,17 @@
-import os
-import sys
-import time
-import subprocess
-import mlippy
-from ikdtools.io.mlip.cfg import write_cfg, read_cfg
-import numpy as np
 import copy
-from mpi4py import MPI
-from pot import read_untrained_MTP, write_MTP, generate_random_numbers
-from opt import optimization_nelder, optimization_bfgs, optimization_DE, optimization_sa
+import os
+import time
 from itertools import combinations_with_replacement
+
+import mlippy
+import numpy as np
+from ikdtools.io.mlip.cfg import read_cfg
+from mpi4py import MPI
+
 from Moo import optimization_GA
+from opt import optimization_nelder
+from pot import generate_random_numbers, read_untrained_MTP, write_MTP
+
 
 def configuration_set(input_cfg, species=['H']):
     Training_set = read_cfg(input_cfg, ":", species)
@@ -22,7 +23,7 @@ def target_value(Training_set):
     # Extract energies and forces from the training set
     Target_energies = [atom.calc.results['free_energy'] for atom in Training_set]
     Target_forces = [atom.calc.results['forces'] for atom in Training_set]
-    Target_stress =   [atom.calc.results['stress'] for atom in Training_set]
+    Target_stress = [atom.calc.results['stress'] for atom in Training_set]
     return np.array(Target_energies), np.array(Target_forces), np.array(Target_stress)
 
 
@@ -30,8 +31,8 @@ def calculate_energy_force_stress(atom, potential):
     atom.calc = potential
     energy = atom.get_potential_energy()
     force = atom.get_forces()
-    stress = atom.get_stress() # stress property not implemented in morse
-    #stress = [0, 0, 0, 0, 0, 0]  # workaround
+    stress = atom.get_stress()  # stress property not implemented in morse
+    # stress = [0, 0, 0, 0, 0, 0]  # workaround
     return energy, force, stress
 
 
@@ -92,7 +93,7 @@ def mytarget(parameters, *args):
     energy_scalar_difference = np.sum(energy_difference ** 2)
 
     # Calculate the force difference
-    force_difference = [np.square(np.linalg.norm(configuration_weight[i] * (current_forces[i] - Target_forces[i]),axis=1)) for i in range(len(Target_forces))]
+    force_difference = [np.square(np.linalg.norm(configuration_weight[i] * (current_forces[i] - Target_forces[i]), axis=1)) for i in range(len(Target_forces))]
     force_scalar_difference = np.sum(np.concatenate(force_difference))
 
     # Calculate the stress difference
@@ -102,7 +103,7 @@ def mytarget(parameters, *args):
     return GEW * energy_scalar_difference + GFW * force_scalar_difference + GSW * stress_scalar_difference
 
 
-#def RMSE(reference_set, current_set, potential):
+# def RMSE(reference_set, current_set, potential):
 #    current_energies, current_forces, current_stress = current_value(current_set, potential)
 #    Target_energies, Target_forces, Target_stress = target_value(reference_set)
 #
@@ -118,7 +119,7 @@ def mytarget(parameters, *args):
 #    print("RMSE force per atom (eV/Ang):", RMSE_force)
 #    print("RMSE stress (GPa):", RMSE_force*0.1)
 
-def RMSE(cfg,pot):
+def RMSE(cfg, pot):
     ts = mlippy.ase_loadcfgs(cfg)
     mlip = mlippy.initialize()
     mlip = mlippy.mtp()
@@ -126,15 +127,11 @@ def RMSE(cfg,pot):
     opts = {}
     mlip.add_atomic_type(1)
     potential = mlippy.MLIP_Calculator(mlip, opts)
-    errors=mlippy.ase_errors(mlip,ts)
-    print("RMSE Energy per atom (meV/atom):",1000*float(errors['Energy per atom: RMS absolute difference']))
-    print("RMSE force per atom (eV/Ang):",float(errors['Forces: RMS absolute difference']))
+    errors = mlippy.ase_errors(mlip, ts)
+    print("RMSE Energy per atom (meV/atom):", 1000 * float(errors['Energy per atom: RMS absolute difference']))
+    print("RMSE force per atom (eV/Ang):", float(errors['Forces: RMS absolute difference']))
     print("RMSE stress (GPa):", float(errors['Stresses: RMS absolute difference']))
     return errors
-
-
-
-
 
 
 def MTP_field(parameters):
@@ -153,9 +150,9 @@ def MTP_field(parameters):
     species_pairs = combinations_with_replacement(range(species_count), 2)
 
     radial_coeffs = np.array(total_radial).reshape(-1, int(yaml_data['radial_basis_size'])).tolist()
-    #if rank==0:
+    # if rank==0:
     file = "Test.mtp"
-    #else:
+    # else:
     #    file = "test.mtp"
     write_MTP(file, species_count, min_dist, max_dist, scaling, radial_coeffs, species_coeffs, moment_coeffs, yaml_data)
 
@@ -167,36 +164,37 @@ def MTP_field(parameters):
     potential = mlippy.MLIP_Calculator(mlip, opts)
 
     return potential
-#======================================================================================================================================================
+# ======================================================================================================================================================
+
+
 if __name__ == "__main__":
     import os
-    import subprocess
     import time
-    
+
     # Other imports...
-    
+
     if __name__ == "__main__":
         start_time = time.time()
         current_directory = os.getcwd()
-        global untrained_mtp 
+        global untrained_mtp
         global comm
         global size
         global rank
         global cfg_file
-         
+
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
         size = comm.Get_size()
-        cfg_file= current_directory+"/final.cfg"
-        untrained_mtp = current_directory+"/02.mtp"
-        
-        #if rank!=0:
+        cfg_file = current_directory + "/final.cfg"
+        untrained_mtp = current_directory + "/02.mtp"
+
+        # if rank!=0:
         #    sys.stdout = None
         Training_set, current_set = configuration_set(cfg_file, species=['H'])
         Target_energies, Target_forces, Target_stress = target_value(Training_set)
 
-        global_weight = [1, 0.01, 0]  
-        configuration_weight = np.ones(len(Training_set))  
+        global_weight = [1, 0.01, 0]
+        configuration_weight = np.ones(len(Training_set))
 
         yaml_data = read_untrained_MTP(untrained_mtp)
         species_count = int(yaml_data['species_count'])
@@ -206,43 +204,39 @@ if __name__ == "__main__":
         folder_path = os.path.join(current_directory, folder_name)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
-    
+
         # Change working directory to the created folder
-    
+
         # Rest of the code...
-        os.chdir(folder_path) 
+        os.chdir(folder_path)
     #    for i in np.arange(1,100):
-	
+
         species_pairs = combinations_with_replacement(range(species_count), 2)
-        w_cheb = species_count+int(yaml_data['alpha_scalar_moments'])
-        cheb=len(list(species_pairs)) * int(yaml_data['radial_funcs_count']) * int(yaml_data['radial_basis_size'])
-        bounds=[(-1000,1000)]+[(-5,5)]*w_cheb+[(-0.1,0.1)]*cheb
+        w_cheb = species_count + int(yaml_data['alpha_scalar_moments'])
+        cheb = len(list(species_pairs)) * int(yaml_data['radial_funcs_count']) * int(yaml_data['radial_basis_size'])
+        bounds = [(-1000, 1000)] + [(-5, 5)] * w_cheb + [(-0.1, 0.1)] * cheb
 
+        initial_guess = [1000] + [5] * w_cheb + generate_random_numbers(cheb, -0.1, 0.1, 10)
 
-        initial_guess = [1000]+[5]*w_cheb +generate_random_numbers(cheb, -0.1, 0.1, 10)
-        
+        optimized_parameters = optimization_GA(mytarget, initial_guess, bounds, Target_energies, Target_forces, Target_stress, global_weight, configuration_weight, current_set)
 
-
-
-        optimized_parameters = optimization_GA(mytarget,initial_guess,bounds,Target_energies, Target_forces, Target_stress,global_weight, configuration_weight, current_set)
-        
-#==============================================================================================
-        #initial_guess=[-7.54050095e+00,-1.92261361e-04,-1.68294883e+00,7.18632606e-01, -7.05708440e-01,1.23713720e+00,7.27847678e-02,2.29800048e-02,8.02591439e-01,-3.11064787e-01,-1.32991017e-01] 
-        initial_guess=optimized_parameters
-        optimized_parameters = optimization_nelder(mytarget,initial_guess,bounds, Target_energies, Target_forces, Target_stress,
+# ==============================================================================================
+        # initial_guess=[-7.54050095e+00,-1.92261361e-04,-1.68294883e+00,7.18632606e-01, -7.05708440e-01,1.23713720e+00,7.27847678e-02,2.29800048e-02,8.02591439e-01,-3.11064787e-01,-1.32991017e-01]
+        initial_guess = optimized_parameters
+        optimized_parameters = optimization_nelder(mytarget, initial_guess, bounds, Target_energies, Target_forces, Target_stress,
                        global_weight, configuration_weight, current_set)
- 
-        #initial_guess=optimized_parameters
-        
-        #optimized_parameters = optimization_bfgs(mytarget,initial_guess, Target_energies, Target_forces, Target_stress,global_weight, configuration_weight, current_set)
+
+        # initial_guess=optimized_parameters
+
+        # optimized_parameters = optimization_bfgs(mytarget,initial_guess, Target_energies, Target_forces, Target_stress,global_weight, configuration_weight, current_set)
         # Change back to the original directory after processing
-#====================================================================================================    
+# ====================================================================================================
         end_time = time.time()
         elapsed_time = end_time - start_time
-            #Calculate RMSE
-        #print(optimized_parameters)
+            # Calculate RMSE
+        # print(optimized_parameters)
         potential = MTP_field(optimized_parameters)
-        RMSE(cfg_file,"Test.mtp")
+        RMSE(cfg_file, "Test.mtp")
 
         print("Total time taken:", elapsed_time, "seconds")
         os.chdir(current_directory)
