@@ -4,9 +4,23 @@
 
 contact **Yuji Ikeda** and **Axel forslund**
 
-To run script
+## Installation
 
-```mpirun -np 4 python3 main.py```
+```bash
+pip install git+https://github.tik.uni-stuttgart.de/ac144228/MTP_train.git
+```
+
+## Usage
+
+```
+motep
+```
+
+or
+
+```
+mpirun -np 4 motep
+```
 
 ## Big Question ?
 What This code do

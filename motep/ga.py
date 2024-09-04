@@ -4,7 +4,18 @@ import numpy as np
 
 
 class GeneticAlgorithm:
-    def __init__(self, fitness_function, parameter, lower_bound, upper_bound, *args, population_size=15, mutation_rate=0.1, elitism_rate=0.1, crossover_probability=0.8):
+    def __init__(
+        self,
+        fitness_function,
+        parameter,
+        lower_bound,
+        upper_bound,
+        *args,
+        population_size=15,
+        mutation_rate=0.1,
+        elitism_rate=0.1,
+        crossover_probability=0.8,
+    ):
         self.fitness_function = fitness_function
         self.population_size = population_size
         self.parameter_length = len(parameter)
@@ -17,11 +28,16 @@ class GeneticAlgorithm:
         self.population = []
 
     def initialize_population(self):
-        self.population = [self.generate_random_parameter() for _ in range(self.population_size)]
+        self.population = [
+            self.generate_random_parameter() for _ in range(self.population_size)
+        ]
 
     def generate_random_parameter(self):
         random.seed(40)
-        return [random.uniform(lower, upper) for lower, upper in zip(self.lower_bound, self.upper_bound)]
+        return [
+            random.uniform(lower, upper)
+            for lower, upper in zip(self.lower_bound, self.upper_bound)
+        ]
 
     def crossover(self, parent1, parent2):
         if random.random() < self.crossover_probability:
@@ -42,15 +58,19 @@ class GeneticAlgorithm:
         return mutated_parameter
 
     def select_elite(self, fitness_scores):
-        sorted_indices = sorted(range(len(fitness_scores)), key=lambda i: fitness_scores[i], reverse=False)
+        sorted_indices = sorted(
+            range(len(fitness_scores)), key=lambda i: fitness_scores[i], reverse=False
+        )
         elite_count = int(self.elitism_rate * len(fitness_scores))
         return [self.population[i] for i in sorted_indices[:elite_count]]
 
     def evolve_with_elites(self, fitness_function, generations, elite_callback=None):
         best_solution = None
-        best_fitness = float('inf')
+        best_fitness = float("inf")
         for gen in range(generations):
-            fitness_scores = [fitness_function(parameter, *self.args) for parameter in self.population]
+            fitness_scores = [
+                fitness_function(parameter, *self.args) for parameter in self.population
+            ]
             elite = self.select_elite(fitness_scores)
             best_index = np.argmin(fitness_scores)
             if fitness_scores[best_index] < best_fitness:
@@ -68,9 +88,11 @@ class GeneticAlgorithm:
 
     def evolve_with_common(self, fitness_function, generations, elite_callback=None):
         best_solution = None
-        best_fitness = float('inf')
+        best_fitness = float("inf")
         for gen in range(generations):
-            fitness_scores = [fitness_function(parameter, *self.args) for parameter in self.population]
+            fitness_scores = [
+                fitness_function(parameter, *self.args) for parameter in self.population
+            ]
             elite = self.select_elite(fitness_scores)
             best_index = np.argmin(fitness_scores)
             if fitness_scores[best_index] < best_fitness:
@@ -88,9 +110,11 @@ class GeneticAlgorithm:
 
     def evolve_with_mix(self, fitness_function, generations, elite_callback=None):
         best_solution = None
-        best_fitness = float('inf')
+        best_fitness = float("inf")
         for gen in range(generations):
-            fitness_scores = [fitness_function(parameter, *self.args) for parameter in self.population]
+            fitness_scores = [
+                fitness_function(parameter, *self.args) for parameter in self.population
+            ]
             elite = self.select_elite(fitness_scores)
             best_index = np.argmin(fitness_scores)
             if fitness_scores[best_index] < best_fitness:
@@ -98,8 +122,12 @@ class GeneticAlgorithm:
                 best_solution = self.population[best_index]
             offspring = elite[:]
             while len(offspring) < self.population_size:
-                parent1 = random.choice(elite)  # Changed to random.choice as random.choices returns a list
-                parent2 = random.choice(self.population)  # Changed to random.choice as random.choices returns a list
+                parent1 = random.choice(
+                    elite
+                )  # Changed to random.choice as random.choices returns a list
+                parent2 = random.choice(
+                    self.population
+                )  # Changed to random.choice as random.choices returns a list
 
                 if random.random() < self.crossover_probability:
                     child1, child2 = self.crossover(parent1, parent2)
@@ -112,10 +140,12 @@ class GeneticAlgorithm:
 
     def evolve_with_steady(self, fitness_function, generations, elite_callback=None):
         best_solution = None
-        best_fitness = float('inf')
+        best_fitness = float("inf")
 
         for gen in range(generations):
-            fitness_scores = [fitness_function(parameter, *self.args) for parameter in self.population]
+            fitness_scores = [
+                fitness_function(parameter, *self.args) for parameter in self.population
+            ]
             elite = self.select_elite(fitness_scores)
 
             # Find the best solution in the current generation
@@ -132,7 +162,9 @@ class GeneticAlgorithm:
                 offspring.extend([self.mutate(child1), self.mutate(child2)])
 
             # Create a combined population of non-elite and offspring
-            combined_population = [ind for ind in self.population if ind not in elite] + offspring
+            combined_population = [
+                ind for ind in self.population if ind not in elite
+            ] + offspring
 
             # Select a portion of combined population to replace the current population
             new_population = elite[:]  # Save elite
@@ -156,9 +188,21 @@ def elite_callback(gen, elite):
 def optimization_GA(mytarget, initial_guess, bounds, *args):
     lower_bound = [item[0] for item in bounds]
     upper_bound = [item[1] for item in bounds]
-    ga = GeneticAlgorithm(mytarget, initial_guess, lower_bound, upper_bound, *args, population_size=200, mutation_rate=0.1, elitism_rate=0.1, crossover_probability=0.8)
+    ga = GeneticAlgorithm(
+        mytarget,
+        initial_guess,
+        lower_bound,
+        upper_bound,
+        *args,
+        population_size=200,
+        mutation_rate=0.1,
+        elitism_rate=0.1,
+        crossover_probability=0.8,
+    )
     ga.initialize_population()
-    best_solution = ga.evolve_with_elites(mytarget, generations=100, elite_callback=elite_callback)
+    best_solution = ga.evolve_with_elites(
+        mytarget, generations=100, elite_callback=elite_callback
+    )
     return best_solution
 
 
