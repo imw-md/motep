@@ -47,14 +47,7 @@ def brac(input):
         return "{{{}}}".format(",".join(map(str, input)))
 
 
-def write_MTP(
-    file,
-    scaling,
-    radial_coeffs,
-    species_coeffs,
-    moment_coeffs,
-    data: dict[str, Any],
-):
+def write_MTP(file, data: dict[str, Any]) -> None:
     version = data["version"]
     potential_name = data["potential_name"]
     species_count = data["species_count"]
@@ -74,7 +67,7 @@ def write_MTP(
         f.write("MTP\n")
         f.write(f"version = {version}\n")
         f.write(f"potential_name = {potential_name}\n")
-        f.write(f"scaling = {scaling:21.15e}\n")
+        f.write(f"scaling = {data['scaling']:21.15e}\n")
         f.write(f"species_count = {species_count:d}\n")
         f.write(f"potential_tag = {potential_tag}\n")
         f.write(f"radial_basis_type = {radial_basis_type}\n")
@@ -88,7 +81,7 @@ def write_MTP(
         for pair in species_pairs:
             f.write(f"\t\t{pair[0]}-{pair[1]}\n")
             for _ in range(int(radial_funcs_count)):
-                f.write("\t\t\t{}\n".format(brac(radial_coeffs[j])))
+                f.write("\t\t\t{}\n".format(brac(data["radial_coeffs"][j])))
                 j += 1
         f.write(f"alpha_moments_count = {alpha_moments_count}\n")
         f.write(f"alpha_index_basic_count = {alpha_index_basic_count}\n")
@@ -97,5 +90,5 @@ def write_MTP(
         f.write(f"alpha_index_times = {alpha_index_times}\n")
         f.write(f"alpha_scalar_moments = {alpha_scalar_moments}\n")
         f.write(f"alpha_moment_mapping = {alpha_moment_mapping}\n")
-        f.write("species_coeffs = {}\n".format(brac(species_coeffs)))
-        f.write("moment_coeffs = {}\n".format(brac(moment_coeffs)))
+        f.write("species_coeffs = {}\n".format(brac(data["species_coeffs"])))
+        f.write("moment_coeffs = {}\n".format(brac(data["moment_coeffs"])))

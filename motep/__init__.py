@@ -174,22 +174,21 @@ def RMSE(cfg, pot):
 
 def MTP_field(parameters):
     data = read_untrained_MTP(untrained_mtp)
-    species_count = int(data["species_count"])
+    species_count = data["species_count"]
+    rbs = data["radial_basis_size"]
+    asm = data["alpha_scalar_moments"]
 
-    scaling = parameters[0]
-    length_moment = int(data["alpha_scalar_moments"])
-    moment_coeffs = parameters[1 : length_moment + 1]
-    species_coeffs = parameters[length_moment + 1 : length_moment + 1 + species_count]
-    total_radial = parameters[length_moment + 1 + species_count :]
+    data["scaling"] = parameters[0]
+    data["moment_coeffs"] = parameters[1 : asm + 1]
+    data["species_coeffs"] = parameters[asm + 1 : asm + 1 + species_count]
+    total_radial = parameters[asm + 1 + species_count :]
+    data["radial_coeffs"] = np.array(total_radial).reshape(-1, rbs).tolist()
 
-    radial_coeffs = (
-        np.array(total_radial).reshape(-1, int(data["radial_basis_size"])).tolist()
-    )
     # if rank==0:
     file = "Test.mtp"
     # else:
     #    file = "test.mtp"
-    write_MTP(file, scaling, radial_coeffs, species_coeffs, moment_coeffs, data)
+    write_MTP(file, data)
 
     mlip = mlippy.initialize()
     mlip = mlippy.mtp()
