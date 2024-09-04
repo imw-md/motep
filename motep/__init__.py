@@ -216,100 +216,95 @@ def MTP_field(parameters):
     return potential
 
 
-if __name__ == "__main__":
-    # Other imports...
+def main():
+    start_time = time.time()
+    current_directory = os.getcwd()
+    global untrained_mtp
+    global comm
+    global size
+    global rank
+    global cfg_file
 
-    if __name__ == "__main__":
-        start_time = time.time()
-        current_directory = os.getcwd()
-        global untrained_mtp
-        global comm
-        global size
-        global rank
-        global cfg_file
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    cfg_file = current_directory + "/final.cfg"
+    untrained_mtp = current_directory + "/02.mtp"
 
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
-        cfg_file = current_directory + "/final.cfg"
-        untrained_mtp = current_directory + "/02.mtp"
+    # if rank!=0:
+    #    sys.stdout = None
+    Training_set, current_set = configuration_set(cfg_file, species=["H"])
+    Target_energies, Target_forces, Target_stress = target_value(Training_set)
 
-        # if rank!=0:
-        #    sys.stdout = None
-        Training_set, current_set = configuration_set(cfg_file, species=["H"])
-        Target_energies, Target_forces, Target_stress = target_value(Training_set)
+    global_weight = [1, 0.01, 0]
+    configuration_weight = np.ones(len(Training_set))
 
-        global_weight = [1, 0.01, 0]
-        configuration_weight = np.ones(len(Training_set))
+    yaml_data = read_untrained_MTP(untrained_mtp)
+    species_count = int(yaml_data["species_count"])
 
-        yaml_data = read_untrained_MTP(untrained_mtp)
-        species_count = int(yaml_data["species_count"])
+    # Create folders for each rank
+    folder_name = f"rank_{rank}"
+    folder_path = os.path.join(current_directory, folder_name)
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
 
-        # Create folders for each rank
-        folder_name = f"rank_{rank}"
-        folder_path = os.path.join(current_directory, folder_name)
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
+    # Change working directory to the created folder
 
-        # Change working directory to the created folder
+    # Rest of the code...
+    os.chdir(folder_path)
+    #    for i in np.arange(1,100):
 
-        # Rest of the code...
-        os.chdir(folder_path)
-        #    for i in np.arange(1,100):
+    species_pairs = combinations_with_replacement(range(species_count), 2)
+    w_cheb = species_count + int(yaml_data["alpha_scalar_moments"])
+    cheb = (
+        len(list(species_pairs))
+        * int(yaml_data["radial_funcs_count"])
+        * int(yaml_data["radial_basis_size"])
+    )
+    bounds = [(-1000, 1000)] + [(-5, 5)] * w_cheb + [(-0.1, 0.1)] * cheb
 
-        species_pairs = combinations_with_replacement(range(species_count), 2)
-        w_cheb = species_count + int(yaml_data["alpha_scalar_moments"])
-        cheb = (
-            len(list(species_pairs))
-            * int(yaml_data["radial_funcs_count"])
-            * int(yaml_data["radial_basis_size"])
-        )
-        bounds = [(-1000, 1000)] + [(-5, 5)] * w_cheb + [(-0.1, 0.1)] * cheb
+    initial_guess = [1000] + [5] * w_cheb + generate_random_numbers(cheb, -0.1, 0.1, 10)
 
-        initial_guess = (
-            [1000] + [5] * w_cheb + generate_random_numbers(cheb, -0.1, 0.1, 10)
-        )
+    optimized_parameters = optimization_GA(
+        mytarget,
+        initial_guess,
+        bounds,
+        Target_energies,
+        Target_forces,
+        Target_stress,
+        global_weight,
+        configuration_weight,
+        current_set,
+    )
 
-        optimized_parameters = optimization_GA(
-            mytarget,
-            initial_guess,
-            bounds,
-            Target_energies,
-            Target_forces,
-            Target_stress,
-            global_weight,
-            configuration_weight,
-            current_set,
-        )
+    # ==============================================================================================
+    # initial_guess=[-7.54050095e+00,-1.92261361e-04,-1.68294883e+00,7.18632606e-01, -7.05708440e-01,1.23713720e+00,7.27847678e-02,2.29800048e-02,8.02591439e-01,-3.11064787e-01,-1.32991017e-01]
+    initial_guess = optimized_parameters
+    optimized_parameters = optimization_nelder(
+        mytarget,
+        initial_guess,
+        bounds,
+        Target_energies,
+        Target_forces,
+        Target_stress,
+        global_weight,
+        configuration_weight,
+        current_set,
+    )
 
-        # ==============================================================================================
-        # initial_guess=[-7.54050095e+00,-1.92261361e-04,-1.68294883e+00,7.18632606e-01, -7.05708440e-01,1.23713720e+00,7.27847678e-02,2.29800048e-02,8.02591439e-01,-3.11064787e-01,-1.32991017e-01]
-        initial_guess = optimized_parameters
-        optimized_parameters = optimization_nelder(
-            mytarget,
-            initial_guess,
-            bounds,
-            Target_energies,
-            Target_forces,
-            Target_stress,
-            global_weight,
-            configuration_weight,
-            current_set,
-        )
+    # initial_guess=optimized_parameters
 
-        # initial_guess=optimized_parameters
+    # optimized_parameters = optimization_bfgs(mytarget,initial_guess, Target_energies, Target_forces, Target_stress,global_weight, configuration_weight, current_set)
+    # Change back to the original directory after processing
+    # ====================================================================================================
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    # Calculate RMSE
+    # print(optimized_parameters)
+    potential = MTP_field(optimized_parameters)
+    RMSE(cfg_file, "Test.mtp")
 
-        # optimized_parameters = optimization_bfgs(mytarget,initial_guess, Target_energies, Target_forces, Target_stress,global_weight, configuration_weight, current_set)
-        # Change back to the original directory after processing
-        # ====================================================================================================
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        # Calculate RMSE
-        # print(optimized_parameters)
-        potential = MTP_field(optimized_parameters)
-        RMSE(cfg_file, "Test.mtp")
-
-        print("Total time taken:", elapsed_time, "seconds")
-        os.chdir(current_directory)
-        comm.Barrier()
-        MPI.Finalize()
+    print("Total time taken:", elapsed_time, "seconds")
+    os.chdir(current_directory)
+    comm.Barrier()
+    MPI.Finalize()

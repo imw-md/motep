@@ -1,3 +1,24 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "motep"
+version = "0.1.0"
+dependencies = [
+    "mpi4py",
+    "scipy",
+]
+authors = [
+    {name = "Pranav Kumar"},
+]
+
+[project.scripts]
+motep = "motep.__init__:main"
+
+[tool.setuptools]
+packages = ["motep"]
+
 [tool.ruff.lint]
 preview = true  # necessary to activate many pycodestyle rules
 select = [
