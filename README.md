@@ -1,8 +1,8 @@
 # MTP_train
 
-```Installation of mlippy, ikdtools```
+```Installation of mlippy```
 
-contact **Yuji Ikeda** and **Axel forslund**
+contact **Axel forslund**
 
 ## Installation
 
