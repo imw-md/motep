@@ -9,8 +9,9 @@ from mpi4py import MPI
 
 from motep.ga import optimization_GA
 from motep.io.mlip.cfg import read_cfg
+from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.opt import optimization_nelder
-from motep.pot import generate_random_numbers, read_untrained_MTP, write_MTP
+from motep.pot import generate_random_numbers
 
 
 def configuration_set(input_cfg, species=["H"]):
@@ -173,7 +174,7 @@ def RMSE(cfg, pot):
 
 
 def MTP_field(parameters):
-    data = read_untrained_MTP(untrained_mtp)
+    data = read_mtp(untrained_mtp)
     species_count = data["species_count"]
     rbs = data["radial_basis_size"]
     asm = data["alpha_scalar_moments"]
@@ -188,7 +189,7 @@ def MTP_field(parameters):
     file = "Test.mtp"
     # else:
     #    file = "test.mtp"
-    write_MTP(file, data)
+    write_mtp(file, data)
 
     mlip = mlippy.initialize()
     mlip = mlippy.mtp()
@@ -223,7 +224,7 @@ def main():
     global_weight = [1, 0.01, 0]
     configuration_weight = np.ones(len(Training_set))
 
-    yaml_data = read_untrained_MTP(untrained_mtp)
+    yaml_data = read_mtp(untrained_mtp)
     species_count = int(yaml_data["species_count"])
 
     # Create folders for each rank
