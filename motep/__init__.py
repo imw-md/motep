@@ -267,8 +267,6 @@ def main():
         current_set,
     )
 
-    # ==============================================================================================
-    # initial_guess=[-7.54050095e+00,-1.92261361e-04,-1.68294883e+00,7.18632606e-01, -7.05708440e-01,1.23713720e+00,7.27847678e-02,2.29800048e-02,8.02591439e-01,-3.11064787e-01,-1.32991017e-01]
     initial_guess = optimized_parameters
     optimized_parameters = optimization_nelder(
         mytarget,
@@ -282,11 +280,6 @@ def main():
         current_set,
     )
 
-    # initial_guess=optimized_parameters
-
-    # optimized_parameters = optimization_bfgs(mytarget,initial_guess, Target_energies, Target_forces, Target_stress,global_weight, configuration_weight, current_set)
-    # Change back to the original directory after processing
-    # ====================================================================================================
     end_time = time.time()
     elapsed_time = end_time - start_time
     # Calculate RMSE
