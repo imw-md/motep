@@ -8,9 +8,9 @@ import numpy as np
 from ikdtools.io.mlip.cfg import read_cfg
 from mpi4py import MPI
 
-from Moo import optimization_GA
-from opt import optimization_nelder
-from pot import generate_random_numbers, read_untrained_MTP, write_MTP
+from motep.ga import optimization_GA
+from motep.opt import optimization_nelder
+from motep.pot import generate_random_numbers, read_untrained_MTP, write_MTP
 
 
 def configuration_set(input_cfg, species=["H"]):
