@@ -244,18 +244,12 @@ def main():
     current_directory = os.getcwd()
     global untrained_mtp
     global comm
-    global size
-    global rank
-    global cfg_file
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
-    size = comm.Get_size()
     cfg_file = current_directory + "/final.cfg"
     untrained_mtp = current_directory + "/02.mtp"
 
-    # if rank!=0:
-    #    sys.stdout = None
     Training_set, current_set = configuration_set(cfg_file, species=["H"])
     Target_energies, Target_forces, Target_stress = target_value(Training_set)
 
