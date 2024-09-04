@@ -173,38 +173,23 @@ def RMSE(cfg, pot):
 
 
 def MTP_field(parameters):
-    # Assuming read_untrained_MTP, write_MTP, and combinations_with_replacement are defined elsewhere
-    yaml_data = read_untrained_MTP(untrained_mtp)
-    species_count = int(yaml_data["species_count"])
-    max_dist = int(float(yaml_data["max_dist"]))
-    min_dist = int(float(yaml_data["min_dist"]))
+    data = read_untrained_MTP(untrained_mtp)
+    species_count = int(data["species_count"])
 
     scaling = parameters[0]
-    length_moment = int(yaml_data["alpha_scalar_moments"])
+    length_moment = int(data["alpha_scalar_moments"])
     moment_coeffs = parameters[1 : length_moment + 1]
     species_coeffs = parameters[length_moment + 1 : length_moment + 1 + species_count]
     total_radial = parameters[length_moment + 1 + species_count :]
 
-    species_pairs = combinations_with_replacement(range(species_count), 2)
-
     radial_coeffs = (
-        np.array(total_radial).reshape(-1, int(yaml_data["radial_basis_size"])).tolist()
+        np.array(total_radial).reshape(-1, int(data["radial_basis_size"])).tolist()
     )
     # if rank==0:
     file = "Test.mtp"
     # else:
     #    file = "test.mtp"
-    write_MTP(
-        file,
-        species_count,
-        min_dist,
-        max_dist,
-        scaling,
-        radial_coeffs,
-        species_coeffs,
-        moment_coeffs,
-        yaml_data,
-    )
+    write_MTP(file, scaling, radial_coeffs, species_coeffs, moment_coeffs, data)
 
     mlip = mlippy.initialize()
     mlip = mlippy.mtp()
