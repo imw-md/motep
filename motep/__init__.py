@@ -176,25 +176,9 @@ def RMSE(cfg, pot):
 
 def MTP_field(parameters: list[float]):
     data = read_mtp(untrained_mtp)
-    species_count = data["species_count"]
-    rbs = data["radial_basis_size"]
-    asm = data["alpha_scalar_moments"]
+    data = update_mtp(copy.deepcopy(data), parameters)
 
-    data["scaling"] = parameters[0]
-    data["moment_coeffs"] = parameters[1 : asm + 1]
-    data["species_coeffs"] = parameters[asm + 1 : asm + 1 + species_count]
-    total_radial = parameters[asm + 1 + species_count :]
-    shape = species_count, species_count, rbs
-    total_radial = np.array(total_radial).reshape(shape).tolist()
-    data["radial_coeffs"] = {}
-    for k0 in range(species_count):
-        for k1 in range(species_count):
-            data["radial_coeffs"][k0, k1] = [total_radial[k0][k1]]
-
-    # if rank==0:
     file = "Test.mtp"
-    # else:
-    #    file = "test.mtp"
     write_mtp(file, data)
 
     mlip = mlippy.initialize()
@@ -237,6 +221,42 @@ def init_parameters(
     parameters = [1000] + [5] * w_cheb + generate_random_numbers(cheb, -0.1, 0.1, seed)
     bounds = [(-1000, 1000)] + [(-5, 5)] * w_cheb + [(-0.1, 0.1)] * cheb
     return parameters, bounds
+
+
+def update_mtp(
+    data: dict[str, Any],
+    parameters: list[float],
+) -> dict[str, Any]:
+    """Update data in the .mtp file.
+
+    Parameters
+    ----------
+    data : dict[str, Any]
+        Data in the .mtp file.
+    parameters : list[float]
+        MTP parameters.
+
+    Returns
+    -------
+    data : dict[str, Any]
+        Updated data in the .mtp file.
+
+    """
+    species_count = data["species_count"]
+    rbs = data["radial_basis_size"]
+    asm = data["alpha_scalar_moments"]
+
+    data["scaling"] = parameters[0]
+    data["moment_coeffs"] = parameters[1 : asm + 1]
+    data["species_coeffs"] = parameters[asm + 1 : asm + 1 + species_count]
+    total_radial = parameters[asm + 1 + species_count :]
+    shape = species_count, species_count, rbs
+    total_radial = np.array(total_radial).reshape(shape).tolist()
+    data["radial_coeffs"] = {}
+    for k0 in range(species_count):
+        for k1 in range(species_count):
+            data["radial_coeffs"][k0, k1] = [total_radial[k0][k1]]
+    return data
 
 
 def main():
