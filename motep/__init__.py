@@ -1,7 +1,7 @@
 import copy
 import os
 import time
-from itertools import combinations_with_replacement
+from itertools import product
 
 import mlippy
 import numpy as np
@@ -9,8 +9,9 @@ from mpi4py import MPI
 
 from motep.ga import optimization_GA
 from motep.io.mlip.cfg import read_cfg
+from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.opt import optimization_nelder
-from motep.pot import generate_random_numbers, read_untrained_MTP, write_MTP
+from motep.pot import generate_random_numbers
 
 
 def configuration_set(input_cfg, species=["H"]):
@@ -172,39 +173,28 @@ def RMSE(cfg, pot):
     return errors
 
 
-def MTP_field(parameters):
-    # Assuming read_untrained_MTP, write_MTP, and combinations_with_replacement are defined elsewhere
-    yaml_data = read_untrained_MTP(untrained_mtp)
-    species_count = int(yaml_data["species_count"])
-    max_dist = int(float(yaml_data["max_dist"]))
-    min_dist = int(float(yaml_data["min_dist"]))
+def MTP_field(parameters: list[float]):
+    data = read_mtp(untrained_mtp)
+    species_count = data["species_count"]
+    rbs = data["radial_basis_size"]
+    asm = data["alpha_scalar_moments"]
 
-    scaling = parameters[0]
-    length_moment = int(yaml_data["alpha_scalar_moments"])
-    moment_coeffs = parameters[1 : length_moment + 1]
-    species_coeffs = parameters[length_moment + 1 : length_moment + 1 + species_count]
-    total_radial = parameters[length_moment + 1 + species_count :]
+    data["scaling"] = parameters[0]
+    data["moment_coeffs"] = parameters[1 : asm + 1]
+    data["species_coeffs"] = parameters[asm + 1 : asm + 1 + species_count]
+    total_radial = parameters[asm + 1 + species_count :]
+    shape = species_count, species_count, rbs
+    total_radial = np.array(total_radial).reshape(shape).tolist()
+    data["radial_coeffs"] = {}
+    for k0 in range(species_count):
+        for k1 in range(species_count):
+            data["radial_coeffs"][k0, k1] = [total_radial[k0][k1]]
 
-    species_pairs = combinations_with_replacement(range(species_count), 2)
-
-    radial_coeffs = (
-        np.array(total_radial).reshape(-1, int(yaml_data["radial_basis_size"])).tolist()
-    )
     # if rank==0:
     file = "Test.mtp"
     # else:
     #    file = "test.mtp"
-    write_MTP(
-        file,
-        species_count,
-        min_dist,
-        max_dist,
-        scaling,
-        radial_coeffs,
-        species_coeffs,
-        moment_coeffs,
-        yaml_data,
-    )
+    write_mtp(file, data)
 
     mlip = mlippy.initialize()
     mlip = mlippy.mtp()
@@ -239,7 +229,7 @@ def main():
     global_weight = [1, 0.01, 0]
     configuration_weight = np.ones(len(Training_set))
 
-    yaml_data = read_untrained_MTP(untrained_mtp)
+    yaml_data = read_mtp(untrained_mtp)
     species_count = int(yaml_data["species_count"])
 
     # Create folders for each rank
@@ -254,7 +244,7 @@ def main():
     os.chdir(folder_path)
     #    for i in np.arange(1,100):
 
-    species_pairs = combinations_with_replacement(range(species_count), 2)
+    species_pairs = product(range(species_count), repeat=2)
     w_cheb = species_count + int(yaml_data["alpha_scalar_moments"])
     cheb = (
         len(list(species_pairs))
