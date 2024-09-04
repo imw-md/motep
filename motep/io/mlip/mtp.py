@@ -1,5 +1,7 @@
 from typing import Any, TextIO
 
+import numpy as np
+
 
 def _parse_radial_coeffs(
     file: TextIO,
@@ -48,56 +50,67 @@ def read_mtp(file_path) -> dict[str, Any]:
     return data
 
 
+def _format_value(value: float | int | list | str) -> str:
+    if isinstance(value, float):
+        return f"{value:21.15e}"
+    if isinstance(value, int):
+        return f"{value:d}"
+    if isinstance(value, list):
+        return _format_list(value)
+    if isinstance(value, np.ndarray):
+        return _format_list(value.tolist())
+    return value.strip()
+
+
 def _format_list(value: list) -> str:
     if len(value) == 0:
         return "{}"
-    if isinstance(value[0], float):
-        return "{" + ", ".join(f"{_:21.15e}" for _ in value) + "}"
-    if isinstance(value[0], int):
-        return "{" + ", ".join(f"{_:d}" for _ in value) + "}"
     if isinstance(value[0], list):
         return "{" + ", ".join(_format_list(_) for _ in value) + "}"
+    return "{" + ", ".join(f"{_format_value(_)}" for _ in value) + "}"
 
 
 def write_mtp(file, data: dict[str, Any]) -> None:
-    version = data["version"]
-    potential_name = data["potential_name"]
-    species_count = data["species_count"]
-    potential_tag = ""
-    radial_basis_type = data["radial_basis_type"]
-    radial_basis_size = data["radial_basis_size"]
-    radial_funcs_count = data["radial_funcs_count"]
-    alpha_moments_count = data["alpha_moments_count"]
-    alpha_index_basic_count = data["alpha_index_basic_count"]
-    alpha_index_basic = data["alpha_index_basic"]
-    alpha_index_times_count = data["alpha_index_times_count"]
-    alpha_index_times = data["alpha_index_times"]
-    alpha_scalar_moments = data["alpha_scalar_moments"]
-    alpha_moment_mapping = data["alpha_moment_mapping"]
+    keys0 = [
+        "version",
+        "potential_name",
+        "scaling",
+        "species_count",
+        "potential_tag",
+        "radial_basis_type",
+    ]
+    keys1 = [
+        "min_dist",
+        "max_dist",
+        "radial_basis_size",
+        "radial_funcs_count",
+    ]
+    keys2 = [
+        "alpha_moments_count",
+        "alpha_index_basic_count",
+        "alpha_index_basic",
+        "alpha_index_times_count",
+        "alpha_index_times",
+        "alpha_scalar_moments",
+        "alpha_moment_mapping",
+        "species_coeffs",
+        "moment_coeffs",
+    ]
 
-    with open(file, "w", encoding="utf-8") as f:
-        f.write("MTP\n")
-        f.write(f"version = {version}\n")
-        f.write(f"potential_name = {potential_name}\n")
-        f.write(f"scaling = {data['scaling']:21.15e}\n")
-        f.write(f"species_count = {species_count:d}\n")
-        f.write(f"potential_tag = {potential_tag}\n")
-        f.write(f"radial_basis_type = {radial_basis_type}\n")
-        f.write(f"\tmin_dist = {data['min_dist']:21.15e}\n")
-        f.write(f"\tmax_dist = {data['max_dist']:21.15e}\n")
-        f.write(f"\tradial_basis_size = {radial_basis_size:d}\n")
-        f.write(f"\tradial_funcs_count = {radial_funcs_count:d}\n")
-        f.write("\tradial_coeffs\n")
-        for key, value in data["radial_coeffs"].items():
-            f.write(f"\t\t{key[0]}-{key[1]}\n")
-            for _ in range(int(radial_funcs_count)):
-                f.write(f"\t\t\t{_format_list(value[_])}\n")
-        f.write(f"alpha_moments_count = {alpha_moments_count}\n")
-        f.write(f"alpha_index_basic_count = {alpha_index_basic_count}\n")
-        f.write(f"alpha_index_basic = {_format_list(alpha_index_basic)}\n")
-        f.write(f"alpha_index_times_count = {alpha_index_times_count}\n")
-        f.write(f"alpha_index_times = {_format_list(alpha_index_times)}\n")
-        f.write(f"alpha_scalar_moments = {alpha_scalar_moments}\n")
-        f.write(f"alpha_moment_mapping = {_format_list(alpha_moment_mapping)}\n")
-        f.write("species_coeffs = {}\n".format(_format_list(data["species_coeffs"])))
-        f.write("moment_coeffs = {}\n".format(_format_list(data["moment_coeffs"])))
+    with open(file, "w", encoding="utf-8") as fd:
+        fd.write("MTP\n")
+        for key in keys0:
+            if key in data:
+                fd.write(f"{key} = {_format_value(data[key])}\n")
+        for key in keys1:
+            if key in data:
+                fd.write(f"\t{key} = {_format_value(data[key])}\n")
+        if "radial_coeffs" in data:
+            fd.write("\tradial_coeffs\n")
+            for key, value in data["radial_coeffs"].items():
+                fd.write(f"\t\t{key[0]}-{key[1]}\n")
+                for _ in range(data["radial_funcs_count"]):
+                    fd.write(f"\t\t\t{_format_list(value[_])}\n")
+        for key in keys2:
+            if key in data:
+                fd.write(f"{key} = {_format_value(data[key])}\n")

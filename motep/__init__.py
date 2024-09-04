@@ -173,7 +173,7 @@ def RMSE(cfg, pot):
     return errors
 
 
-def MTP_field(parameters):
+def MTP_field(parameters: list[float]):
     data = read_mtp(untrained_mtp)
     species_count = data["species_count"]
     rbs = data["radial_basis_size"]
