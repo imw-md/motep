@@ -1,4 +1,3 @@
-from itertools import combinations_with_replacement
 from typing import Any, TextIO
 
 
@@ -89,13 +88,10 @@ def write_mtp(file, data: dict[str, Any]) -> None:
         f.write(f"\tradial_basis_size = {radial_basis_size:d}\n")
         f.write(f"\tradial_funcs_count = {radial_funcs_count:d}\n")
         f.write("\tradial_coeffs\n")
-        species_pairs = combinations_with_replacement(range(species_count), 2)
-        j = 0
-        for pair in species_pairs:
-            f.write(f"\t\t{pair[0]}-{pair[1]}\n")
+        for key, value in data["radial_coeffs"].items():
+            f.write(f"\t\t{key[0]}-{key[1]}\n")
             for _ in range(int(radial_funcs_count)):
-                f.write("\t\t\t{}\n".format(_format_list(data["radial_coeffs"][j])))
-                j += 1
+                f.write(f"\t\t\t{_format_list(value[_])}\n")
         f.write(f"alpha_moments_count = {alpha_moments_count}\n")
         f.write(f"alpha_index_basic_count = {alpha_index_basic_count}\n")
         f.write(f"alpha_index_basic = {_format_list(alpha_index_basic)}\n")

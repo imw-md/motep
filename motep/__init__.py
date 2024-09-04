@@ -1,7 +1,7 @@
 import copy
 import os
 import time
-from itertools import combinations_with_replacement
+from itertools import product
 
 import mlippy
 import numpy as np
@@ -183,7 +183,12 @@ def MTP_field(parameters):
     data["moment_coeffs"] = parameters[1 : asm + 1]
     data["species_coeffs"] = parameters[asm + 1 : asm + 1 + species_count]
     total_radial = parameters[asm + 1 + species_count :]
-    data["radial_coeffs"] = np.array(total_radial).reshape(-1, rbs).tolist()
+    shape = species_count, species_count, rbs
+    total_radial = np.array(total_radial).reshape(shape).tolist()
+    data["radial_coeffs"] = {}
+    for k0 in range(species_count):
+        for k1 in range(species_count):
+            data["radial_coeffs"][k0, k1] = [total_radial[k0][k1]]
 
     # if rank==0:
     file = "Test.mtp"
@@ -239,7 +244,7 @@ def main():
     os.chdir(folder_path)
     #    for i in np.arange(1,100):
 
-    species_pairs = combinations_with_replacement(range(species_count), 2)
+    species_pairs = product(range(species_count), repeat=2)
     w_cheb = species_count + int(yaml_data["alpha_scalar_moments"])
     cheb = (
         len(list(species_pairs))
