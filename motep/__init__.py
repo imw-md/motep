@@ -2,6 +2,7 @@ import copy
 import os
 import time
 from itertools import product
+from typing import Any
 
 import mlippy
 import numpy as np
@@ -206,6 +207,38 @@ def MTP_field(parameters: list[float]):
     return potential
 
 
+def init_parameters(
+    data: dict[str, Any],
+) -> tuple[list[float], list[tuple[float, float]]]:
+    """Initialize MTP parameters.
+
+    Parameters
+    ----------
+    data : dict[str, Any]
+        Data in the .mtp file.
+
+    Returns
+    -------
+    parameters : list[float]
+        Initial parameters.
+    bounds : list[tuple[float, float]]
+        Bounds of the parameters.
+
+    """
+    species_count = data["species_count"]
+    species_pairs = product(range(species_count), repeat=2)
+    w_cheb = species_count + int(data["alpha_scalar_moments"])
+    cheb = (
+        len(list(species_pairs))
+        * int(data["radial_funcs_count"])
+        * int(data["radial_basis_size"])
+    )
+    seed = 10
+    parameters = [1000] + [5] * w_cheb + generate_random_numbers(cheb, -0.1, 0.1, seed)
+    bounds = [(-1000, 1000)] + [(-5, 5)] * w_cheb + [(-0.1, 0.1)] * cheb
+    return parameters, bounds
+
+
 def main():
     start_time = time.time()
     current_directory = os.getcwd()
@@ -229,9 +262,6 @@ def main():
     global_weight = [1, 0.01, 0]
     configuration_weight = np.ones(len(Training_set))
 
-    yaml_data = read_mtp(untrained_mtp)
-    species_count = int(yaml_data["species_count"])
-
     # Create folders for each rank
     folder_name = f"rank_{rank}"
     folder_path = os.path.join(current_directory, folder_name)
@@ -244,16 +274,7 @@ def main():
     os.chdir(folder_path)
     #    for i in np.arange(1,100):
 
-    species_pairs = product(range(species_count), repeat=2)
-    w_cheb = species_count + int(yaml_data["alpha_scalar_moments"])
-    cheb = (
-        len(list(species_pairs))
-        * int(yaml_data["radial_funcs_count"])
-        * int(yaml_data["radial_basis_size"])
-    )
-    bounds = [(-1000, 1000)] + [(-5, 5)] * w_cheb + [(-0.1, 0.1)] * cheb
-
-    initial_guess = [1000] + [5] * w_cheb + generate_random_numbers(cheb, -0.1, 0.1, 10)
+    initial_guess, bounds = init_parameters(read_mtp(untrained_mtp))
 
     optimized_parameters = optimization_GA(
         mytarget,
