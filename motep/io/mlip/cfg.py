@@ -1,0 +1,262 @@
+"""Module for MTP formats"""
+
+from typing import Dict, List, Optional, TextIO, Union
+
+import numpy as np
+from ase import Atoms
+from ase.calculators.lammps import convert
+from ase.calculators.singlepoint import SinglePointCalculator
+from ase.data import atomic_masses, chemical_symbols
+
+
+def read_cfg(
+    filename: str,
+    index: int = -1,
+    species: Optional[List[str]] = None,
+) -> Union[Atoms, List[Atoms]]:
+    """Read images from a MTP .cfg file
+
+    Parameters
+    ----------
+    species : dict[int, str] | list[str], optional
+        List that defines types of chemical symbols (e.g, ['Pd', 'H'] means Pd
+        is type 0 and H type 1), by default None. If None, dummy symbols 'X',
+        'H', 'He', etc. are assigned for type 0, 1, 2, etc.
+    """
+    atoms_list = []
+    with open(filename, "r", encoding="utf-8") as file:
+        for line in file:
+            if line.startswith("BEGIN_CFG"):
+                atoms = _read_image(file, species)
+                atoms_list.append(atoms)
+    if index == ":":
+        return atoms_list
+    else:
+        return atoms_list[index]
+
+
+def _read_image(file: TextIO, species: List[str]) -> Atoms:
+    keys_c = ["cartes_x", "cartes_y", "cartes_z"]
+    keys_d = ["direct_x", "direct_y", "direct_z"]
+    cell = None
+    stress = None
+    results = {}
+    for line in file:
+        if line.startswith("END_CFG"):
+            break
+        if line.split()[0] == "Size":
+            size = int(next(file).split()[0])
+        elif line.split()[0] in ["Supercell", "SuperCell"]:
+            cell = [[float(_) for _ in next(file).split()] for _ in range(3)]
+        elif line.split()[0] in ["AtomData:", "Atomic_data:"]:
+            atomdata = {_: [] for _ in line.split()[1:]}
+            for _ in range(size):
+                line = next(file)
+                for key, value in zip(atomdata, line.split(), strict=True):
+                    value = int(value) if value.isdigit() else float(value)
+                    atomdata[key].append(value)
+        elif line.split()[0] == "Energy":
+            energy = float(next(file).split()[0])
+            for k in ["energy", "free_energy"]:
+                results[k] = energy
+        elif line.split()[0] == "PlusStress:":
+            keys = line.split()[1:]
+            stress = [float(value) for value in next(file).split()]
+            stress = dict(zip(keys, stress), strict=True)
+        elif line.split()[0] == "Feature" and line.split()[1] == "MV_grade":
+            results["MV_grade"] = float(line.split()[2])
+
+    if species is None:
+        symbols = None
+        numbers = atomdata["type"]
+    else:
+        symbols = [species[_] for _ in atomdata["type"]]
+        numbers = None
+
+    if all((_ in atomdata) for _ in keys_c):
+        positions = list(zip(*[atomdata[_] for _ in keys_c], strict=True))
+        atoms = Atoms(
+            symbols=symbols,
+            numbers=numbers,
+            positions=positions,
+            cell=cell,
+            pbc=True,
+        )
+    elif all((_ in atomdata) for _ in keys_d):
+        positions = list(zip(*[atomdata[_] for _ in keys_d], strict=True))
+        atoms = Atoms(
+            symbols=symbols,
+            numbers=numbers,
+            scaled_positions=positions,
+            cell=cell,
+            pbc=True,
+        )
+    else:
+        raise ValueError
+
+    atoms.calc = SinglePointCalculator(atoms)
+    atoms.calc.results.update(results)
+    if "fx" in atomdata:
+        _set_forces(atoms, atomdata)
+    if cell is not None and stress is not None:
+        _set_stress(atoms, stress)
+    return atoms
+
+
+def _set_forces(atoms: Atoms, atomdata: dict):
+    keys_forces = ["fx", "fy", "fz"]
+    forces = list(zip(*[atomdata[_] for _ in keys_forces], strict=True))
+    atoms.calc.results["forces"] = np.array(forces)
+
+
+def _set_stress(atoms: Atoms, stress):
+    voigt_order = ["xx", "yy", "zz", "yz", "xz", "xy"]
+    stress = np.array([stress[_] for _ in voigt_order])
+    atoms.calc.results["stress"] = -stress / atoms.get_volume()
+
+
+def write_cfg(
+    filename: str,
+    images: Union[Atoms, List[Atoms]],
+    species: Union[Dict[str, int], List[str]] = None,
+    key_energy: str = "free_energy",
+    verbose=False,
+):
+    """Write images into the MTP .cfg format
+
+    Parameters
+    ----------
+    filename : str
+        _description_
+    images : Atoms | list[Atoms]
+        _description_
+    species : dict[str, int] | list[str], optional
+        List that defines types of chemical symbols (e.g, ['Pd', 'H'] means Pd
+        is type 0 and H type 1), by default None. If None, this list is built
+        by assigning each distinct species to an integer in the order of
+        appearance in `images`.
+    key_energy : str, default="free_energy"
+        Key for the energy (either "free_energy" or "energy") to be printed.
+    verbose : bool, optional
+        _description_, by default False
+    """
+    if isinstance(images, Atoms):
+        images = [images]
+
+    if species is None:
+        species = _get_spiecies(images)
+    elif isinstance(species, list):
+        species = {s: i for i, s in enumerate(species)}
+    else:
+        assert isinstance(species, dict)
+    if verbose:
+        print(species)
+
+    # with open("parm.lammps", "w", encoding="utf-8") as file:
+    #     _write_parameters(file, species)
+
+    if isinstance(images, Atoms):
+        images = [images]
+
+    with open(filename, "w", encoding="utf-8") as file:
+        for atoms in images:
+            _write_image(file, atoms, species, key_energy)
+
+
+def _get_spiecies(images: List[Atoms]) -> Dict[str, int]:
+    symbols = []
+    for atoms in images:
+        symbols.extend(atoms.get_chemical_symbols())
+    _ = sorted(set(symbols), key=symbols.index)
+    return {s: i for i, s in enumerate(_)}
+
+
+def _write_image(
+    file: TextIO,
+    atoms: Atoms,
+    types: Dict[str, int],
+    key_energy: str,
+):
+    if not hasattr(atoms, "calc") or atoms.calc is None:
+        atoms.calc = SinglePointCalculator(atoms)  # dummy calculator
+
+    file.write("BEGIN_CFG\n")
+    file.write(" Size\n")
+    file.write(f"{len(atoms):6d}\n")
+
+    if all(atoms.pbc):
+        _write_supercell(file, atoms)
+
+    _write_atom_data(file, atoms, types)
+
+    if key_energy in atoms.calc.results:
+        energy = atoms.calc.get_property(key_energy)
+        file.write(" Energy\n")
+        file.write(f"{energy:24.12f}\n")
+
+    if "stress" in atoms.calc.results:
+        _write_stress(file, atoms)
+
+    file.write(" Feature   EFS_by\tVASP\n")
+    file.write("END_CFG\n")
+    file.write("\n")
+
+
+def _write_supercell(file: TextIO, atoms: Atoms):
+    file.write(" Supercell\n")
+    for vector in atoms.cell:
+        file.write("   ")
+        for _ in vector:
+            file.write(f"{_:14.6f}")
+        file.write("\n")
+
+
+def _write_atom_data(file: TextIO, atoms: Atoms, types: Dict[str, int]):
+    line = " AtomData:  id type "
+    file.write(line)
+    for _ in "cartes_x cartes_y cartes_z".split():
+        file.write(f"{_:>14s}")
+    if "forces" in atoms.calc.results:
+        file.write(" ")
+        for _ in "fx fy fz".split():
+            file.write(f"{_:>12s}")
+    file.write("\n")
+    symbols = atoms.get_chemical_symbols()
+    positions = atoms.get_positions()
+    if "forces" in atoms.calc.results:
+        forces = atoms.calc.results["forces"]
+    for i, symbol in enumerate(symbols):
+        file.write(f"{i + 1:14d}")
+        file.write(f"{types[symbol]:5d}")
+        file.write(" ")
+        for j in range(3):
+            file.write(f"{positions[i, j]:14.6f}")
+        if "forces" in atoms.calc.results:
+            file.write(" ")
+            for j in range(3):
+                file.write(f"{forces[i, j]:12.6f}")
+        file.write("\n")
+
+
+def _write_stress(file: TextIO, atoms: Atoms):
+    line = ""
+    for _ in ["xx", "yy", "zz", "yz", "xz", "xy"]:
+        line += f"{_:>12s}"
+    line = f" PlusStress:{line[8:]}\n"
+    file.write(line)
+    file.write("    ")
+    for _ in atoms.get_stress():
+        _ *= -1.0 * atoms.get_volume()
+        file.write(f"{_:12.5f}")
+    file.write("\n")
+
+
+def _write_parameters(file: TextIO, species: Dict[str, int]):
+    file.write("# Masses\n\n")
+    units = "metal"  # g/mol
+    for s, i in species.items():
+        atomic_number = chemical_symbols.index(s)
+        mass = atomic_masses[atomic_number]
+        mass = convert(mass, "mass", "ASE", units)
+        atom_type = i + 1
+        file.write(f"mass {atom_type:>6} {mass:23.17g} # {s}\n")
