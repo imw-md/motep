@@ -17,12 +17,6 @@ from motep.pot import generate_random_numbers
 from motep.utils import cd
 
 
-def configuration_set(input_cfg, species=["H"]):
-    Training_set = read_cfg(input_cfg, ":", species)
-    current_set = copy.deepcopy(Training_set)
-    return Training_set, current_set
-
-
 def fetch_target_values(
     images: list[Atoms],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -275,11 +269,11 @@ def main():
     cfg_file = current_directory + "/final.cfg"
     untrained_mtp = current_directory + "/02.mtp"
 
-    Training_set, current_set = configuration_set(cfg_file, species=["H"])
-    target_energies, target_forces, target_stress = fetch_target_values(Training_set)
+    images = read_cfg(cfg_file, index=":", species=["H"])  # training set
+    target_energies, target_forces, target_stress = fetch_target_values(images)
 
     global_weight = [1, 0.01, 0]
-    configuration_weight = np.ones(len(Training_set))
+    configuration_weight = np.ones(len(images))
 
     fitness = Fitness(
         target_energies,
@@ -287,7 +281,7 @@ def main():
         target_stress,
         global_weight,
         configuration_weight,
-        current_set,
+        images,
     )
 
     parameters, bounds = init_parameters(read_mtp(untrained_mtp))
