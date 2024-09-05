@@ -154,11 +154,12 @@ class Fitness:
 #    print("RMSE stress (GPa):", RMSE_force*0.1)
 
 
-def RMSE(cfg, pot):
+def calc_rmse(cfg, file: str):
+    """Calculate RMSEs."""
     ts = mlippy.ase_loadcfgs(cfg)
     mlip = mlippy.initialize()
     mlip = mlippy.mtp()
-    mlip.load_potential("Test.mtp")
+    mlip.load_potential(file)
     opts = {}
     mlip.add_atomic_type(1)
     potential = mlippy.MLIP_Calculator(mlip, opts)
@@ -299,7 +300,7 @@ def main():
         parameters = optimization_GA(fitness, paramters, bounds)
         parameters = optimization_nelder(fitness, paramters, bounds)
         MTP_field(parameters)
-        RMSE(cfg_file, "Test.mtp")
+        calc_rmse(cfg_file, "Test.mtp")
 
     end_time = time.time()
     print("Total time taken:", end_time - start_time, "seconds")
