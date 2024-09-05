@@ -6,6 +6,7 @@ from typing import Any
 
 import mlippy
 import numpy as np
+from ase import Atoms
 from mpi4py import MPI
 
 from motep.ga import optimization_GA
@@ -22,12 +23,14 @@ def configuration_set(input_cfg, species=["H"]):
     return Training_set, current_set
 
 
-def target_value(Training_set):
-    # Extract energies and forces from the training set
-    Target_energies = [atom.calc.results["free_energy"] for atom in Training_set]
-    Target_forces = [atom.calc.results["forces"] for atom in Training_set]
-    Target_stress = [atom.calc.results["stress"] for atom in Training_set]
-    return np.array(Target_energies), np.array(Target_forces), np.array(Target_stress)
+def fetch_target_values(
+    images: list[Atoms],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Fetch energies, forces, and stresses from the training dataset."""
+    energies = [atoms.calc.results["free_energy"] for atoms in images]
+    forces = [atom.calc.results["forces"] for atom in images]
+    stresses = [atom.calc.results["stress"] for atom in images]
+    return np.array(energies), np.array(forces), np.array(stresses)
 
 
 def calculate_energy_force_stress(atom, potential):
@@ -273,7 +276,7 @@ def main():
     untrained_mtp = current_directory + "/02.mtp"
 
     Training_set, current_set = configuration_set(cfg_file, species=["H"])
-    target_energies, target_forces, target_stress = target_value(Training_set)
+    target_energies, target_forces, target_stress = fetch_target_values(Training_set)
 
     global_weight = [1, 0.01, 0]
     configuration_weight = np.ones(len(Training_set))
@@ -287,7 +290,7 @@ def main():
         current_set,
     )
 
-    paramters, bounds = init_parameters(read_mtp(untrained_mtp))
+    parameters, bounds = init_parameters(read_mtp(untrained_mtp))
 
     # Create folders for each rank
     folder_name = f"rank_{rank}"
@@ -297,8 +300,8 @@ def main():
 
     # Change working directory to the created folder
     with cd(folder_path):
-        parameters = optimization_GA(fitness, paramters, bounds)
-        parameters = optimization_nelder(fitness, paramters, bounds)
+        parameters = optimization_GA(fitness, parameters, bounds)
+        parameters = optimization_nelder(fitness, parameters, bounds)
         MTP_field(parameters)
         calc_rmse(cfg_file, "Test.mtp")
 
