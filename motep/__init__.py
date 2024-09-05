@@ -13,6 +13,7 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.opt import optimization_nelder
 from motep.pot import generate_random_numbers
+from motep.utils import cd
 
 
 def configuration_set(input_cfg, species=["H"]):
@@ -285,6 +286,8 @@ def main():
         current_set,
     )
 
+    paramters, bounds = init_parameters(read_mtp(untrained_mtp))
+
     # Create folders for each rank
     folder_name = f"rank_{rank}"
     folder_path = os.path.join(current_directory, folder_name)
@@ -292,26 +295,14 @@ def main():
         os.makedirs(folder_path)
 
     # Change working directory to the created folder
-
-    # Rest of the code...
-    os.chdir(folder_path)
-    #    for i in np.arange(1,100):
-
-    initial_guess, bounds = init_parameters(read_mtp(untrained_mtp))
-
-    optimized_parameters = optimization_GA(fitness, initial_guess, bounds)
-
-    initial_guess = optimized_parameters
-    optimized_parameters = optimization_nelder(fitness, initial_guess, bounds)
+    with cd(folder_path):
+        parameters = optimization_GA(fitness, paramters, bounds)
+        parameters = optimization_nelder(fitness, paramters, bounds)
+        MTP_field(parameters)
+        RMSE(cfg_file, "Test.mtp")
 
     end_time = time.time()
-    elapsed_time = end_time - start_time
-    # Calculate RMSE
-    # print(optimized_parameters)
-    potential = MTP_field(optimized_parameters)
-    RMSE(cfg_file, "Test.mtp")
+    print("Total time taken:", end_time - start_time, "seconds")
 
-    print("Total time taken:", elapsed_time, "seconds")
-    os.chdir(current_directory)
     comm.Barrier()
     MPI.Finalize()
