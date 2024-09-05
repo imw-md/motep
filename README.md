@@ -12,14 +12,28 @@ pip install git+https://github.tik.uni-stuttgart.de/ac144228/MTP_train.git
 
 ## Usage
 
+### `motep train`
+
 ```
-motep
+motep train motep.toml
 ```
 
 or
 
 ```
-mpirun -np 4 motep
+mpirun -np 4 motep train motep.toml
+```
+
+where the setting file `motep.toml` is like
+
+```
+configurations = 'training.cfg'
+potential_initial = 'initial.mtp'
+potential_final = 'final.mtp'
+energy-weight = 1.0
+force-weight = 0.01
+stress-weight = 0.0
+steps = ['GA', 'Nelder-Mead']
 ```
 
 ## Big Question ?
