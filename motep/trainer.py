@@ -106,23 +106,22 @@ def current_value(images: list[Atoms], potential):
 
 
 class Fitness:
-    """Class for evaluating fitness."""
+    """Class for evaluating fitness.
 
-    def __init__(
-        self,
-        target_energies,
-        target_forces,
-        target_stress,
-        configuration_weight,
-        images: list[Atoms],
-        setting: dict[str, Any],
-    ):
-        self.target_energies = target_energies
-        self.target_forces = target_forces
-        self.target_stress = target_stress
-        self.configuration_weight = configuration_weight
-        self.images = images
+    Parameters
+    ----------
+    cfg_file : str
+        filename containing the training dataset.
+
+    """
+
+    def __init__(self, cfg_file: str, setting: dict[str, Any]):
+        self.images = read_cfg(cfg_file, index=":", species=["H"])
         self.setting = setting
+        self.target_energies, self.target_forces, self.target_stress = (
+            fetch_target_values(self.images)
+        )
+        self.configuration_weight = np.ones(len(self.images))
 
     def __call__(self, parameters):
         potential = MTP_field(self.setting["potential_final"], parameters)
@@ -300,19 +299,7 @@ def run(args: argparse.Namespace) -> None:
     cfg_file = str(pathlib.Path(setting["configurations"]).resolve())
     untrained_mtp = str(pathlib.Path(setting["potential_initial"]).resolve())
 
-    images = read_cfg(cfg_file, index=":", species=["H"])  # training set
-    target_energies, target_forces, target_stress = fetch_target_values(images)
-
-    configuration_weight = np.ones(len(images))
-
-    fitness = Fitness(
-        target_energies,
-        target_forces,
-        target_stress,
-        configuration_weight,
-        images,
-        setting,
-    )
+    fitness = Fitness(cfg_file, setting)
 
     parameters, bounds = init_parameters(read_mtp(untrained_mtp))
 
