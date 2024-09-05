@@ -2,8 +2,9 @@
 
 import argparse
 import copy
-import os
+import pathlib
 import time
+import tomllib
 from itertools import product
 from typing import Any
 
@@ -15,9 +16,28 @@ from mpi4py import MPI
 from motep.ga import optimization_GA
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
-from motep.opt import optimization_nelder
+from motep.opt import optimization_bfgs, optimization_nelder
 from motep.pot import generate_random_numbers
 from motep.utils import cd
+
+
+def make_default_setting() -> dict[str, Any]:
+    """Make default setting."""
+    return {
+        "configurations": "training.cfg",
+        "potential_initial": "initial.mtp",
+        "potential_final": "final.mtp",
+        "energy-weight": 1.0,
+        "force-weight": 0.01,
+        "stress-weight": 0.0,
+        "steps": ["GA", "Nelder-Mead"],
+    }
+
+
+def parse_setting(filename: str) -> dict:
+    """Parse setting file."""
+    with pathlib.Path(filename).open("rb") as f:
+        return tomllib.load(f)
 
 
 def fetch_target_values(
@@ -25,21 +45,21 @@ def fetch_target_values(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Fetch energies, forces, and stresses from the training dataset."""
     energies = [atoms.calc.results["free_energy"] for atoms in images]
-    forces = [atom.calc.results["forces"] for atom in images]
-    stresses = [atom.calc.results["stress"] for atom in images]
+    forces = [atoms.calc.results["forces"] for atoms in images]
+    stresses = [atoms.calc.results["stress"] for atoms in images]
     return np.array(energies), np.array(forces), np.array(stresses)
 
 
-def calculate_energy_force_stress(atom, potential):
-    atom.calc = potential
-    energy = atom.get_potential_energy()
-    force = atom.get_forces()
-    stress = atom.get_stress()  # stress property not implemented in morse
+def calculate_energy_force_stress(atoms: Atoms, potential):
+    atoms.calc = potential
+    energy = atoms.get_potential_energy()
+    force = atoms.get_forces()
+    stress = atoms.get_stress()  # stress property not implemented in morse
     # stress = [0, 0, 0, 0, 0, 0]  # workaround
     return energy, force, stress
 
 
-def current_value(current_set, potential):
+def current_value(images: list[Atoms], potential):
     rank = comm.Get_rank()
     size = comm.Get_size()
     # Initialize lists to store energies, forces, and stresses
@@ -47,17 +67,15 @@ def current_value(current_set, potential):
     current_forces = []
     current_stress = []
 
-    if isinstance(current_set, list):
-        atoms = current_set
-    else:
-        atoms = [current_set]
+    if not isinstance(images, list):
+        images = [images]
 
     # Determine the chunk of atoms to process for each MPI process
-    chunk_size = len(atoms) // size
-    remainder = len(atoms) % size
+    chunk_size = len(images) // size
+    remainder = len(images) % size
     start_idx = rank * chunk_size
     end_idx = (rank + 1) * chunk_size + (remainder if rank == size - 1 else 0)
-    local_atoms = atoms[start_idx:end_idx]
+    local_atoms = images[start_idx:end_idx]
 
     # Perform local calculations
     local_results = []
@@ -95,24 +113,21 @@ class Fitness:
         target_energies,
         target_forces,
         target_stress,
-        global_weight,
         configuration_weight,
-        current_set,
+        images: list[Atoms],
+        setting: dict[str, Any],
     ):
         self.target_energies = target_energies
         self.target_forces = target_forces
         self.target_stress = target_stress
-        self.global_weight = global_weight
         self.configuration_weight = configuration_weight
-        self.current_set = current_set
+        self.images = images
+        self.setting = setting
 
     def __call__(self, parameters):
-        GEW, GFW, GSW = self.global_weight
-
-        # potential = force_field(parameters)
-        potential = MTP_field(parameters)
+        potential = MTP_field(self.setting["potential_final"], parameters)
         current_energies, current_forces, current_stress = current_value(
-            self.current_set,
+            self.images,
             potential,
         )
 
@@ -134,7 +149,11 @@ class Fitness:
         ]
         stress_mse = (self.configuration_weight**2) @ stress_ses
 
-        return GEW * energy_mse + GFW * force_mse + GSW * stress_mse
+        return (
+            self.setting["energy-weight"] * energy_mse
+            + self.setting["force-weight"] * force_mse
+            + self.setting["stress-weight"] * stress_mse
+        )
 
 
 # def RMSE(reference_set, current_set, potential):
@@ -176,11 +195,10 @@ def calc_rmse(cfg, file: str):
     return errors
 
 
-def MTP_field(parameters: list[float]):
+def MTP_field(file: str, parameters: list[float]):
     data = read_mtp(untrained_mtp)
     data = update_mtp(copy.deepcopy(data), parameters)
 
-    file = "Test.mtp"
     write_mtp(file, data)
 
     mlip = mlippy.initialize()
@@ -263,49 +281,57 @@ def update_mtp(
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Add arguments."""
+    parser.add_argument("setting")
 
 
 def run(args: argparse.Namespace) -> None:
     """Run."""
-    start_time = time.time()
-    current_directory = os.getcwd()
     global untrained_mtp
     global comm
 
+    start_time = time.time()
+
+    setting = make_default_setting()
+    setting.update(parse_setting(args.setting))
+    print(setting)
+
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
-    cfg_file = current_directory + "/final.cfg"
-    untrained_mtp = current_directory + "/02.mtp"
+    cfg_file = str(pathlib.Path(setting["configurations"]).resolve())
+    untrained_mtp = str(pathlib.Path(setting["potential_initial"]).resolve())
 
     images = read_cfg(cfg_file, index=":", species=["H"])  # training set
     target_energies, target_forces, target_stress = fetch_target_values(images)
 
-    global_weight = [1, 0.01, 0]
     configuration_weight = np.ones(len(images))
 
     fitness = Fitness(
         target_energies,
         target_forces,
         target_stress,
-        global_weight,
         configuration_weight,
         images,
+        setting,
     )
 
     parameters, bounds = init_parameters(read_mtp(untrained_mtp))
 
+    funs = {
+        "GA": optimization_GA,
+        "Nelder-Mead": optimization_nelder,
+        "L-BFGS-B": optimization_bfgs,
+    }
+
     # Create folders for each rank
     folder_name = f"rank_{rank}"
-    folder_path = os.path.join(current_directory, folder_name)
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+    pathlib.Path(folder_name).mkdir(parents=True, exist_ok=True)
 
     # Change working directory to the created folder
-    with cd(folder_path):
-        parameters = optimization_GA(fitness, parameters, bounds)
-        parameters = optimization_nelder(fitness, parameters, bounds)
-        MTP_field(parameters)
-        calc_rmse(cfg_file, "Test.mtp")
+    with cd(folder_name):
+        for step in setting["steps"]:
+            parameters = funs[step](fitness, parameters, bounds)
+        MTP_field(setting["potential_final"], parameters)
+        calc_rmse(cfg_file, setting["potential_final"])
 
     end_time = time.time()
     print("Total time taken:", end_time - start_time, "seconds")

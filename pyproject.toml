@@ -10,6 +10,7 @@ dependencies = [
     "mpi4py",
     "scipy",
 ]
+requires-python = ">=3.11"  # tomllib
 authors = [
     {name = "Pranav Kumar"},
 ]
@@ -22,9 +23,4 @@ packages = ["motep"]
 
 [tool.ruff.lint]
 preview = true  # necessary to activate many pycodestyle rules
-select = [
-    "F",  # Pyflakes
-    "E",  # pycodestyle
-    "W",  # pycodestyle
-    "I"   # isort
-]
+select = ["ALL"]
