@@ -36,6 +36,14 @@ stress-weight = 0.0
 steps = ['GA', 'Nelder-Mead']
 ```
 
+If some of the following parameters are already given in `initial.mtp`,
+they are read and kept fixed during training.
+
+- `scaling`
+- `radial_coeffs`
+- `moment_coeffs`
+- `species_coeffs`
+
 ## Big Question ?
 What This code do
 
