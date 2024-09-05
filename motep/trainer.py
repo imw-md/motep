@@ -229,16 +229,22 @@ def init_parameters(
 
     """
     species_count = data["species_count"]
-    species_pairs = product(range(species_count), repeat=2)
-    w_cheb = species_count + int(data["alpha_scalar_moments"])
-    cheb = (
-        len(list(species_pairs))
-        * int(data["radial_funcs_count"])
-        * int(data["radial_basis_size"])
-    )
+    species_pairs = list(product(range(species_count), repeat=2))
+    asm = data["alpha_scalar_moments"]
+    cheb = len(species_pairs) * data["radial_funcs_count"] * data["radial_basis_size"]
     seed = 10
-    parameters = [1000] + [5] * w_cheb + generate_random_numbers(cheb, -0.1, 0.1, seed)
-    bounds = [(-1000, 1000)] + [(-5, 5)] * w_cheb + [(-0.1, 0.1)] * cheb
+    parameters = (
+        [1000]
+        + [5] * asm
+        + [5] * species_count
+        + generate_random_numbers(cheb, -0.1, 0.1, seed)
+    )
+    bounds = (
+        [(-1000, 1000)]
+        + [(-5, 5)] * asm
+        + [(-5, 5)] * species_count
+        + [(-0.1, 0.1)] * cheb
+    )
     return parameters, bounds
 
 
