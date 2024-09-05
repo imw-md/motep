@@ -2,6 +2,7 @@ import copy
 import os
 import time
 from itertools import product
+from typing import Any
 
 import mlippy
 import numpy as np
@@ -175,6 +176,72 @@ def RMSE(cfg, pot):
 
 def MTP_field(parameters: list[float]):
     data = read_mtp(untrained_mtp)
+    data = update_mtp(copy.deepcopy(data), parameters)
+
+    file = "Test.mtp"
+    write_mtp(file, data)
+
+    mlip = mlippy.initialize()
+    mlip = mlippy.mtp()
+    mlip.load_potential(file)
+    opts = {}
+    mlip.add_atomic_type(1)
+    potential = mlippy.MLIP_Calculator(mlip, opts)
+
+    return potential
+
+
+def init_parameters(
+    data: dict[str, Any],
+) -> tuple[list[float], list[tuple[float, float]]]:
+    """Initialize MTP parameters.
+
+    Parameters
+    ----------
+    data : dict[str, Any]
+        Data in the .mtp file.
+
+    Returns
+    -------
+    parameters : list[float]
+        Initial parameters.
+    bounds : list[tuple[float, float]]
+        Bounds of the parameters.
+
+    """
+    species_count = data["species_count"]
+    species_pairs = product(range(species_count), repeat=2)
+    w_cheb = species_count + int(data["alpha_scalar_moments"])
+    cheb = (
+        len(list(species_pairs))
+        * int(data["radial_funcs_count"])
+        * int(data["radial_basis_size"])
+    )
+    seed = 10
+    parameters = [1000] + [5] * w_cheb + generate_random_numbers(cheb, -0.1, 0.1, seed)
+    bounds = [(-1000, 1000)] + [(-5, 5)] * w_cheb + [(-0.1, 0.1)] * cheb
+    return parameters, bounds
+
+
+def update_mtp(
+    data: dict[str, Any],
+    parameters: list[float],
+) -> dict[str, Any]:
+    """Update data in the .mtp file.
+
+    Parameters
+    ----------
+    data : dict[str, Any]
+        Data in the .mtp file.
+    parameters : list[float]
+        MTP parameters.
+
+    Returns
+    -------
+    data : dict[str, Any]
+        Updated data in the .mtp file.
+
+    """
     species_count = data["species_count"]
     rbs = data["radial_basis_size"]
     asm = data["alpha_scalar_moments"]
@@ -189,21 +256,7 @@ def MTP_field(parameters: list[float]):
     for k0 in range(species_count):
         for k1 in range(species_count):
             data["radial_coeffs"][k0, k1] = [total_radial[k0][k1]]
-
-    # if rank==0:
-    file = "Test.mtp"
-    # else:
-    #    file = "test.mtp"
-    write_mtp(file, data)
-
-    mlip = mlippy.initialize()
-    mlip = mlippy.mtp()
-    mlip.load_potential(file)
-    opts = {}
-    mlip.add_atomic_type(1)
-    potential = mlippy.MLIP_Calculator(mlip, opts)
-
-    return potential
+    return data
 
 
 def main():
@@ -211,26 +264,17 @@ def main():
     current_directory = os.getcwd()
     global untrained_mtp
     global comm
-    global size
-    global rank
-    global cfg_file
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
-    size = comm.Get_size()
     cfg_file = current_directory + "/final.cfg"
     untrained_mtp = current_directory + "/02.mtp"
 
-    # if rank!=0:
-    #    sys.stdout = None
     Training_set, current_set = configuration_set(cfg_file, species=["H"])
     Target_energies, Target_forces, Target_stress = target_value(Training_set)
 
     global_weight = [1, 0.01, 0]
     configuration_weight = np.ones(len(Training_set))
-
-    yaml_data = read_mtp(untrained_mtp)
-    species_count = int(yaml_data["species_count"])
 
     # Create folders for each rank
     folder_name = f"rank_{rank}"
@@ -244,16 +288,7 @@ def main():
     os.chdir(folder_path)
     #    for i in np.arange(1,100):
 
-    species_pairs = product(range(species_count), repeat=2)
-    w_cheb = species_count + int(yaml_data["alpha_scalar_moments"])
-    cheb = (
-        len(list(species_pairs))
-        * int(yaml_data["radial_funcs_count"])
-        * int(yaml_data["radial_basis_size"])
-    )
-    bounds = [(-1000, 1000)] + [(-5, 5)] * w_cheb + [(-0.1, 0.1)] * cheb
-
-    initial_guess = [1000] + [5] * w_cheb + generate_random_numbers(cheb, -0.1, 0.1, 10)
+    initial_guess, bounds = init_parameters(read_mtp(untrained_mtp))
 
     optimized_parameters = optimization_GA(
         mytarget,
@@ -267,8 +302,6 @@ def main():
         current_set,
     )
 
-    # ==============================================================================================
-    # initial_guess=[-7.54050095e+00,-1.92261361e-04,-1.68294883e+00,7.18632606e-01, -7.05708440e-01,1.23713720e+00,7.27847678e-02,2.29800048e-02,8.02591439e-01,-3.11064787e-01,-1.32991017e-01]
     initial_guess = optimized_parameters
     optimized_parameters = optimization_nelder(
         mytarget,
@@ -282,11 +315,6 @@ def main():
         current_set,
     )
 
-    # initial_guess=optimized_parameters
-
-    # optimized_parameters = optimization_bfgs(mytarget,initial_guess, Target_energies, Target_forces, Target_stress,global_weight, configuration_weight, current_set)
-    # Change back to the original directory after processing
-    # ====================================================================================================
     end_time = time.time()
     elapsed_time = end_time - start_time
     # Calculate RMSE
