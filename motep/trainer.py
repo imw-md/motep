@@ -5,7 +5,6 @@ import copy
 import pathlib
 import time
 import tomllib
-from itertools import product
 from typing import Any
 
 import mlippy
@@ -228,22 +227,50 @@ def init_parameters(
         Bounds of the parameters.
 
     """
-    species_count = data["species_count"]
-    species_pairs = list(product(range(species_count), repeat=2))
+    nspecies = data["species_count"]
     asm = data["alpha_scalar_moments"]
-    cheb = len(species_pairs) * data["radial_funcs_count"] * data["radial_basis_size"]
+    cheb = nspecies**2 * data["radial_funcs_count"] * data["radial_basis_size"]
     seed = 10
+    if "scaling" in data:
+        tmp = data["scaling"]
+        parameters_scaling = [tmp]
+        bounds_scaling = [[tmp, tmp]]
+    else:
+        parameters_scaling = [1000.0] * nspecies
+        bounds_scaling = [(-1000.0, 1000.0)] * nspecies
+    if "moment_coeffs" in data:
+        tmp = np.array(data["moment_coeffs"])
+        parameters_moment_coeffs = tmp.tolist()
+        bounds_moment_coeffs = np.repeat(tmp[:, None], 2, axis=1).tolist()
+    else:
+        parameters_moment_coeffs = [5.0] * asm
+        bounds_moment_coeffs = [(-5.0, 5.0)] * asm
+    if "species_coeffs" in data:
+        tmp = np.array(data["species_coeffs"])
+        parameters_species_coeffs = tmp.tolist()
+        bounds_species_coeffs = np.repeat(tmp[:, None], 2, axis=1).tolist()
+    else:
+        parameters_species_coeffs = [5.0] * nspecies
+        bounds_species_coeffs = [(-5.0, 5.0)] * nspecies
+    if "radial_coeffs" in data:
+        tmp = np.array([p for ps in data["species_coeffs"] for p in ps])
+        parameters_radial_coeffs = tmp.tolist()
+        bounds_radial_coeffs = np.repeat(tmp[:, None], 2, axis=1).tolist()
+    else:
+        lb, ub = -0.1, +0.1
+        parameters_radial_coeffs = generate_random_numbers(cheb, lb, ub, seed)
+        bounds_radial_coeffs = [(lb, ub)] * cheb
     parameters = (
-        [1000]
-        + [5] * asm
-        + [5] * species_count
-        + generate_random_numbers(cheb, -0.1, 0.1, seed)
+        parameters_scaling
+        + parameters_moment_coeffs
+        + parameters_species_coeffs
+        + parameters_radial_coeffs
     )
     bounds = (
-        [(-1000, 1000)]
-        + [(-5, 5)] * asm
-        + [(-5, 5)] * species_count
-        + [(-0.1, 0.1)] * cheb
+        bounds_scaling
+        + bounds_moment_coeffs
+        + bounds_species_coeffs
+        + bounds_radial_coeffs
     )
     return parameters, bounds
 
