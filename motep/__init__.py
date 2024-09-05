@@ -86,46 +86,54 @@ def current_value(current_set, potential):
     )
 
 
-def mytarget(parameters, *args):
-    (
+class Fitness:
+    """Class for evaluating fitness."""
+
+    def __init__(
+        self,
         target_energies,
         target_forces,
         target_stress,
         global_weight,
         configuration_weight,
         current_set,
-    ) = args
-    GEW, GFW, GSW = global_weight
+    ):
+        self.target_energies = target_energies
+        self.target_forces = target_forces
+        self.target_stress = target_stress
+        self.global_weight = global_weight
+        self.configuration_weight = configuration_weight
+        self.current_set = current_set
 
-    # potential = force_field(parameters)
-    potential = MTP_field(parameters)
-    current_energies, current_forces, current_stress = current_value(
-        current_set, potential
-    )
+    def __call__(self, parameters):
+        GEW, GFW, GSW = self.global_weight
 
-    # Calculate the energy difference
-    energy_ses = (current_energies - target_energies) ** 2
-    energy_scalar_difference = (configuration_weight**2) @ energy_ses
+        # potential = force_field(parameters)
+        potential = MTP_field(parameters)
+        current_energies, current_forces, current_stress = current_value(
+            self.current_set,
+            potential,
+        )
 
-    # Calculate the force difference
-    force_ses = [
-        np.sum((current_forces[i] - target_forces[i]) ** 2)
-        for i in range(len(target_forces))
-    ]
-    force_scalar_difference = (configuration_weight**2) @ force_ses
+        # Calculate the energy difference
+        energy_ses = (current_energies - self.target_energies) ** 2
+        energy_mse = (self.configuration_weight**2) @ energy_ses
 
-    # Calculate the stress difference
-    stress_ses = [
-        np.sum((current_stress[i] - target_stress[i]) ** 2)
-        for i in range(len(target_stress))
-    ]
-    stress_scalar_difference = (configuration_weight**2) @ stress_ses
+        # Calculate the force difference
+        force_ses = [
+            np.sum((current_forces[i] - self.target_forces[i]) ** 2)
+            for i in range(len(self.target_forces))
+        ]
+        force_mse = (self.configuration_weight**2) @ force_ses
 
-    return (
-        GEW * energy_scalar_difference
-        + GFW * force_scalar_difference
-        + GSW * stress_scalar_difference
-    )
+        # Calculate the stress difference
+        stress_ses = [
+            np.sum((current_stress[i] - self.target_stress[i]) ** 2)
+            for i in range(len(self.target_stress))
+        ]
+        stress_mse = (self.configuration_weight**2) @ stress_ses
+
+        return GEW * energy_mse + GFW * force_mse + GSW * stress_mse
 
 
 # def RMSE(reference_set, current_set, potential):
@@ -263,10 +271,19 @@ def main():
     untrained_mtp = current_directory + "/02.mtp"
 
     Training_set, current_set = configuration_set(cfg_file, species=["H"])
-    Target_energies, Target_forces, Target_stress = target_value(Training_set)
+    target_energies, target_forces, target_stress = target_value(Training_set)
 
     global_weight = [1, 0.01, 0]
     configuration_weight = np.ones(len(Training_set))
+
+    fitness = Fitness(
+        target_energies,
+        target_forces,
+        target_stress,
+        global_weight,
+        configuration_weight,
+        current_set,
+    )
 
     # Create folders for each rank
     folder_name = f"rank_{rank}"
@@ -282,30 +299,10 @@ def main():
 
     initial_guess, bounds = init_parameters(read_mtp(untrained_mtp))
 
-    optimized_parameters = optimization_GA(
-        mytarget,
-        initial_guess,
-        bounds,
-        Target_energies,
-        Target_forces,
-        Target_stress,
-        global_weight,
-        configuration_weight,
-        current_set,
-    )
+    optimized_parameters = optimization_GA(fitness, initial_guess, bounds)
 
     initial_guess = optimized_parameters
-    optimized_parameters = optimization_nelder(
-        mytarget,
-        initial_guess,
-        bounds,
-        Target_energies,
-        Target_forces,
-        Target_stress,
-        global_weight,
-        configuration_weight,
-        current_set,
-    )
+    optimized_parameters = optimization_nelder(fitness, initial_guess, bounds)
 
     end_time = time.time()
     elapsed_time = end_time - start_time
