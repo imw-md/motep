@@ -10,7 +10,6 @@ class GeneticAlgorithm:
         parameter,
         lower_bound,
         upper_bound,
-        *args,
         population_size=15,
         mutation_rate=0.1,
         elitism_rate=0.1,
@@ -22,7 +21,6 @@ class GeneticAlgorithm:
         self.mutation_rate = mutation_rate
         self.elitism_rate = elitism_rate
         self.crossover_probability = crossover_probability
-        self.args = args
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
         self.population = []
@@ -69,7 +67,7 @@ class GeneticAlgorithm:
         best_fitness = float("inf")
         for gen in range(generations):
             fitness_scores = [
-                fitness_function(parameter, *self.args) for parameter in self.population
+                fitness_function(parameter) for parameter in self.population
             ]
             elite = self.select_elite(fitness_scores)
             best_index = np.argmin(fitness_scores)
@@ -83,7 +81,7 @@ class GeneticAlgorithm:
                 offspring.extend([self.mutate(child1), self.mutate(child2)])
             self.population = offspring
             if elite_callback:
-                elite_callback(gen, fitness_function(elite[0], *self.args))
+                elite_callback(gen, fitness_function(elite[0]))
         return best_solution
 
     def evolve_with_common(self, fitness_function, generations, elite_callback=None):
@@ -91,7 +89,7 @@ class GeneticAlgorithm:
         best_fitness = float("inf")
         for gen in range(generations):
             fitness_scores = [
-                fitness_function(parameter, *self.args) for parameter in self.population
+                fitness_function(parameter) for parameter in self.population
             ]
             elite = self.select_elite(fitness_scores)
             best_index = np.argmin(fitness_scores)
@@ -105,7 +103,7 @@ class GeneticAlgorithm:
                 offspring.extend([self.mutate(child1), self.mutate(child2)])
             self.population = offspring
             if elite_callback:
-                elite_callback(gen, fitness_function(elite[0], *self.args))
+                elite_callback(gen, fitness_function(elite[0]))
         return best_solution
 
     def evolve_with_mix(self, fitness_function, generations, elite_callback=None):
@@ -113,7 +111,7 @@ class GeneticAlgorithm:
         best_fitness = float("inf")
         for gen in range(generations):
             fitness_scores = [
-                fitness_function(parameter, *self.args) for parameter in self.population
+                fitness_function(parameter) for parameter in self.population
             ]
             elite = self.select_elite(fitness_scores)
             best_index = np.argmin(fitness_scores)
@@ -135,7 +133,7 @@ class GeneticAlgorithm:
 
             self.population = elite + offspring
             if elite_callback:
-                elite_callback(gen, fitness_function(elite[0], *self.args))
+                elite_callback(gen, fitness_function(elite[0]))
         return best_solution
 
     def evolve_with_steady(self, fitness_function, generations, elite_callback=None):
@@ -144,7 +142,7 @@ class GeneticAlgorithm:
 
         for gen in range(generations):
             fitness_scores = [
-                fitness_function(parameter, *self.args) for parameter in self.population
+                fitness_function(parameter) for parameter in self.population
             ]
             elite = self.select_elite(fitness_scores)
 
@@ -176,7 +174,7 @@ class GeneticAlgorithm:
 
             # Call the elite callback if provided
             if elite_callback:
-                elite_callback(gen, fitness_function(elite[0], *self.args))
+                elite_callback(gen, fitness_function(elite[0]))
 
         return best_solution
 
@@ -185,7 +183,7 @@ def elite_callback(gen, elite):
     print(f"Generation {gen}: Top Elite - {elite}")
 
 
-def optimization_GA(mytarget, initial_guess, bounds, *args):
+def optimization_GA(mytarget, initial_guess, bounds):
     lower_bound = [item[0] for item in bounds]
     upper_bound = [item[1] for item in bounds]
     ga = GeneticAlgorithm(
@@ -193,7 +191,6 @@ def optimization_GA(mytarget, initial_guess, bounds, *args):
         initial_guess,
         lower_bound,
         upper_bound,
-        *args,
         population_size=200,
         mutation_rate=0.1,
         elitism_rate=0.1,

@@ -23,11 +23,10 @@ def print_result(result: OptimizeResult):
     print("  Final function value:", result.fun)
 
 
-def optimization_sa(mytarget, initial_guess, bounds, *args):
+def optimization_sa(fun, initial_guess, bounds):
     result = dual_annealing(
-        mytarget,
+        fun,
         bounds=bounds,
-        args=args,
         callback=callback,
         seed=40,
         x0=initial_guess,
@@ -36,11 +35,10 @@ def optimization_sa(mytarget, initial_guess, bounds, *args):
     return result.x
 
 
-def optimization_nelder(mytarget, initial_guess, bounds, *args):
+def optimization_nelder(fun, initial_guess, bounds):
     result = minimize(
-        mytarget,
+        fun,
         initial_guess,
-        args=args,
         bounds=bounds,
         method="Nelder-Mead",
         tol=1e-7,
@@ -51,11 +49,10 @@ def optimization_nelder(mytarget, initial_guess, bounds, *args):
     return result.x
 
 
-def optimization_bfgs(mytarget, initial_guess, bounds, *args):
+def optimization_bfgs(fun, initial_guess, bounds):
     result = minimize(
-        mytarget,
+        fun,
         initial_guess,
-        args=args,
         bounds=bounds,
         method="L-BFGS-B",
         tol=1e-7,
@@ -65,11 +62,10 @@ def optimization_bfgs(mytarget, initial_guess, bounds, *args):
     return result.x
 
 
-def optimization_DE(mytarget, initial_guess, bounds, *args):
+def optimization_DE(fun, initial_guess, bounds):
     result = differential_evolution(
-        mytarget,
+        fun,
         bounds,
-        args=args,
         popsize=30,
         callback=callback,
     )

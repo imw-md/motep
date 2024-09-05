@@ -6,6 +6,7 @@ from typing import Any
 
 import mlippy
 import numpy as np
+from ase import Atoms
 from mpi4py import MPI
 
 from motep.ga import optimization_GA
@@ -13,20 +14,17 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.opt import optimization_nelder
 from motep.pot import generate_random_numbers
+from motep.utils import cd
 
 
-def configuration_set(input_cfg, species=["H"]):
-    Training_set = read_cfg(input_cfg, ":", species)
-    current_set = copy.deepcopy(Training_set)
-    return Training_set, current_set
-
-
-def target_value(Training_set):
-    # Extract energies and forces from the training set
-    Target_energies = [atom.calc.results["free_energy"] for atom in Training_set]
-    Target_forces = [atom.calc.results["forces"] for atom in Training_set]
-    Target_stress = [atom.calc.results["stress"] for atom in Training_set]
-    return np.array(Target_energies), np.array(Target_forces), np.array(Target_stress)
+def fetch_target_values(
+    images: list[Atoms],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Fetch energies, forces, and stresses from the training dataset."""
+    energies = [atoms.calc.results["free_energy"] for atoms in images]
+    forces = [atom.calc.results["forces"] for atom in images]
+    stresses = [atom.calc.results["stress"] for atom in images]
+    return np.array(energies), np.array(forces), np.array(stresses)
 
 
 def calculate_energy_force_stress(atom, potential):
@@ -86,54 +84,54 @@ def current_value(current_set, potential):
     )
 
 
-def mytarget(parameters, *args):
-    (
-        Target_energies,
-        Target_forces,
-        Target_stress,
+class Fitness:
+    """Class for evaluating fitness."""
+
+    def __init__(
+        self,
+        target_energies,
+        target_forces,
+        target_stress,
         global_weight,
         configuration_weight,
         current_set,
-    ) = args
-    GEW, GFW, GSW = global_weight
+    ):
+        self.target_energies = target_energies
+        self.target_forces = target_forces
+        self.target_stress = target_stress
+        self.global_weight = global_weight
+        self.configuration_weight = configuration_weight
+        self.current_set = current_set
 
-    # potential = force_field(parameters)
-    potential = MTP_field(parameters)
-    current_energies, current_forces, current_stress = current_value(
-        current_set, potential
-    )
+    def __call__(self, parameters):
+        GEW, GFW, GSW = self.global_weight
 
-    # Calculate the energy difference
-    energy_difference = configuration_weight * (current_energies - Target_energies)
-    energy_scalar_difference = np.sum(energy_difference**2)
-
-    # Calculate the force difference
-    force_difference = [
-        np.square(
-            np.linalg.norm(
-                configuration_weight[i] * (current_forces[i] - Target_forces[i]), axis=1
-            )
+        # potential = force_field(parameters)
+        potential = MTP_field(parameters)
+        current_energies, current_forces, current_stress = current_value(
+            self.current_set,
+            potential,
         )
-        for i in range(len(Target_forces))
-    ]
-    force_scalar_difference = np.sum(np.concatenate(force_difference))
 
-    # Calculate the stress difference
-    stress_difference = [
-        np.square(
-            np.linalg.norm(
-                configuration_weight[j] * (current_stress[j] - Target_stress[j])
-            )
-        )
-        for j in range(len(Target_stress))
-    ]
-    stress_scalar_difference = np.sum(stress_difference)
+        # Calculate the energy difference
+        energy_ses = (current_energies - self.target_energies) ** 2
+        energy_mse = (self.configuration_weight**2) @ energy_ses
 
-    return (
-        GEW * energy_scalar_difference
-        + GFW * force_scalar_difference
-        + GSW * stress_scalar_difference
-    )
+        # Calculate the force difference
+        force_ses = [
+            np.sum((current_forces[i] - self.target_forces[i]) ** 2)
+            for i in range(len(self.target_forces))
+        ]
+        force_mse = (self.configuration_weight**2) @ force_ses
+
+        # Calculate the stress difference
+        stress_ses = [
+            np.sum((current_stress[i] - self.target_stress[i]) ** 2)
+            for i in range(len(self.target_stress))
+        ]
+        stress_mse = (self.configuration_weight**2) @ stress_ses
+
+        return GEW * energy_mse + GFW * force_mse + GSW * stress_mse
 
 
 # def RMSE(reference_set, current_set, potential):
@@ -153,11 +151,12 @@ def mytarget(parameters, *args):
 #    print("RMSE stress (GPa):", RMSE_force*0.1)
 
 
-def RMSE(cfg, pot):
+def calc_rmse(cfg, file: str):
+    """Calculate RMSEs."""
     ts = mlippy.ase_loadcfgs(cfg)
     mlip = mlippy.initialize()
     mlip = mlippy.mtp()
-    mlip.load_potential("Test.mtp")
+    mlip.load_potential(file)
     opts = {}
     mlip.add_atomic_type(1)
     potential = mlippy.MLIP_Calculator(mlip, opts)
@@ -270,11 +269,22 @@ def main():
     cfg_file = current_directory + "/final.cfg"
     untrained_mtp = current_directory + "/02.mtp"
 
-    Training_set, current_set = configuration_set(cfg_file, species=["H"])
-    Target_energies, Target_forces, Target_stress = target_value(Training_set)
+    images = read_cfg(cfg_file, index=":", species=["H"])  # training set
+    target_energies, target_forces, target_stress = fetch_target_values(images)
 
     global_weight = [1, 0.01, 0]
-    configuration_weight = np.ones(len(Training_set))
+    configuration_weight = np.ones(len(images))
+
+    fitness = Fitness(
+        target_energies,
+        target_forces,
+        target_stress,
+        global_weight,
+        configuration_weight,
+        images,
+    )
+
+    parameters, bounds = init_parameters(read_mtp(untrained_mtp))
 
     # Create folders for each rank
     folder_name = f"rank_{rank}"
@@ -283,46 +293,14 @@ def main():
         os.makedirs(folder_path)
 
     # Change working directory to the created folder
-
-    # Rest of the code...
-    os.chdir(folder_path)
-    #    for i in np.arange(1,100):
-
-    initial_guess, bounds = init_parameters(read_mtp(untrained_mtp))
-
-    optimized_parameters = optimization_GA(
-        mytarget,
-        initial_guess,
-        bounds,
-        Target_energies,
-        Target_forces,
-        Target_stress,
-        global_weight,
-        configuration_weight,
-        current_set,
-    )
-
-    initial_guess = optimized_parameters
-    optimized_parameters = optimization_nelder(
-        mytarget,
-        initial_guess,
-        bounds,
-        Target_energies,
-        Target_forces,
-        Target_stress,
-        global_weight,
-        configuration_weight,
-        current_set,
-    )
+    with cd(folder_path):
+        parameters = optimization_GA(fitness, parameters, bounds)
+        parameters = optimization_nelder(fitness, parameters, bounds)
+        MTP_field(parameters)
+        calc_rmse(cfg_file, "Test.mtp")
 
     end_time = time.time()
-    elapsed_time = end_time - start_time
-    # Calculate RMSE
-    # print(optimized_parameters)
-    potential = MTP_field(optimized_parameters)
-    RMSE(cfg_file, "Test.mtp")
+    print("Total time taken:", end_time - start_time, "seconds")
 
-    print("Total time taken:", elapsed_time, "seconds")
-    os.chdir(current_directory)
     comm.Barrier()
     MPI.Finalize()
