@@ -88,9 +88,9 @@ def current_value(current_set, potential):
 
 def mytarget(parameters, *args):
     (
-        Target_energies,
-        Target_forces,
-        Target_stress,
+        target_energies,
+        target_forces,
+        target_stress,
         global_weight,
         configuration_weight,
         current_set,
@@ -104,30 +104,22 @@ def mytarget(parameters, *args):
     )
 
     # Calculate the energy difference
-    energy_difference = configuration_weight * (current_energies - Target_energies)
-    energy_scalar_difference = np.sum(energy_difference**2)
+    energy_ses = (current_energies - target_energies) ** 2
+    energy_scalar_difference = (configuration_weight**2) @ energy_ses
 
     # Calculate the force difference
-    force_difference = [
-        np.square(
-            np.linalg.norm(
-                configuration_weight[i] * (current_forces[i] - Target_forces[i]), axis=1
-            )
-        )
-        for i in range(len(Target_forces))
+    force_ses = [
+        np.sum((current_forces[i] - target_forces[i]) ** 2)
+        for i in range(len(target_forces))
     ]
-    force_scalar_difference = np.sum(np.concatenate(force_difference))
+    force_scalar_difference = (configuration_weight**2) @ force_ses
 
     # Calculate the stress difference
-    stress_difference = [
-        np.square(
-            np.linalg.norm(
-                configuration_weight[j] * (current_stress[j] - Target_stress[j])
-            )
-        )
-        for j in range(len(Target_stress))
+    stress_ses = [
+        np.sum((current_stress[i] - target_stress[i]) ** 2)
+        for i in range(len(target_stress))
     ]
-    stress_scalar_difference = np.sum(stress_difference)
+    stress_scalar_difference = (configuration_weight**2) @ stress_ses
 
     return (
         GEW * energy_scalar_difference
