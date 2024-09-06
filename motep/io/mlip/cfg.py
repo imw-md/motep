@@ -1,6 +1,7 @@
-"""Module for MTP formats"""
+"""Module for MTP formats."""
 
-from typing import Dict, List, Optional, TextIO, Union
+import pathlib
+from typing import TextIO
 
 import numpy as np
 from ase import Atoms
@@ -12,9 +13,9 @@ from ase.data import atomic_masses, chemical_symbols
 def read_cfg(
     filename: str,
     index: int = -1,
-    species: Optional[List[str]] = None,
-) -> Union[Atoms, List[Atoms]]:
-    """Read images from a MTP .cfg file
+    species: dict[int, str] | list[str] | None = None,
+) -> Atoms | list[Atoms]:
+    """Read images from a MTP .cfg file.
 
     Parameters
     ----------
@@ -22,20 +23,20 @@ def read_cfg(
         List that defines types of chemical symbols (e.g, ['Pd', 'H'] means Pd
         is type 0 and H type 1), by default None. If None, dummy symbols 'X',
         'H', 'He', etc. are assigned for type 0, 1, 2, etc.
+
     """
     atoms_list = []
-    with open(filename, "r", encoding="utf-8") as file:
+    with pathlib.Path(filename).open(encoding="utf-8") as file:
         for line in file:
             if line.startswith("BEGIN_CFG"):
                 atoms = _read_image(file, species)
                 atoms_list.append(atoms)
     if index == ":":
         return atoms_list
-    else:
-        return atoms_list[index]
+    return atoms_list[index]
 
 
-def _read_image(file: TextIO, species: List[str]) -> Atoms:
+def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
     keys_c = ["cartes_x", "cartes_y", "cartes_z"]
     keys_d = ["direct_x", "direct_y", "direct_z"]
     cell = None
@@ -46,9 +47,9 @@ def _read_image(file: TextIO, species: List[str]) -> Atoms:
             break
         if line.split()[0] == "Size":
             size = int(next(file).split()[0])
-        elif line.split()[0] in ["Supercell", "SuperCell"]:
+        elif line.split()[0] in {"Supercell", "SuperCell"}:
             cell = [[float(_) for _ in next(file).split()] for _ in range(3)]
-        elif line.split()[0] in ["AtomData:", "Atomic_data:"]:
+        elif line.split()[0] in {"AtomData:", "Atomic_data:"}:
             atomdata = {_: [] for _ in line.split()[1:]}
             for _ in range(size):
                 line = next(file)
@@ -62,7 +63,7 @@ def _read_image(file: TextIO, species: List[str]) -> Atoms:
         elif line.split()[0] == "PlusStress:":
             keys = line.split()[1:]
             stress = [float(value) for value in next(file).split()]
-            stress = dict(zip(keys, stress), strict=True)
+            stress = dict(zip(keys, stress, strict=True))
         elif line.split()[0] == "Feature" and line.split()[1] == "MV_grade":
             results["MV_grade"] = float(line.split()[2])
 
@@ -117,12 +118,12 @@ def _set_stress(atoms: Atoms, stress):
 
 def write_cfg(
     filename: str,
-    images: Union[Atoms, List[Atoms]],
-    species: Union[Dict[str, int], List[str]] = None,
+    images: Atoms | list[Atoms],
+    species: dict[str, int] | list[str] | None = None,
     key_energy: str = "free_energy",
-    verbose=False,
+    verbose: bool = False,
 ):
-    """Write images into the MTP .cfg format
+    """Write images into the MTP .cfg format.
 
     Parameters
     ----------
@@ -139,12 +140,13 @@ def write_cfg(
         Key for the energy (either "free_energy" or "energy") to be printed.
     verbose : bool, optional
         _description_, by default False
+
     """
     if isinstance(images, Atoms):
         images = [images]
 
     if species is None:
-        species = _get_spiecies(images)
+        species = _get_species(images)
     elif isinstance(species, list):
         species = {s: i for i, s in enumerate(species)}
     else:
@@ -158,12 +160,12 @@ def write_cfg(
     if isinstance(images, Atoms):
         images = [images]
 
-    with open(filename, "w", encoding="utf-8") as file:
+    with pathlib.Path(filename).open("w", encoding="utf-8") as file:
         for atoms in images:
             _write_image(file, atoms, species, key_energy)
 
 
-def _get_spiecies(images: List[Atoms]) -> Dict[str, int]:
+def _get_species(images: list[Atoms]) -> dict[str, int]:
     symbols = []
     for atoms in images:
         symbols.extend(atoms.get_chemical_symbols())
@@ -174,7 +176,7 @@ def _get_spiecies(images: List[Atoms]) -> Dict[str, int]:
 def _write_image(
     file: TextIO,
     atoms: Atoms,
-    types: Dict[str, int],
+    types: dict[str, int],
     key_energy: str,
 ):
     if not hasattr(atoms, "calc") or atoms.calc is None:
@@ -211,7 +213,7 @@ def _write_supercell(file: TextIO, atoms: Atoms):
         file.write("\n")
 
 
-def _write_atom_data(file: TextIO, atoms: Atoms, types: Dict[str, int]):
+def _write_atom_data(file: TextIO, atoms: Atoms, types: dict[str, int]):
     line = " AtomData:  id type "
     file.write(line)
     for _ in "cartes_x cartes_y cartes_z".split():
@@ -251,7 +253,7 @@ def _write_stress(file: TextIO, atoms: Atoms):
     file.write("\n")
 
 
-def _write_parameters(file: TextIO, species: Dict[str, int]):
+def _write_parameters(file: TextIO, species: dict[str, int]):
     file.write("# Masses\n\n")
     units = "metal"  # g/mol
     for s, i in species.items():
