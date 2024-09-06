@@ -10,10 +10,11 @@ from typing import Any
 import mlippy
 import numpy as np
 from ase import Atoms
+from ase.data import chemical_symbols
 from mpi4py import MPI
 
 from motep.ga import optimization_GA
-from motep.io.mlip.cfg import read_cfg
+from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.opt import optimization_bfgs, optimization_nelder
 from motep.pot import generate_random_numbers
@@ -45,7 +46,12 @@ def fetch_target_values(
     """Fetch energies, forces, and stresses from the training dataset."""
     energies = [atoms.calc.results["free_energy"] for atoms in images]
     forces = [atoms.calc.results["forces"] for atoms in images]
-    stresses = [atoms.calc.results["stress"] for atoms in images]
+    stresses = [
+        atoms.calc.results["stress"]
+        if "stress" in atoms.calc.results
+        else np.zeros((3, 3))
+        for atoms in images
+    ]
     return np.array(energies), np.array(forces), np.array(stresses)
 
 
@@ -53,8 +59,10 @@ def calculate_energy_force_stress(atoms: Atoms, potential):
     atoms.calc = potential
     energy = atoms.get_potential_energy()
     force = atoms.get_forces()
-    stress = atoms.get_stress()  # stress property not implemented in morse
-    # stress = [0, 0, 0, 0, 0, 0]  # workaround
+    try:
+        stress = atoms.get_stress()
+    except NotImplementedError:
+        stress = np.zeros((3, 3))
     return energy, force, stress
 
 
@@ -104,6 +112,15 @@ def current_value(images: list[Atoms], potential):
     )
 
 
+def init_mlip(file: str, species: list[str]):
+    mlip = mlippy.initialize()
+    mlip = mlippy.mtp()
+    mlip.load_potential(file)
+    for _ in species:
+        mlip.add_atomic_type(chemical_symbols.index(_))
+    return mlip
+
+
 class Fitness:
     """Class for evaluating fitness.
 
@@ -115,15 +132,18 @@ class Fitness:
     """
 
     def __init__(self, cfg_file: str, setting: dict[str, Any]):
-        self.images = read_cfg(cfg_file, index=":", species=["H"])
+        species = setting.get("species")
+        self.images = read_cfg(cfg_file, index=":", species=species)
+        self.species = list(_get_species(self.images)) if species is None else species
         self.setting = setting
         self.target_energies, self.target_forces, self.target_stress = (
             fetch_target_values(self.images)
         )
         self.configuration_weight = np.ones(len(self.images))
 
-    def __call__(self, parameters):
-        potential = MTP_field(self.setting["potential_final"], parameters)
+    def __call__(self, parameters: list[float]):
+        file = self.setting["potential_final"]
+        potential = MTP_field(file, parameters, self.species)
         current_energies, current_forces, current_stress = current_value(
             self.images,
             potential,
@@ -153,6 +173,32 @@ class Fitness:
             + self.setting["stress-weight"] * stress_mse
         )
 
+    def calc_rmse(
+        self,
+        cfg_file: str,
+        parameters: list[float],
+    ) -> dict[str, float]:
+        """Calculate RMSEs."""
+        file = self.setting["potential_final"]
+        MTP_field(file, parameters, self.species)
+
+        ts = mlippy.ase_loadcfgs(cfg_file)
+        mlip = init_mlip(file, self.species)
+        errors = mlippy.ase_errors(mlip, ts)
+        print(
+            "RMSE Energy per atom (meV/atom):",
+            1000 * float(errors["Energy per atom: RMS absolute difference"]),
+        )
+        print(
+            "RMSE force per atom (eV/Ang):",
+            float(errors["Forces: RMS absolute difference"]),
+        )
+        print(
+            "RMSE stress (GPa):",
+            float(errors["Stresses: RMS absolute difference"]),
+        )
+        return errors
+
 
 # def RMSE(reference_set, current_set, potential):
 #    current_energies, current_forces, current_stress = current_value(current_set, potential)
@@ -171,40 +217,13 @@ class Fitness:
 #    print("RMSE stress (GPa):", RMSE_force*0.1)
 
 
-def calc_rmse(cfg, file: str):
-    """Calculate RMSEs."""
-    ts = mlippy.ase_loadcfgs(cfg)
-    mlip = mlippy.initialize()
-    mlip = mlippy.mtp()
-    mlip.load_potential(file)
-    opts = {}
-    mlip.add_atomic_type(1)
-    potential = mlippy.MLIP_Calculator(mlip, opts)
-    errors = mlippy.ase_errors(mlip, ts)
-    print(
-        "RMSE Energy per atom (meV/atom):",
-        1000 * float(errors["Energy per atom: RMS absolute difference"]),
-    )
-    print(
-        "RMSE force per atom (eV/Ang):",
-        float(errors["Forces: RMS absolute difference"]),
-    )
-    print("RMSE stress (GPa):", float(errors["Stresses: RMS absolute difference"]))
-    return errors
-
-
-def MTP_field(file: str, parameters: list[float]):
+def MTP_field(file: str, parameters: list[float], species: list[str]):
     data = read_mtp(untrained_mtp)
     data = update_mtp(copy.deepcopy(data), parameters)
 
     write_mtp(file, data)
-
-    mlip = mlippy.initialize()
-    mlip = mlippy.mtp()
-    mlip.load_potential(file)
-    opts = {}
-    mlip.add_atomic_type(1)
-    potential = mlippy.MLIP_Calculator(mlip, opts)
+    mlip = init_mlip(file, species)
+    potential = mlippy.MLIP_Calculator(mlip, {})
 
     return potential
 
@@ -350,8 +369,7 @@ def run(args: argparse.Namespace) -> None:
     with cd(folder_name):
         for step in setting["steps"]:
             parameters = funs[step](fitness, parameters, bounds)
-        MTP_field(setting["potential_final"], parameters)
-        calc_rmse(cfg_file, setting["potential_final"])
+        fitness.calc_rmse(cfg_file, parameters)
 
     end_time = time.time()
     print("Total time taken:", end_time - start_time, "seconds")
