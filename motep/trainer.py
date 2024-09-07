@@ -255,8 +255,8 @@ def init_parameters(
         parameters_scaling = [tmp]
         bounds_scaling = [[tmp, tmp]]
     else:
-        parameters_scaling = [1000.0] * nspecies
-        bounds_scaling = [(-1000.0, 1000.0)] * nspecies
+        parameters_scaling = [1000.0]
+        bounds_scaling = [(-1000.0, 1000.0)]
     if "moment_coeffs" in data:
         tmp = np.array(data["moment_coeffs"])
         parameters_moment_coeffs = tmp.tolist()
