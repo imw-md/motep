@@ -1,5 +1,6 @@
 """Module for MTP formats."""
 
+import os
 import pathlib
 from typing import TextIO
 
@@ -11,7 +12,7 @@ from ase.data import atomic_masses, chemical_symbols
 
 
 def read_cfg(
-    filename: str,
+    filename: str | os.PathLike,
     index: int = -1,
     species: dict[int, str] | list[str] | None = None,
 ) -> Atoms | list[Atoms]:
@@ -42,6 +43,7 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
     cell = None
     stress = None
     results = {}
+    info = {}  # added PK
     for line in file:
         if line.startswith("END_CFG"):
             break
@@ -64,8 +66,14 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
             keys = line.split()[1:]
             stress = [float(value) for value in next(file).split()]
             stress = dict(zip(keys, stress, strict=True))
-        elif line.split()[0] == "Feature" and line.split()[1] == "MV_grade":
-            results["MV_grade"] = float(line.split()[2])
+        elif line.split()[0] == "Feature":
+            try:
+                info[str(line.split()[1])] = float(line.split()[2])
+            except ValueError:
+                info[str(line.split()[1])] = line.split()[2]
+
+    if "nbh_grades" in atomdata:
+        results["nbh_grades"] = atomdata["nbh_grades"]
 
     if species is None:
         symbols = None
@@ -74,6 +82,8 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
         symbols = [species[_] for _ in atomdata["type"]]
         numbers = None
 
+    pbc = False if cell is None else True
+
     if all((_ in atomdata) for _ in keys_c):
         positions = list(zip(*[atomdata[_] for _ in keys_c], strict=True))
         atoms = Atoms(
@@ -81,7 +91,7 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
             numbers=numbers,
             positions=positions,
             cell=cell,
-            pbc=True,
+            pbc=pbc,
         )
     elif all((_ in atomdata) for _ in keys_d):
         positions = list(zip(*[atomdata[_] for _ in keys_d], strict=True))
@@ -90,7 +100,7 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
             numbers=numbers,
             scaled_positions=positions,
             cell=cell,
-            pbc=True,
+            pbc=pbc,
         )
     else:
         raise ValueError
@@ -101,6 +111,7 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
         _set_forces(atoms, atomdata)
     if cell is not None and stress is not None:
         _set_stress(atoms, stress)
+    atoms.info = info  # added PK
     return atoms
 
 
@@ -117,7 +128,7 @@ def _set_stress(atoms: Atoms, stress):
 
 
 def write_cfg(
-    filename: str,
+    filename: str | os.PathLike,
     images: Atoms | list[Atoms],
     species: dict[str, int] | list[str] | None = None,
     key_energy: str = "free_energy",
@@ -198,8 +209,8 @@ def _write_image(
 
     if "stress" in atoms.calc.results:
         _write_stress(file, atoms)
-
-    file.write(" Feature   EFS_by\tVASP\n")
+    for key in atoms.info:
+        file.write(f" Feature   {key}\t{atoms.info[key]}\n")
     file.write("END_CFG\n")
     file.write("\n")
 
