@@ -55,8 +55,7 @@ def fetch_target_values(
     return np.array(energies), forces, stresses
 
 
-def calculate_energy_force_stress(atoms: Atoms, potential):
-    atoms.calc = potential
+def calculate_energy_force_stress(atoms: Atoms):
     energy = atoms.get_potential_energy()
     forces = atoms.get_forces()
     try:
@@ -66,7 +65,7 @@ def calculate_energy_force_stress(atoms: Atoms, potential):
     return energy, forces, stress
 
 
-def current_value(images: list[Atoms], potential, comm: MPI.Comm):
+def current_value(images: list[Atoms], comm: MPI.Comm):
     rank = comm.Get_rank()
     size = comm.Get_size()
     # Initialize lists to store energies, forces, and stresses
@@ -84,7 +83,7 @@ def current_value(images: list[Atoms], potential, comm: MPI.Comm):
     # Perform local calculations
     local_results = []
     for atoms in local_atoms:
-        local_results.append(calculate_energy_force_stress(atoms, potential))
+        local_results.append(calculate_energy_force_stress(atoms))
 
     # Gather results from all processes
     all_results = comm.gather(local_results, root=0)
@@ -143,9 +142,10 @@ class Fitness:
     def __call__(self, parameters: list[float]):
         file = self.setting["potential_final"]
         potential = MTP_field(file, parameters, self.species)
+        for atoms in self.images:
+            atoms.calc = potential
         current_energies, current_forces, current_stress = current_value(
             self.images,
-            potential,
             self.comm,
         )
 
