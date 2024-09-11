@@ -44,38 +44,35 @@ def fetch_target_values(
     images: list[Atoms],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Fetch energies, forces, and stresses from the training dataset."""
-    energies = [atoms.calc.results["free_energy"] for atoms in images]
-    forces = [atoms.calc.results["forces"] for atoms in images]
+    energies = [atoms.get_potential_energy(force_consistent=True) for atoms in images]
+    forces = [atoms.get_forces() for atoms in images]
     stresses = [
-        atoms.calc.results["stress"]
+        atoms.get_stress(voigt=False)
         if "stress" in atoms.calc.results
         else np.zeros((3, 3))
         for atoms in images
     ]
-    return np.array(energies), np.array(forces), np.array(stresses)
+    return np.array(energies), forces, stresses
 
 
 def calculate_energy_force_stress(atoms: Atoms, potential):
     atoms.calc = potential
     energy = atoms.get_potential_energy()
-    force = atoms.get_forces()
+    forces = atoms.get_forces()
     try:
-        stress = atoms.get_stress()
+        stress = atoms.get_stress(voigt=False)
     except NotImplementedError:
         stress = np.zeros((3, 3))
-    return energy, force, stress
+    return energy, forces, stress
 
 
-def current_value(images: list[Atoms], potential):
+def current_value(images: list[Atoms], potential, comm: MPI.Comm):
     rank = comm.Get_rank()
     size = comm.Get_size()
     # Initialize lists to store energies, forces, and stresses
     current_energies = []
     current_forces = []
     current_stress = []
-
-    if not isinstance(images, list):
-        images = [images]
 
     # Determine the chunk of atoms to process for each MPI process
     chunk_size = len(images) // size
@@ -86,8 +83,8 @@ def current_value(images: list[Atoms], potential):
 
     # Perform local calculations
     local_results = []
-    for atom in local_atoms:
-        local_results.append(calculate_energy_force_stress(atom, potential))
+    for atoms in local_atoms:
+        local_results.append(calculate_energy_force_stress(atoms, potential))
 
     # Gather results from all processes
     all_results = comm.gather(local_results, root=0)
@@ -105,11 +102,7 @@ def current_value(images: list[Atoms], potential):
     current_forces = comm.bcast(current_forces, root=0)
     current_stress = comm.bcast(current_stress, root=0)
 
-    return (
-        np.array(current_energies),
-        np.array(current_forces),
-        np.array(current_stress),
-    )
+    return np.array(current_energies), current_forces, current_stress
 
 
 def init_mlip(file: str, species: list[str]):
@@ -131,7 +124,12 @@ class Fitness:
 
     """
 
-    def __init__(self, cfg_file: str, setting: dict[str, Any]):
+    def __init__(
+        self,
+        cfg_file: str,
+        setting: dict[str, Any],
+        comm: MPI.Comm,
+    ):
         species = setting.get("species")
         self.images = read_cfg(cfg_file, index=":", species=species)
         self.species = list(_get_species(self.images)) if species is None else species
@@ -140,6 +138,7 @@ class Fitness:
             fetch_target_values(self.images)
         )
         self.configuration_weight = np.ones(len(self.images))
+        self.comm = comm
 
     def __call__(self, parameters: list[float]):
         file = self.setting["potential_final"]
@@ -147,6 +146,7 @@ class Fitness:
         current_energies, current_forces, current_stress = current_value(
             self.images,
             potential,
+            self.comm,
         )
 
         # Calculate the energy difference
@@ -338,7 +338,6 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 def run(args: argparse.Namespace) -> None:
     """Run."""
     global untrained_mtp
-    global comm
 
     start_time = time.time()
 
@@ -351,7 +350,7 @@ def run(args: argparse.Namespace) -> None:
     cfg_file = str(pathlib.Path(setting["configurations"]).resolve())
     untrained_mtp = str(pathlib.Path(setting["potential_initial"]).resolve())
 
-    fitness = Fitness(cfg_file, setting)
+    fitness = Fitness(cfg_file, setting, comm)
 
     parameters, bounds = init_parameters(read_mtp(untrained_mtp))
 
