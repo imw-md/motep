@@ -1,3 +1,6 @@
+from typing import Callable
+
+import numpy as np
 from scipy.optimize import (
     OptimizeResult,
     differential_evolution,
@@ -6,9 +9,19 @@ from scipy.optimize import (
 )
 
 
-def callback(intermediate_result: OptimizeResult):
-    """A callable called after each iteration."""
-    print("Function value:", intermediate_result.fun)
+class Callback:
+    """Callback after each iteration."""
+
+    def __init__(self, fun: Callable):
+        self.fun = fun
+
+    def __call__(self, intermediate_result: OptimizeResult | np.ndarray):
+        fun = (
+            intermediate_result.fun
+            if isinstance(intermediate_result, OptimizeResult)
+            else self.fun(intermediate_result)
+        )
+        print("Function value:", fun)
 
 
 def print_result(result: OptimizeResult):
@@ -24,6 +37,7 @@ def print_result(result: OptimizeResult):
 
 
 def optimization_sa(fun, initial_guess, bounds):
+    callback = Callback(fun)
     result = dual_annealing(
         fun,
         bounds=bounds,
@@ -36,6 +50,7 @@ def optimization_sa(fun, initial_guess, bounds):
 
 
 def optimization_nelder(fun, initial_guess, bounds):
+    callback = Callback(fun)
     result = minimize(
         fun,
         initial_guess,
@@ -50,6 +65,7 @@ def optimization_nelder(fun, initial_guess, bounds):
 
 
 def optimization_bfgs(fun, initial_guess, bounds):
+    callback = Callback(fun)
     result = minimize(
         fun,
         initial_guess,
@@ -63,6 +79,7 @@ def optimization_bfgs(fun, initial_guess, bounds):
 
 
 def optimization_DE(fun, initial_guess, bounds):
+    callback = Callback(fun)
     result = differential_evolution(
         fun,
         bounds,
