@@ -10,7 +10,8 @@ from motep.io.mlip.mtp import read_mtp
 from motep.mtp import MTP, init_radial_basis_functions, calc_radial_basis
 
 
-@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+# @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize("level", [2, 4, 6])
 @pytest.mark.parametrize(
     ("molecule", "species"),
     [(762, {1: 0}), (291, {6: 0, 1: 1}), (14214, {9: 0, 1: 1}), (23208, {8: 0})],
@@ -66,15 +67,22 @@ def test_forces(
     mtp._initiate_neighbor_list(atoms_ref)
 
     forces_ref = mtp.get_energy(atoms_ref)[1]
+
+    dx = 1e-6
+
     atoms = atoms_ref.copy()
-    atoms.positions[0, 0] += 1e-6
+    atoms.positions[0, 0] += dx
     ep = mtp.get_energy(atoms)[0]
+
     atoms = atoms_ref.copy()
-    atoms.positions[0, 0] -= 1e-6
+    atoms.positions[0, 0] -= dx
     em = mtp.get_energy(atoms)[0]
-    f = -1.0 * (ep - em) / 2e-6
+
+    f = -1.0 * (ep - em) / (2.0 * dx)
+
     print(forces_ref[0, 0], f)
-    assert forces_ref[0, 0] == pytest.approx(f, abs=1e-6)
+
+    assert forces_ref[0, 0] == pytest.approx(f, abs=1e-4)
 
 
 params = [

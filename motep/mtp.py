@@ -176,9 +176,9 @@ def calc_moment_basis(
     moment_jacobian = np.zeros((alpha_moments_count, *r_ijs.shape))  # dEi/dxj
     # Precompute powers
     max_pow = np.max(alpha_index_basic)
-    abs_pows = np.ones((max_pow + 2, *r_abs.shape))
-    val_pows = np.ones((max_pow + 2, *r_ijs.shape))
-    for pow in range(1, max_pow + 2):
+    abs_pows = np.ones((max_pow + 1, *r_abs.shape))
+    val_pows = np.ones((max_pow + 1, *r_ijs.shape))
+    for pow in range(1, max_pow + 1):
         abs_pows[pow] = abs_pows[pow - 1] * r_abs
         val_pows[pow] = val_pows[pow - 1] * r_ijs
     # Compute basic moments
@@ -194,6 +194,28 @@ def calc_moment_basis(
         )
         val = rb_values[mu] * mult0
         der = rb_derivs[mu] * mult0 * r_ijs / r_abs
+        der -= val * k * r_ijs / (r_abs**2)
+        if xpow != 0:
+            der[0] += (
+                rb_values[mu]
+                * (xpow * val_pows[xpow - 1, 0])
+                * val_pows[ypow, 1]
+                * val_pows[zpow, 2]
+            ) / abs_pows[k]
+        if ypow != 0:
+            der[1] += (
+                rb_values[mu]
+                * val_pows[xpow, 0]
+                * (ypow * val_pows[ypow - 1, 1])
+                * val_pows[zpow, 2]
+            ) / abs_pows[k]
+        if zpow != 0:
+            der[2] += (
+                rb_values[mu]
+                * val_pows[xpow, 0]
+                * val_pows[ypow, 1]
+                * (zpow * val_pows[zpow - 1, 2])
+            ) / abs_pows[k]
         moment_components[i] = val.sum()
         moment_jacobian[i] = der
     # Compute contractions
