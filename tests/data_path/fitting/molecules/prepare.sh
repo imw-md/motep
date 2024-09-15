@@ -10,7 +10,7 @@ update_species_count () {
 mlip=~/codes/mlip-2
 mlp=$mlip/bin/mlp
 root=$PWD
-original=$(realpath $(dirname $0))/../original
+original=$(realpath $(dirname $0))/../../original/molecules
 # species_counts=([762]=1 [291]=2 [14214]=2 [23208]=1)
 species_counts=([23208]=1)
 
