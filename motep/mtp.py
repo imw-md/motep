@@ -89,9 +89,8 @@ class MTP:
             self.parameters["radial_funcs_count"],
         )
 
-    def _get_local_energy(self, atoms: Atoms, i: int):
+    def _get_local_energy(self, atoms: Atoms, i: int, js: list[int], r_ijs):
         itype = self.parameters["species"][atoms.numbers[i]]
-        js, r_ijs = self._get_distances(atoms, i)
         jtypes = [self.parameters["species"][atoms.numbers[j]] for j in js]
         r_abs = np.linalg.norm(r_ijs, axis=0)
         rb_values, rb_derivs = self.calc_radial_basis(r_abs, itype, jtypes)
@@ -104,14 +103,19 @@ class MTP:
             self.parameters["alpha_index_times"],
             self.parameters["alpha_moment_mapping"],
         )
-        species_coeffs = self.parameters["species_coeffs"]
         moment_coeffs = self.parameters["moment_coeffs"]
-        return species_coeffs[itype] + moment_coeffs @ basis_values
+        return moment_coeffs @ basis_values
 
     def get_energy(self, atoms: Atoms):
+        """Calculate the energy of the given system."""
         self.update_neighbor_list(atoms)
-        generator = (self._get_local_energy(atoms, i) for i in range(len(atoms)))
-        self.results["energies"] = np.fromiter(generator, dtype=float)
+        energies = np.zeros(len(atoms))
+        for i in range(len(atoms)):
+            js, r_ijs = self._get_distances(atoms, i)
+            e = self._get_local_energy(atoms, i, js, r_ijs)
+            itype = self.parameters["species"][atoms.numbers[i]]
+            energies[i] = e + self.parameters["species_coeffs"][itype]
+        self.results["energies"] = energies
         self.results["energy"] = self.results["energies"].sum()
         return self.results["energy"]
 
@@ -153,7 +157,7 @@ def calc_moment_basis(
     r_ijs: np.ndarray,  # (3, neighbors)
     r_abs: np.ndarray,  # (neighbors)
     rb_values: np.ndarray,  # (neighbors, mu)
-    alpha_moments_count,
+    alpha_moments_count: int,
     alpha_index_basic: int,
     alpha_index_times: int,
     alpha_moment_mapping: np.ndarray,
