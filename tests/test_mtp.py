@@ -13,7 +13,7 @@ from motep.mtp import MTP, init_radial_basis_functions, calc_radial_basis
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize(
     ("molecule", "species"),
-    [[762, {1: 0}], [291, {6: 0, 1: 2}]],
+    [(762, {1: 0}), (291, {6: 0, 1: 1}), (14214, {9: 0, 1: 1}), (23208, {8: 0})],
 )
 # @pytest.mark.parametrize("molecule", [762])
 def test_mtp(
@@ -23,9 +23,9 @@ def test_mtp(
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
-    if molecule == 291 and level == 4:
-        pytest.skip()
     path = data_path / f"fitting/{molecule}/{level:02d}"
+    if not (path / "pot.mtp").exists():
+        pytest.skip()
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
     mtp = MTP(parameters)
@@ -47,7 +47,7 @@ def test_mtp(
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize(
     "molecule, species",
-    [[762, {1: 0}], [291, {6: 0, 1: 2}]],
+    [(762, {1: 0}), (291, {6: 0, 1: 1}), (14214, {9: 0, 1: 1}), (23208, {8: 0})],
 )
 def test_forces(
     molecule: int,
@@ -56,9 +56,9 @@ def test_forces(
     data_path: pathlib.Path,
 ) -> None:
     """Test if forces are consistent with finite-difference values."""
-    if molecule == 291 and level == 4:
-        pytest.skip()
     path = data_path / f"fitting/{molecule}/{level:02d}"
+    if not (path / "pot.mtp").exists():
+        pytest.skip()
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
     mtp = MTP(parameters)

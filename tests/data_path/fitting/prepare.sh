@@ -11,10 +11,12 @@ mlip=~/codes/mlip-2
 mlp=$mlip/bin/mlp
 root=$PWD
 original=$(realpath $(dirname $0))/../original
-species_counts=([762]=1 [291]=2)
+# species_counts=([762]=1 [291]=2 [14214]=2 [23208]=1)
+species_counts=([23208]=1)
 
 for molecule in ${!species_counts[@]}; do
-  for level in 02 04 06 08 10; do
+  # for level in 02 04 06 08 10; do
+  for level in 10; do
     echo $molecule
     echo $level
     d=$molecule/$level
