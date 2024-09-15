@@ -200,6 +200,8 @@ def calc_moment_basis(
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
         moment_components[i3] += mult * moment_components[i1] * moment_components[i2]
+        moment_jacobian[i3] += mult * moment_jacobian[i1] * moment_components[i2]
+        moment_jacobian[i3] += mult * moment_components[i1] * moment_jacobian[i2]
     # Compute basis
     basis_vals = moment_components[alpha_moment_mapping]
     basis_ders = moment_jacobian[alpha_moment_mapping]

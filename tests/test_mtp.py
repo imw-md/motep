@@ -43,6 +43,40 @@ def test_mtp(
     np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
 
 
+# @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize(
+    "molecule, species",
+    [[762, {1: 0}], [291, {6: 0, 1: 2}]],
+)
+def test_forces(
+    molecule: int,
+    species: dict[int, int],
+    level: int,
+    data_path: pathlib.Path,
+) -> None:
+    """Test if forces are consistent with finite-difference values."""
+    if molecule == 291 and level == 4:
+        pytest.skip()
+    path = data_path / f"fitting/{molecule}/{level:02d}"
+    parameters = read_mtp(path / "pot.mtp")
+    # parameters["species"] = species
+    mtp = MTP(parameters)
+    atoms_ref = read_cfg(path / "out.cfg", index=-1)
+    mtp._initiate_neighbor_list(atoms_ref)
+
+    forces_ref = mtp.get_energy(atoms_ref)[1]
+    atoms = atoms_ref.copy()
+    atoms.positions[0, 0] += 1e-6
+    ep = mtp.get_energy(atoms)[0]
+    atoms = atoms_ref.copy()
+    atoms.positions[0, 0] -= 1e-6
+    em = mtp.get_energy(atoms)[0]
+    f = -1.0 * (ep - em) / 2e-6
+    print(forces_ref[0, 0], f)
+    assert forces_ref[0, 0] == pytest.approx(f, abs=1e-6)
+
+
 params = [
     (
         np.array(
