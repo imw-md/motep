@@ -33,9 +33,14 @@ def test_mtp(
     mtp._initiate_neighbor_list(images[0])
 
     energies_ref = np.array([_.get_potential_energy() for _ in images])
-    energies = np.array([mtp.get_energy(_) for _ in images]).reshape(-1)
+    energies = np.array([mtp.get_energy(_)[0] for _ in images]).reshape(-1)
     print(np.array(energies), np.array(energies_ref))
     np.testing.assert_allclose(energies, energies_ref)
+
+    forces_ref = np.vstack([_.get_forces() for _ in images])
+    forces = np.vstack([mtp.get_energy(_)[1] for _ in images])
+    print(np.array(forces), np.array(forces_ref))
+    np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
 
 
 params = [

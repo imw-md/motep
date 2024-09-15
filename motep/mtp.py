@@ -94,30 +94,39 @@ class MTP:
         jtypes = [self.parameters["species"][atoms.numbers[j]] for j in js]
         r_abs = np.linalg.norm(r_ijs, axis=0)
         rb_values, rb_derivs = self.calc_radial_basis(r_abs, itype, jtypes)
-        basis_values = calc_moment_basis(
+        basis_values, basis_derivs = calc_moment_basis(
             r_ijs,
             r_abs,
             rb_values,
+            rb_derivs,
             self.parameters["alpha_moments_count"],
             self.parameters["alpha_index_basic"],
             self.parameters["alpha_index_times"],
             self.parameters["alpha_moment_mapping"],
         )
         moment_coeffs = self.parameters["moment_coeffs"]
-        return moment_coeffs @ basis_values
+        return (
+            moment_coeffs @ basis_values,
+            np.tensordot(moment_coeffs, basis_derivs, axes=(0, 0)),
+        )
 
     def get_energy(self, atoms: Atoms):
         """Calculate the energy of the given system."""
         self.update_neighbor_list(atoms)
         energies = np.zeros(len(atoms))
+        forces = np.zeros((len(atoms), 3))
         for i in range(len(atoms)):
             js, r_ijs = self._get_distances(atoms, i)
-            e = self._get_local_energy(atoms, i, js, r_ijs)
+            e, gradient = self._get_local_energy(atoms, i, js, r_ijs)
             itype = self.parameters["species"][atoms.numbers[i]]
             energies[i] = e + self.parameters["species_coeffs"][itype]
+            for k, j in enumerate(js):
+                forces[i] -= gradient[:, k]
+                forces[j] += gradient[:, k]
         self.results["energies"] = energies
         self.results["energy"] = self.results["energies"].sum()
-        return self.results["energy"]
+        self.results["forces"] = forces
+        return self.results["energy"], self.results["forces"]
 
     def _initiate_neighbor_list(self, atoms: Atoms):
         self._neighbor_list = NewPrimitiveNeighborList(
@@ -156,13 +165,15 @@ def _compute_offsets(nl: NewPrimitiveNeighborList, atoms: Atoms):
 def calc_moment_basis(
     r_ijs: np.ndarray,  # (3, neighbors)
     r_abs: np.ndarray,  # (neighbors)
-    rb_values: np.ndarray,  # (neighbors, mu)
+    rb_values: np.ndarray,  # (mu, neighbors)
+    rb_derivs: np.ndarray,  # (mu, neighbors)
     alpha_moments_count: int,
     alpha_index_basic: int,
     alpha_index_times: int,
     alpha_moment_mapping: np.ndarray,
 ):
     moment_components = np.zeros(alpha_moments_count)
+    moment_jacobian = np.zeros((alpha_moments_count, *r_ijs.shape))  # dEi/dxj
     # Precompute powers
     max_pow = np.max(alpha_index_basic)
     abs_pows = np.ones((max_pow + 2, *r_abs.shape))
@@ -182,11 +193,14 @@ def calc_moment_basis(
             / abs_pows[k]
         )
         val = rb_values[mu] * mult0
+        der = rb_derivs[mu] * mult0 * r_ijs / r_abs
         moment_components[i] = val.sum()
+        moment_jacobian[i] = der
     # Compute contractions
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
         moment_components[i3] += mult * moment_components[i1] * moment_components[i2]
     # Compute basis
     basis_vals = moment_components[alpha_moment_mapping]
-    return basis_vals
+    basis_ders = moment_jacobian[alpha_moment_mapping]
+    return basis_vals, basis_ders
