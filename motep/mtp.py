@@ -29,6 +29,34 @@ def init_radial_basis_functions(
     return np.array(radial_basis_funcs).reshape(shape)
 
 
+def calc_radial_basis(
+    radial_basis_funcs: np.ndarray,  # array of Chebyshev objects
+    r_abs: np.ndarray,
+    itype: int,
+    jtypes: list[int],
+    scaling: float,
+    min_dist: float,
+    max_dist: float,
+    radial_funcs_count: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    is_within_cutoff = (min_dist < r_abs) & (r_abs < max_dist)
+    smooth_values = scaling * (max_dist - r_abs) ** 2
+    smooth_derivs = -2.0 * scaling * (max_dist - r_abs)
+    rb_values = np.zeros((radial_funcs_count, r_abs.size))
+    rb_derivs = np.zeros((radial_funcs_count, r_abs.size))
+    for mu in range(radial_funcs_count):
+        for j, jtype in enumerate(jtypes):
+            if is_within_cutoff[j]:
+                rb_funcs = radial_basis_funcs[itype, jtype, mu]
+                v = rb_funcs(r_abs[j]) * smooth_values[j]
+                rb_values[mu, j] = v
+                d0 = rb_funcs.deriv()(r_abs[j]) * smooth_values[j]
+                d1 = rb_funcs(r_abs[j]) * smooth_derivs[j]
+                d = d0 + d1
+                rb_derivs[mu, j] = d
+    return rb_values, rb_derivs
+
+
 class MTP:
     """MLIP-2 MTP."""
 
@@ -44,30 +72,29 @@ class MTP:
         )
         self.results = {}
 
-    def calc_radial_basis(self, r_abs: np.ndarray, itype: int, jtypes: list[int]):
-        scaling = self.parameters["scaling"]
-        max_dist = self.parameters["max_dist"]
-        rfc = self.parameters["radial_funcs_count"]
-        is_within_cutoff = r_abs < max_dist
-        smoothing = scaling * (max_dist - r_abs) ** 2
-        rb_values = []
-        for ifunc in range(rfc):
-            for j, jtype in enumerate(jtypes):
-                v = (
-                    self.radial_basis_funcs[itype, jtype, ifunc](r_abs[j])
-                    * smoothing[j]
-                    if is_within_cutoff[j]
-                    else 0.0
-                )
-                rb_values.append(v)
-        return np.array(rb_values).reshape(rfc, -1)
+    def calc_radial_basis(
+        self,
+        r_abs: np.ndarray,
+        itype: int,
+        jtypes: list[int],
+    ) -> tuple[np.ndarray, np.ndarray]:
+        return calc_radial_basis(
+            self.radial_basis_funcs,
+            r_abs,
+            itype,
+            jtypes,
+            self.parameters["scaling"],
+            self.parameters["min_dist"],
+            self.parameters["max_dist"],
+            self.parameters["radial_funcs_count"],
+        )
 
     def _get_local_energy(self, atoms: Atoms, i: int):
         itype = self.parameters["species"][atoms.numbers[i]]
         js, r_ijs = self._get_distances(atoms, i)
         jtypes = [self.parameters["species"][atoms.numbers[j]] for j in js]
         r_abs = np.linalg.norm(r_ijs, axis=0)
-        rb_values = self.calc_radial_basis(r_abs, itype, jtypes)
+        rb_values, rb_derivs = self.calc_radial_basis(r_abs, itype, jtypes)
         basis_values = calc_moment_basis(
             r_ijs,
             r_abs,
