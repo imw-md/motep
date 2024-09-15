@@ -158,17 +158,26 @@ def calc_moment_basis(
     alpha_index_times: int,
     alpha_moment_mapping: np.ndarray,
 ):
-    r_ijs_unit = r_ijs / r_abs
     moment_components = np.zeros(alpha_moments_count)
     # Precompute powers
     max_pow = np.max(alpha_index_basic)
-    val_pows = np.ones((max_pow + 1, *r_ijs_unit.shape))
-    for pow in range(1, max_pow + 1):
-        val_pows[pow] = val_pows[pow - 1] * r_ijs_unit
+    abs_pows = np.ones((max_pow + 2, *r_abs.shape))
+    val_pows = np.ones((max_pow + 2, *r_ijs.shape))
+    for pow in range(1, max_pow + 2):
+        abs_pows[pow] = abs_pows[pow - 1] * r_abs
+        val_pows[pow] = val_pows[pow - 1] * r_ijs
     # Compute basic moments
     for i, aib in enumerate(alpha_index_basic):
         mu, xpow, ypow, zpow = aib
-        val = rb_values[mu] * val_pows[xpow, 0] * val_pows[ypow, 1] * val_pows[zpow, 2]
+        k = xpow + ypow + zpow
+        mult0 = (
+            1.0
+            * val_pows[xpow, 0]
+            * val_pows[ypow, 1]
+            * val_pows[zpow, 2]
+            / abs_pows[k]
+        )
+        val = rb_values[mu] * mult0
         moment_components[i] = val.sum()
     # Compute contractions
     for ait in alpha_index_times:
