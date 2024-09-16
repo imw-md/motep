@@ -115,6 +115,7 @@ class MTP:
         self.update_neighbor_list(atoms)
         energies = np.zeros(len(atoms))
         forces = np.zeros((len(atoms), 3))
+        stress = np.zeros((3, 3))
         for i in range(len(atoms)):
             js, r_ijs = self._get_distances(atoms, i)
             e, gradient = self._get_local_energy(atoms, i, js, r_ijs)
@@ -123,10 +124,19 @@ class MTP:
             for k, j in enumerate(js):
                 forces[i] -= gradient[:, k]
                 forces[j] += gradient[:, k]
+            stress += r_ijs @ gradient.T
         self.results["energies"] = energies
         self.results["energy"] = self.results["energies"].sum()
         self.results["forces"] = forces
-        return self.results["energy"], self.results["forces"]
+
+        if atoms.cell.rank == 3:
+            stress = (stress + stress.T) * 0.5  # symmetrize
+            stress /= atoms.get_volume()
+            self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
+        else:
+            self.results["stress"] = np.full(6, np.nan)
+
+        return self.results["energy"], self.results["forces"], self.results["stress"]
 
     def _initiate_neighbor_list(self, atoms: Atoms):
         self._neighbor_list = PrimitiveNeighborList(

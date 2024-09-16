@@ -10,6 +10,22 @@ from motep.io.mlip.mtp import read_mtp
 from motep.mtp import MTP, calc_radial_basis, init_radial_basis_functions
 
 
+def get_scale(component: str, dx: float) -> np.ndarray:
+    """Get the scaling matrix for the corresponding stress component."""
+    if component == "xx":
+        voigt_index = 0
+        scale = np.diag((1.0 + dx, 1.0, 1.0))
+    elif component == "yy":
+        voigt_index = 1
+        scale = np.diag((1.0, 1.0 + dx, 1.0))
+    elif component == "zz":
+        voigt_index = 2
+        scale = np.diag((1.0, 1.0, 1.0 + dx))
+    else:
+        raise ValueError(component)
+    return voigt_index, scale
+
+
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize(
     ("molecule", "species"),
@@ -43,6 +59,7 @@ def test_molecules(
     np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
 
 
+@pytest.mark.parametrize("index", [0, -1])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize(
     ("crystal", "species"),
@@ -52,6 +69,7 @@ def test_crystals(
     crystal: int,
     species: dict[int, int],
     level: int,
+    index: int,
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
@@ -61,7 +79,7 @@ def test_crystals(
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
     mtp = MTP(parameters)
-    images = [read_cfg(path / "out.cfg", index=0)]
+    images = [read_cfg(path / "out.cfg", index=index)]
     mtp._initiate_neighbor_list(images[0])
 
     energies_ref = np.array([_.get_potential_energy() for _ in images])
@@ -73,6 +91,11 @@ def test_crystals(
     forces = np.vstack([mtp.get_energy(_)[1] for _ in images])
     print(np.array(forces), np.array(forces_ref))
     np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
+
+    stress_ref = np.vstack([_.get_stress() for _ in images])
+    stress = np.vstack([mtp.get_energy(_)[2] for _ in images])
+    print(np.array(stress), np.array(stress_ref))
+    np.testing.assert_allclose(stress, stress_ref, rtol=0.0, atol=1e-4)
 
 
 # @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
@@ -114,6 +137,59 @@ def test_forces(
     print(forces_ref[0, 0], f)
 
     assert forces_ref[0, 0] == pytest.approx(f, abs=1e-4)
+
+
+@pytest.mark.parametrize("component", ["xx", "yy", "zz"])
+@pytest.mark.parametrize("index", [0, -1])
+@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize(
+    ("crystal", "species"),
+    [("cubic", {29: 0}), ("noncubic", {29: 0})],
+)
+def test_stress(
+    crystal: int,
+    species: dict[int, int],
+    level: int,
+    index: int,
+    component: str,
+    data_path: pathlib.Path,
+) -> None:
+    """Test if stresses are consistent with finite-difference values.
+
+    Notes
+    -----
+    At this moment, the test fails for "noncubic" with index "-1" (distorted
+    atomic positions). The reason is not yet clear and to be fixed later.
+
+    """
+    path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
+    if not (path / "pot.mtp").exists():
+        pytest.skip()
+    parameters = read_mtp(path / "pot.mtp")
+    # parameters["species"] = species
+    mtp = MTP(parameters)
+    atoms_ref = read_cfg(path / "out.cfg", index=index)
+    mtp._initiate_neighbor_list(atoms_ref)
+
+    stress_ref = mtp.get_energy(atoms_ref)[2]
+
+    dx = 1e-6
+
+    atoms = atoms_ref.copy()
+    sindex, scale = get_scale(component, +1.0 * dx)
+    atoms.set_cell(scale @ atoms.get_cell(), scale_atoms=True)
+    ep = mtp.get_energy(atoms)[0]
+
+    atoms = atoms_ref.copy()
+    sindex, scale = get_scale(component, -1.0 * dx)
+    atoms.set_cell(scale @ atoms.get_cell(), scale_atoms=True)
+    em = mtp.get_energy(atoms)[0]
+
+    s = (ep - em) / (2.0 * dx) / atoms_ref.get_volume()
+
+    print(stress_ref[sindex], s, stress_ref[sindex] / s)
+
+    assert stress_ref[sindex] == pytest.approx(s, abs=1e-4)
 
 
 params = [
