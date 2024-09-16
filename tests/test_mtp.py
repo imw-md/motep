@@ -7,7 +7,7 @@ import pytest
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.mtp import MTP, init_radial_basis_functions, calc_radial_basis
+from motep.mtp import MTP, calc_radial_basis, init_radial_basis_functions
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
@@ -24,6 +24,38 @@ def test_molecules(
 ) -> None:
     """Test PyMTP."""
     path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
+    if not (path / "pot.mtp").exists():
+        pytest.skip()
+    parameters = read_mtp(path / "pot.mtp")
+    # parameters["species"] = species
+    mtp = MTP(parameters)
+    images = [read_cfg(path / "out.cfg", index=0)]
+    mtp._initiate_neighbor_list(images[0])
+
+    energies_ref = np.array([_.get_potential_energy() for _ in images])
+    energies = np.array([mtp.get_energy(_)[0] for _ in images]).reshape(-1)
+    print(np.array(energies), np.array(energies_ref))
+    np.testing.assert_allclose(energies, energies_ref)
+
+    forces_ref = np.vstack([_.get_forces() for _ in images])
+    forces = np.vstack([mtp.get_energy(_)[1] for _ in images])
+    print(np.array(forces), np.array(forces_ref))
+    np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
+
+
+@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize(
+    ("crystal", "species"),
+    [("cubic", {29: 0}), ("noncubic", {29: 0})],
+)
+def test_crystals(
+    crystal: int,
+    species: dict[int, int],
+    level: int,
+    data_path: pathlib.Path,
+) -> None:
+    """Test PyMTP."""
+    path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
     parameters = read_mtp(path / "pot.mtp")
