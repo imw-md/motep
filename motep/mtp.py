@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 from ase import Atoms
-from ase.neighborlist import NewPrimitiveNeighborList
+from ase.neighborlist import PrimitiveNeighborList
 from numpy.polynomial import Chebyshev
 
 
@@ -129,8 +129,8 @@ class MTP:
         return self.results["energy"], self.results["forces"]
 
     def _initiate_neighbor_list(self, atoms: Atoms):
-        self._neighbor_list = NewPrimitiveNeighborList(
-            cutoffs=self.parameters["max_dist"],
+        self._neighbor_list = PrimitiveNeighborList(
+            cutoffs=[self.parameters["max_dist"]] * len(atoms),
             skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
             self_interaction=False,  # Exclude [0, 0, 0]
             bothways=True,  # return both ij and ji
@@ -157,7 +157,7 @@ class MTP:
         return indices_js, dist_vectors.T
 
 
-def _compute_offsets(nl: NewPrimitiveNeighborList, atoms: Atoms):
+def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
     cell = atoms.cell
     return np.array([nl.get_neighbors(j)[1] @ cell for j in range(len(atoms))])
 
