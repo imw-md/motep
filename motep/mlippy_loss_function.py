@@ -10,6 +10,7 @@ from mpi4py import MPI
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss_function import (
+    calc_rmses,
     calculate_energy_force_stress,
     fetch_target_values,
     update_mtp,
@@ -110,14 +111,14 @@ class MlippyLossFunction:
 
     def __call__(self, parameters: list[float]):
         file = self.setting["potential_final"]
-        potential = MTP_field(
+        calc = MTP_field(
             file,
             self.untrained_mtp,
             parameters,
             self.species,
         )
         for atoms in self.images:
-            atoms.calc = potential
+            atoms.calc = calc
         current_energies, current_forces, current_stress = current_value(
             self.images,
             self.comm,
@@ -147,28 +148,23 @@ class MlippyLossFunction:
             + self.setting["stress-weight"] * stress_mse
         )
 
-    def calc_rmse(
-        self,
-        cfg_file: str,
-        parameters: list[float],
-    ) -> dict[str, float]:
+    def calc_rmses(self, parameters: list[float]) -> dict[str, float]:
         """Calculate RMSEs."""
         file = self.setting["potential_final"]
-        MTP_field(file, self.untrained_mtp, parameters, self.species)
+        calc = MTP_field(file, self.untrained_mtp, parameters, self.species)
+        for atoms in self.images:
+            atoms.calc = calc
+        current_energies, current_forces, current_stress = current_value(
+            self.images,
+            self.comm,
+        )
 
-        ts = mlippy.ase_loadcfgs(cfg_file)
-        mlip = init_mlip(file, self.species)
-        errors = mlippy.ase_errors(mlip, ts)
-        print(
-            "RMSE Energy per atom (meV/atom):",
-            1000 * float(errors["Energy per atom: RMS absolute difference"]),
+        calc_rmses(
+            self.images,
+            current_energies,
+            self.target_energies,
+            current_forces,
+            self.target_forces,
+            current_stress,
+            self.target_stress,
         )
-        print(
-            "RMSE force per atom (eV/Ang):",
-            float(errors["Forces: RMS absolute difference"]),
-        )
-        print(
-            "RMSE stress (GPa):",
-            float(errors["Stresses: RMS absolute difference"]),
-        )
-        return errors

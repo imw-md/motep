@@ -149,7 +149,7 @@ def run(args: argparse.Namespace) -> None:
     with cd(folder_name):
         for step in setting["steps"]:
             parameters = funs[step](fitness, parameters, bounds)
-        fitness.calc_rmse(cfg_file, parameters)
+        fitness.calc_rmses(parameters)
 
     end_time = time.time()
     print("Total time taken:", end_time - start_time, "seconds")

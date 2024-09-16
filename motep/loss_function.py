@@ -69,6 +69,39 @@ def update_mtp(
     return data
 
 
+def calc_rmses(
+    images: list[Atoms],
+    current_energies: np.ndarray,
+    target_energies: np.ndarray,
+    current_forces: np.ndarray,
+    target_forces: np.ndarray,
+    current_stress: np.ndarray,
+    target_stress: np.ndarray,
+):
+    """Calculate RMSEs."""
+    se_energies = [
+        ((current_energies[i] - target_energies[i]) / len(atoms)) ** 2
+        for i, atoms in enumerate(images)
+    ]
+    total_number_of_atoms = sum(len(atoms) for atoms in images)
+    se_forces = [
+        np.sum((current_forces[i] - target_forces[i]) ** 2) / 3.0
+        for i, atoms in enumerate(images)
+    ]
+    se_stress = [
+        np.sum((current_stress[i] - target_stress[i]) ** 2) / 9.0
+        for i, atoms in enumerate(images)
+    ]
+
+    rmse_energy = np.sqrt(np.mean(se_energies))
+    rmse_forces = np.sqrt(np.sum(se_forces) / total_number_of_atoms)
+    rmse_stress = np.sqrt(np.mean(se_stress))  # eV/Ang^3
+
+    print("RMSE Energy per atom (eV/atom):", rmse_energy)
+    print("RMSE force per component (eV/Ang):", rmse_forces)
+    print("RMSE stress per component (GPa):", rmse_stress * eV * 1e21)
+
+
 class LossFunction:
     """Loss function."""
 
@@ -141,9 +174,8 @@ class LossFunction:
 
         return np.array(current_energies), current_forces, current_stress
 
-    def calc_rmse(self, cfg_file: str, parameters: list[float]) -> None:
+    def calc_rmses(self, parameters: list[float]) -> None:
         """Calculate RMSEs."""
-        self.images = read_cfg(cfg_file, index=":", species=self.species)
         for atoms in self.images:
             atoms.calc = MTP(
                 engine=self.engine,
@@ -153,26 +185,14 @@ class LossFunction:
             atoms.calc.update_parameters(data)
         current_energies, current_forces, current_stress = self.calc_current_values()
 
-        se_energies = [
-            ((current_energies[i] - self.target_energies[i]) / len(atoms)) ** 2
-            for i, atoms in enumerate(self.images)
-        ]
-        total_number_of_atoms = sum(len(atoms) for atoms in self.images)
-        se_forces = [
-            np.sum((current_forces[i] - self.target_forces[i]) ** 2)
-            for i, atoms in enumerate(self.images)
-        ]
-        se_stress = [
-            np.sum((current_stress[i] - self.target_stress[i]) ** 2) / 9.0
-            for i, atoms in enumerate(self.images)
-        ]
-
-        rmse_energy = np.sqrt(np.mean(se_energies))  # eV/atom
-        rmse_force = np.sqrt(np.sum(se_forces) / total_number_of_atoms)
-        rmse_stress = np.sqrt(np.mean(se_stress))  # eV/Ang^3
-
-        print("RMSE Energy per atom (meV/atom):", rmse_energy * 1e3)
-        print("RMSE force per atom (eV/Ang):", rmse_force)
-        print("RMSE stress (GPa):", rmse_stress * eV * 1e21)
+        calc_rmses(
+            self.images,
+            current_energies,
+            self.target_energies,
+            current_forces,
+            self.target_forces,
+            current_stress,
+            self.target_stress,
+        )
 
         write_mtp(self.setting["potential_final"], data)
