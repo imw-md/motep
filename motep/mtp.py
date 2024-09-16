@@ -57,20 +57,32 @@ def calc_radial_basis(
     return rb_values, rb_derivs
 
 
-class MTP:
-    """MLIP-2 MTP."""
+class NumpyMTPEngine:
+    def __init__(self, mtp_parameters: dict[str, Any] | None = None):
+        """MLIP-2 MTP.
 
-    def __init__(self, parameters: dict[str, Any]):
+        Parameters
+        ----------
+        mtp_parameters : dict[str, Any]
+            Parameters in the MLIP .mtp file.
+
+        """
+        self.parameters = {}
+        if mtp_parameters is not None:
+            self.update(mtp_parameters)
+        self.results = {}
+
+    def update(self, parameters: dict[str, Any]) -> None:
         self.parameters = parameters
         if "species" not in self.parameters:
             species = {_: _ for _ in range(self.parameters["species_count"])}
             self.parameters["species"] = species
-        self.radial_basis_funcs = init_radial_basis_functions(
-            self.parameters["radial_coeffs"],
-            self.parameters["min_dist"],
-            self.parameters["max_dist"],
-        )
-        self.results = {}
+        if "radial_coeffs" in self.parameters:
+            self.radial_basis_funcs = init_radial_basis_functions(
+                self.parameters["radial_coeffs"],
+                self.parameters["min_dist"],
+                self.parameters["max_dist"],
+            )
 
     def calc_radial_basis(
         self,

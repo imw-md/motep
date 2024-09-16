@@ -2,8 +2,8 @@ import pathlib
 
 from mpi4py import MPI
 
-from motep.trainer import current_value
 from motep.io.mlip.cfg import read_cfg
+from motep.mlippy_loss_function import current_value
 
 
 def test_current_value():

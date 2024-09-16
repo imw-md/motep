@@ -9,6 +9,11 @@ from mpi4py import MPI
 
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
+from motep.loss_function import (
+    calculate_energy_force_stress,
+    fetch_target_values,
+    update_mtp,
+)
 
 
 def init_mlip(file: str, species: list[str]):
@@ -18,31 +23,6 @@ def init_mlip(file: str, species: list[str]):
     for _ in species:
         mlip.add_atomic_type(chemical_symbols.index(_))
     return mlip
-
-
-def fetch_target_values(
-    images: list[Atoms],
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Fetch energies, forces, and stresses from the training dataset."""
-    energies = [atoms.get_potential_energy(force_consistent=True) for atoms in images]
-    forces = [atoms.get_forces() for atoms in images]
-    stresses = [
-        atoms.get_stress(voigt=False)
-        if "stress" in atoms.calc.results
-        else np.zeros((3, 3))
-        for atoms in images
-    ]
-    return np.array(energies), forces, stresses
-
-
-def calculate_energy_force_stress(atoms: Atoms):
-    energy = atoms.get_potential_energy()
-    forces = atoms.get_forces()
-    try:
-        stress = atoms.get_stress(voigt=False)
-    except NotImplementedError:
-        stress = np.zeros((3, 3))
-    return energy, forces, stress
 
 
 def current_value(images: list[Atoms], comm: MPI.Comm):
@@ -98,42 +78,6 @@ def MTP_field(
     potential = mlippy.MLIP_Calculator(mlip, {})
 
     return potential
-
-
-def update_mtp(
-    data: dict[str, Any],
-    parameters: list[float],
-) -> dict[str, Any]:
-    """Update data in the .mtp file.
-
-    Parameters
-    ----------
-    data : dict[str, Any]
-        Data in the .mtp file.
-    parameters : list[float]
-        MTP parameters.
-
-    Returns
-    -------
-    data : dict[str, Any]
-        Updated data in the .mtp file.
-
-    """
-    species_count = data["species_count"]
-    rbs = data["radial_basis_size"]
-    asm = data["alpha_scalar_moments"]
-
-    data["scaling"] = parameters[0]
-    data["moment_coeffs"] = parameters[1 : asm + 1]
-    data["species_coeffs"] = parameters[asm + 1 : asm + 1 + species_count]
-    total_radial = parameters[asm + 1 + species_count :]
-    shape = species_count, species_count, rbs
-    total_radial = np.array(total_radial).reshape(shape).tolist()
-    data["radial_coeffs"] = {}
-    for k0 in range(species_count):
-        for k1 in range(species_count):
-            data["radial_coeffs"][k0, k1] = [total_radial[k0][k1]]
-    return data
 
 
 class MlippyLossFunction:
@@ -228,20 +172,3 @@ class MlippyLossFunction:
             float(errors["Stresses: RMS absolute difference"]),
         )
         return errors
-
-
-# def RMSE(reference_set, current_set, potential):
-#    current_energies, current_forces, current_stress = current_value(current_set, potential)
-#    Target_energies, Target_forces, Target_stress = target_value(reference_set)
-#
-#    error_energy = [((current_energies[i] - Target_energies[i]) / len(current_set[i])) ** 2 for i in range(len(current_set))]
-#    error_force = [np.sum(current_forces[i] - Target_forces[i]) / (3 * len(current_set[i])) ** 2 for i in range(len(current_set))]
-#    error_stress = [np.sum(current_stress[i] - Target_stress[i]) / 6 ** 2 for i in range(len(current_set))]
-#
-#    RMSE_energy = (np.sum(error_energy) * 1000) / len(current_set)
-#    RMSE_force = (np.sum(error_force)) / len(current_set)
-#    RMSE_stress = (np.sum(error_stress)) / len(current_set)
-#
-#    print("RMSE Energy per atom (meV/atom):", RMSE_energy)
-#    print("RMSE force per atom (eV/Ang):", RMSE_force)
-#    print("RMSE stress (GPa):", RMSE_force*0.1)

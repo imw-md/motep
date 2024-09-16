@@ -1,3 +1,4 @@
+import itertools
 import pathlib
 from typing import Any, TextIO
 
@@ -101,7 +102,7 @@ def write_mtp(file, data: dict[str, Any]) -> None:
         "species_coeffs",
         "moment_coeffs",
     ]
-
+    species_count = data["species_count"]
     with pathlib.Path(file).open("w", encoding="utf-8") as fd:
         fd.write("MTP\n")
         for key in keys0:
@@ -112,8 +113,9 @@ def write_mtp(file, data: dict[str, Any]) -> None:
                 fd.write(f"\t{key} = {_format_value(data[key])}\n")
         if "radial_coeffs" in data:
             fd.write("\tradial_coeffs\n")
-            for key, value in data["radial_coeffs"].items():
-                fd.write(f"\t\t{key[0]}-{key[1]}\n")
+            for k0, k1 in itertools.product(range(species_count), repeat=2):
+                value = data["radial_coeffs"][k0, k1]
+                fd.write(f"\t\t{k0}-{k1}\n")
                 for _ in range(data["radial_funcs_count"]):
                     fd.write(f"\t\t\t{_format_list(value[_])}\n")
         for key in keys2:

@@ -11,6 +11,7 @@ from mpi4py import MPI
 
 from motep.ga import optimization_GA
 from motep.io.mlip.mtp import read_mtp
+from motep.loss_function import LossFunction
 from motep.opt import optimization_bfgs, optimization_nelder
 from motep.pot import generate_random_numbers
 from motep.utils import cd
@@ -22,7 +23,7 @@ def make_default_setting() -> dict[str, Any]:
         "configurations": "training.cfg",
         "potential_initial": "initial.mtp",
         "potential_final": "final.mtp",
-        "calculator": "mlippy",
+        "engine": "numpy",
         "energy-weight": 1.0,
         "force-weight": 0.01,
         "stress-weight": 0.0,
@@ -120,10 +121,17 @@ def run(args: argparse.Namespace) -> None:
     cfg_file = str(pathlib.Path(setting["configurations"]).resolve())
     untrained_mtp = str(pathlib.Path(setting["potential_initial"]).resolve())
 
-    if setting["calculator"] == "mlippy":
+    if setting["engine"] == "mlippy":
         from motep.mlippy_loss_function import MlippyLossFunction
 
         fitness = MlippyLossFunction(cfg_file, untrained_mtp, setting, comm)
+    else:
+        fitness = LossFunction(
+            cfg_file,
+            untrained_mtp,
+            engine=setting["engine"],
+            setting=setting,
+        )
 
     parameters, bounds = init_parameters(read_mtp(untrained_mtp))
 

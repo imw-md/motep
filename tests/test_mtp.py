@@ -7,7 +7,7 @@ import pytest
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.mtp import MTP, calc_radial_basis, init_radial_basis_functions
+from motep.mtp import NumpyMTPEngine, calc_radial_basis, init_radial_basis_functions
 
 
 def get_scale(component: str, dx: float) -> np.ndarray:
@@ -44,7 +44,7 @@ def test_molecules(
         pytest.skip()
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
-    mtp = MTP(parameters)
+    mtp = NumpyMTPEngine(parameters)
     images = [read_cfg(path / "out.cfg", index=0)]
     mtp._initiate_neighbor_list(images[0])
 
@@ -78,7 +78,7 @@ def test_crystals(
         pytest.skip()
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
-    mtp = MTP(parameters)
+    mtp = NumpyMTPEngine(parameters)
     images = [read_cfg(path / "out.cfg", index=index)]
     mtp._initiate_neighbor_list(images[0])
 
@@ -116,7 +116,7 @@ def test_forces(
         pytest.skip()
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
-    mtp = MTP(parameters)
+    mtp = NumpyMTPEngine(parameters)
     atoms_ref = read_cfg(path / "out.cfg", index=-1)
     mtp._initiate_neighbor_list(atoms_ref)
 
@@ -167,7 +167,7 @@ def test_stress(
         pytest.skip()
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
-    mtp = MTP(parameters)
+    mtp = NumpyMTPEngine(parameters)
     atoms_ref = read_cfg(path / "out.cfg", index=index)
     mtp._initiate_neighbor_list(atoms_ref)
 
