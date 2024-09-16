@@ -159,7 +159,7 @@ class MTP:
 
 def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
     cell = atoms.cell
-    return np.array([nl.get_neighbors(j)[1] @ cell for j in range(len(atoms))])
+    return [nl.get_neighbors(j)[1] @ cell for j in range(len(atoms))]
 
 
 def calc_moment_basis(
