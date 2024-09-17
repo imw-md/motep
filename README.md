@@ -1,14 +1,12 @@
 # MTP_train
 
-```Installation of mlippy```
-
-contact **Axel forslund**
-
 ## Installation
 
 ```bash
 pip install git+https://github.tik.uni-stuttgart.de/ac144228/MTP_train.git
 ```
+
+Optionally [our modified version of `mlippy`](https://gitlab.com/yuzie007/mlip-2/-/tree/mlippy) can be used.
 
 ## Usage
 
@@ -26,10 +24,11 @@ mpirun -np 4 motep train motep.toml
 
 where the setting file `motep.toml` is like
 
-```
+```toml
 configurations = 'training.cfg'
 potential_initial = 'initial.mtp'
 potential_final = 'final.mtp'
+engine = 'numpy'  # {'numpy', 'mlippy'}
 energy-weight = 1.0
 force-weight = 0.01
 stress-weight = 0.0
@@ -131,5 +130,6 @@ This class represents the Genetic Algorithm (GA) implementation. It has the foll
   - The replacement strategy ensures that the population size remains constant.
   - This method can be useful for problems where memory usage is a concern or when it's desirable to maintain a stable population size.
 
+## Authors
 
-
+Pranav Kumar (trainer), Axel Forslund (calculator), Yuji Ikeda (testing)

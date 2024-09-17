@@ -12,7 +12,9 @@ dependencies = [
 ]
 requires-python = ">=3.11"  # tomllib
 authors = [
-    {name = "Pranav Kumar"},
+    {name = "Pranav Kumar"},  # trainer
+    {name = "Axel Forslund"},  # calculator
+    {name = "Yuji Ikeda"},  # testing
 ]
 
 [project.scripts]
