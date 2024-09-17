@@ -1,38 +1,8 @@
 """Initializer."""
 
-import random
 from typing import Any
 
 import numpy as np
-
-
-def generate_random_numbers(
-    n: int,
-    lb: float,
-    ub: float,
-    seed: int | None,
-) -> list[float]:
-    """Generate random numbers.
-
-    Parameters
-    ----------
-    n : int
-        Number of random numbers.
-    lb : float
-        Lower bound.
-    ub : float
-        Upper bound.
-    seed : int | None
-        Seed for the pseudo-random-number generator.
-
-    Returns
-    -------
-    list[float]
-        Random numbers.
-
-    """
-    random.seed(seed)
-    return [random.uniform(lb, ub) for _ in range(n)]
 
 
 def init_parameters(
@@ -59,25 +29,22 @@ def init_parameters(
         Bounds of the parameters.
 
     """
-    parameters_scaling, bounds_scaling = _init_scaling(
-        data,
-        optimized,
-        seed,
-    )
+    rng = np.random.default_rng(seed)
+    parameters_scaling, bounds_scaling = _init_scaling(data, optimized)
     parameters_moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
         data,
         optimized,
-        seed,
+        rng,
     )
     parameters_species_coeffs, bounds_species_coeffs = _init_species_coeffs(
         data,
         optimized,
-        seed,
+        rng,
     )
     parameters_radial_coeffs, bounds_radial_coeffs = _init_radial_coeffs(
         data,
         optimized,
-        seed,
+        rng,
     )
     parameters = (
         parameters_scaling
@@ -97,23 +64,26 @@ def init_parameters(
 def _init_scaling(
     data: dict[str, Any],
     optimized: list[str],
-    seed: int,
 ) -> tuple[list[float], list[tuple[float, float]]]:
     key = "scaling"
-    v = data.get(key, 1000.0)
+    v = data.get(key, 1.0)
     parameters_scaling = [v]
-    bounds_scaling = [(-1000.0, 1000.0)] if key in optimized else [(v, v)]
+    bounds_scaling = [(0.0, 1000.0)] if key in optimized else [(v, v)]
     return parameters_scaling, bounds_scaling
 
 
 def _init_moment_coeffs(
     data: dict[str, Any],
     optimized: list[str],
-    seed: int,
+    rng: np.random.Generator,
 ) -> tuple[list[float], list[tuple[float, float]]]:
     asm = data["alpha_scalar_moments"]
     key = "moment_coeffs"
-    v = np.array(data[key]) if key in data else np.full(asm, 5.0)
+    if key in data:
+        v = np.array(data[key])
+    else:
+        lb, ub = -5.0, +5.0
+        v = rng.uniform(lb, ub, asm)
     parameters = v.tolist()
     if key in optimized:
         lb, ub = -5.0, +5.0
@@ -126,11 +96,11 @@ def _init_moment_coeffs(
 def _init_species_coeffs(
     data: dict[str, Any],
     optimized: list[str],
-    seed: int,
+    rng: np.random.Generator,
 ) -> tuple[list[float], list[tuple[float, float]]]:
     species_count = data["species_count"]
     key = "species_coeffs"
-    v = np.array(data[key]) if key in data else np.full(species_count, 5.0)
+    v = np.array(data[key]) if key in data else np.zeros(species_count)
     parameters = v.tolist()
     if key in optimized:
         lb, ub = -5.0, +5.0
@@ -143,7 +113,7 @@ def _init_species_coeffs(
 def _init_radial_coeffs(
     data: dict[str, Any],
     optimized: list[str],
-    seed: int,
+    rng: np.random.Generator,
 ) -> tuple[list[float], list[tuple[float, float]]]:
     species_count = data["species_count"]
     rfc = data["radial_funcs_count"]
@@ -154,7 +124,7 @@ def _init_radial_coeffs(
         v = np.array(data[key]).flatten()
     else:
         lb, ub = -0.1, +0.1
-        v = np.array(generate_random_numbers(n, lb, ub, seed))
+        v = rng.uniform(lb, ub, n)
     parameters = v.tolist()
     if key in optimized:
         lb, ub = -0.1, +0.1
