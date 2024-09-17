@@ -43,7 +43,7 @@ class MTP(Calculator):
 
     def update_parameters(self, parameters: dict[str, Any]):
         self.engine.update(parameters)
-        self.atoms = None  # trigger new calculation
+        self.results = {}  # trigger new calculation
 
     def calculate(
         self,
