@@ -5,7 +5,34 @@ from typing import Any
 
 import numpy as np
 
-from motep.pot import generate_random_numbers
+
+def generate_random_numbers(
+    n: int,
+    lb: float,
+    ub: float,
+    seed: int | None,
+) -> list[float]:
+    """Generate random numbers.
+
+    Parameters
+    ----------
+    n : int
+        Number of random numbers.
+    lb : float
+        Lower bound.
+    ub : float
+        Upper bound.
+    seed : int | None
+        Seed for the pseudo-random-number generator.
+
+    Returns
+    -------
+    list[float]
+        Random numbers.
+
+    """
+    random.seed(seed)
+    return [random.uniform(lb, ub) for _ in range(n)]
 
 
 def init_parameters(
@@ -21,7 +48,7 @@ def init_parameters(
         Data in the .mtp file.
     optimized : list[str]
         Parameters to be optimized.
-    seed : int
+    seed : int | None
         Seed of the pseudo-random-number generator.
 
     Returns
@@ -32,8 +59,6 @@ def init_parameters(
         Bounds of the parameters.
 
     """
-    if seed is None:
-        seed = random.randrange(2**31 - 1)
     parameters_scaling, bounds_scaling = _init_scaling(
         data,
         optimized,
