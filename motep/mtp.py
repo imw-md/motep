@@ -71,6 +71,7 @@ class NumpyMTPEngine:
         if mtp_parameters is not None:
             self.update(mtp_parameters)
         self.results = {}
+        self._neighbor_list = None
 
     def update(self, parameters: dict[str, Any]) -> None:
         self.parameters = parameters
