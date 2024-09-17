@@ -3,7 +3,11 @@
 from typing import Any
 
 from ase import Atoms
-from ase.calculators.calculator import Calculator, all_changes
+from ase.calculators.calculator import (
+    Calculator,
+    PropertyNotImplementedError,
+    all_changes,
+)
 
 
 def make_mtp_engine(engine: str = "numpy"):
@@ -54,4 +58,7 @@ class MTP(Calculator):
 
         self.results["energy"] = self.results["free_energy"] = energy
         self.results["forces"] = forces
-        self.results["stress"] = stress
+        if self.atoms.cell.rank == 3:
+            self.results["stress"] = stress
+        elif "stress" in properties:
+            raise PropertyNotImplementedError
