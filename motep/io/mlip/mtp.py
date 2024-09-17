@@ -1,3 +1,5 @@
+import itertools
+import pathlib
 from typing import Any, TextIO
 
 import numpy as np
@@ -6,23 +8,27 @@ import numpy as np
 def _parse_radial_coeffs(
     file: TextIO,
     data: dict[str, Any],
-) -> dict[tuple[int, int], list[list[float]]]:
-    d = {}
+) -> np.ndarray:
+    coeffs = []
     for _ in range(data["species_count"]):
         for _ in range(data["species_count"]):
-            key = tuple(int(_) for _ in next(file).strip().split("-"))
-            value = []
+            next(file)  # skip line with e.g. `0-0`
             for _ in range(data["radial_funcs_count"]):
                 tmp = next(file).strip().strip("{}").split(",")
-                value.append([float(_) for _ in tmp])
-            d[key] = value
-    return d
+                coeffs.append([float(_) for _ in tmp])
+    shape = (
+        data["species_count"],
+        data["species_count"],
+        data["radial_funcs_count"],
+        data["radial_basis_size"],
+    )
+    return np.array(coeffs).reshape(shape)
 
 
-def read_mtp(file_path) -> dict[str, Any]:
+def read_mtp(filename) -> dict[str, Any]:
     data = {}
-    with open(file_path, "r", encoding="utf-8") as file:
-        for line in file:
+    with pathlib.Path(filename).open("r", encoding="utf-8") as fd:
+        for line in fd:
             if line.strip() == "MTP":
                 continue
             if "=" in line:
@@ -45,7 +51,7 @@ def read_mtp(file_path) -> dict[str, Any]:
                     data[key] = value.strip()
             elif line.strip() == "radial_coeffs":
                 key = "radial_coeffs"
-                data[key] = _parse_radial_coeffs(file, data)
+                data[key] = _parse_radial_coeffs(fd, data)
 
     return data
 
@@ -96,8 +102,8 @@ def write_mtp(file, data: dict[str, Any]) -> None:
         "species_coeffs",
         "moment_coeffs",
     ]
-
-    with open(file, "w", encoding="utf-8") as fd:
+    species_count = data["species_count"]
+    with pathlib.Path(file).open("w", encoding="utf-8") as fd:
         fd.write("MTP\n")
         for key in keys0:
             if key in data:
@@ -107,8 +113,9 @@ def write_mtp(file, data: dict[str, Any]) -> None:
                 fd.write(f"\t{key} = {_format_value(data[key])}\n")
         if "radial_coeffs" in data:
             fd.write("\tradial_coeffs\n")
-            for key, value in data["radial_coeffs"].items():
-                fd.write(f"\t\t{key[0]}-{key[1]}\n")
+            for k0, k1 in itertools.product(range(species_count), repeat=2):
+                value = data["radial_coeffs"][k0, k1]
+                fd.write(f"\t\t{k0}-{k1}\n")
                 for _ in range(data["radial_funcs_count"]):
                     fd.write(f"\t\t\t{_format_list(value[_])}\n")
         for key in keys2:
