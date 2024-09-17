@@ -6,7 +6,7 @@ import numpy as np
 from ase import Atoms
 from scipy.constants import eV
 
-from motep.calculators import MTP
+from motep.calculator import MTP
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 
