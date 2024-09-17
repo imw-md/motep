@@ -1,6 +1,9 @@
 configurations = 'training.cfg'
 potential_initial = 'initial.mtp'
 potential_final = 'final.mtp'
+optimized = ['scaling', 'radial_coeffs', 'species_coeffs', 'moment_coeffs']
+seed = 10
+engine = 'mlippy'
 energy-weight = 1.0
 force-weight = 0.01
 stress-weight = 0.0
