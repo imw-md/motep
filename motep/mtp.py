@@ -165,8 +165,8 @@ class NumpyMTPEngine:
         if self._neighbor_list is None:
             self._initiate_neighbor_list(atoms)
         else:
-            self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
-            self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
+            if self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
+                self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
 
     def _get_distances(
         self,
