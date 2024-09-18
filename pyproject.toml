@@ -20,8 +20,8 @@ authors = [
 [project.scripts]
 motep = "motep.__init__:main"
 
-[tool.setuptools]
-packages = ["motep"]
+[tool.setuptools.packages]
+find = {}
 
 [tool.ruff.lint]
 preview = true  # necessary to activate many pycodestyle rules
