@@ -58,7 +58,7 @@ What This code do
 - Can provide configurational weight to each atomic configurations
 - Can optimize MTPs (You can optimize any force-field)
 - New python based MTP calculator
-- Switch to different radial basis type then chebyshev
+- Switch to different radial basis type other then chebyshev such as Legendre/Cubic-spline/B-spline
 
 ````
 
