@@ -35,11 +35,10 @@ def calc_radial_basis(
     itype: int,
     jtypes: list[int],
     scaling: float,
-    min_dist: float,
     max_dist: float,
     radial_funcs_count: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    is_within_cutoff = (min_dist < r_abs) & (r_abs < max_dist)
+    is_within_cutoff = r_abs < max_dist
     smooth_values = scaling * (max_dist - r_abs) ** 2
     smooth_derivs = -2.0 * scaling * (max_dist - r_abs)
     rb_values = np.zeros((radial_funcs_count, r_abs.size))
@@ -97,7 +96,6 @@ class NumpyMTPEngine:
             itype,
             jtypes,
             self.parameters["scaling"],
-            self.parameters["min_dist"],
             self.parameters["max_dist"],
             self.parameters["radial_funcs_count"],
         )
