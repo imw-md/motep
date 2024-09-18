@@ -294,25 +294,24 @@ class NumbaMTPEngine(EngineBase):
 
     def get_energy(self, atoms: Atoms):
         self.update_neighbor_list(atoms)
-        energy, forces = self.numba_calc_energy_and_forces(atoms)
-        return energy, forces
+        return self.numba_calc_energy_and_forces(atoms)
 
     def numba_calc_energy_and_forces(self, atoms):
         from motep.numba import numba_calc_energy_and_forces
 
-        mlip_params = self.parameters["from_mlip"]
-        energy, forces = numba_calc_energy_and_forces(
+        mlip_params = self.parameters
+        energy, forces, stress = numba_calc_energy_and_forces(
             self,
             atoms,
             mlip_params["alpha_moments_count"],
-            mlip_params["alpha_moment_mapping"],
-            mlip_params["alpha_index_basic"],
-            mlip_params["alpha_index_times"],
+            np.array(mlip_params["alpha_moment_mapping"], dtype=int),
+            np.array(mlip_params["alpha_index_basic"], dtype=int),
+            np.array(mlip_params["alpha_index_times"], dtype=int),
             mlip_params["scaling"],
             mlip_params["min_dist"],
             mlip_params["max_dist"],
             mlip_params["species_coeffs"],
             mlip_params["moment_coeffs"],
-            mlip_params["radial_coeffs"][(0, 0)],
+            mlip_params["radial_coeffs"],
         )
-        return energy, forces
+        return energy, forces, stress
