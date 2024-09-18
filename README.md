@@ -32,7 +32,7 @@ engine = 'numpy'  # {'numpy', 'mlippy'}
 energy-weight = 1.0
 force-weight = 0.01
 stress-weight = 0.0
-steps = ['GA', 'Nelder-Mead']
+steps = ['L-BFGS-B', 'Nelder-Mead']
 ```
 
 If some of the following parameters are already given in `initial.mtp`,
