@@ -16,8 +16,10 @@ def init_radial_basis_functions(
     radial_coeffs: np.ndarray,
     min_dist: float,
     max_dist: float,
-) -> np.ndarray:  # array of Chebyshev objects
+) -> tuple[np.ndarray, np.ndarray]:  # array of Chebyshev objects
+    """Initialize radial basis functions."""
     radial_basis_funcs = []
+    radial_basis_dfdrs = []  # derivatives
     domain = [min_dist, max_dist]
     nspecies, _, nmu, _ = radial_coeffs.shape
     for i0 in range(nspecies):
@@ -25,24 +27,32 @@ def init_radial_basis_functions(
             for i2 in range(nmu):
                 p = Chebyshev(radial_coeffs[i0, i1, i2], domain=domain)
                 radial_basis_funcs.append(p)
+                radial_basis_dfdrs.append(p.deriv())
     shape = nspecies, nspecies, nmu
-    return np.array(radial_basis_funcs).reshape(shape)
+    return (
+        np.array(radial_basis_funcs).reshape(shape),
+        np.array(radial_basis_dfdrs).reshape(shape),
+    )
 
 
 def update_radial_basis_coefficients(
     radial_coeffs: np.ndarray,
     radial_basis_funcs: np.ndarray,  # array of Chebyshev objects
+    radial_basis_dfdrs: np.ndarray,  # array of Chebyshev objects
 ) -> None:
     """Update radial basis coefficients."""
     nspecies, _, nmu, _ = radial_coeffs.shape
     for i0 in range(nspecies):
         for i1 in range(nspecies):
             for i2 in range(nmu):
-                radial_basis_funcs[i0, i1, i2].coef = radial_coeffs[i0, i1, i2]
+                p = radial_basis_funcs[i0, i1, i2]
+                p.coef = radial_coeffs[i0, i1, i2]
+                radial_basis_dfdrs[i0, i1, i2] = p.deriv()
 
 
 def calc_radial_basis(
     radial_basis_funcs: np.ndarray,  # array of Chebyshev objects
+    radial_basis_dfdrs: np.ndarray,  # array of Chebyshev objects
     r_abs: np.ndarray,
     itype: int,
     jtypes: list[int],
@@ -58,11 +68,12 @@ def calc_radial_basis(
     for mu in range(radial_funcs_count):
         for j, jtype in enumerate(jtypes):
             if is_within_cutoff[j]:
-                rb_funcs = radial_basis_funcs[itype, jtype, mu]
-                v = rb_funcs(r_abs[j]) * smooth_values[j]
+                rb_func = radial_basis_funcs[itype, jtype, mu]
+                rb_dfdr = radial_basis_dfdrs[itype, jtype, mu]
+                v = rb_func(r_abs[j]) * smooth_values[j]
                 rb_values[mu, j] = v
-                d0 = rb_funcs.deriv()(r_abs[j]) * smooth_values[j]
-                d1 = rb_funcs(r_abs[j]) * smooth_derivs[j]
+                d0 = rb_dfdr(r_abs[j]) * smooth_values[j]
+                d1 = rb_func(r_abs[j]) * smooth_derivs[j]
                 d = d0 + d1
                 rb_derivs[mu, j] = d
     return rb_values, rb_derivs
@@ -79,6 +90,7 @@ class NumpyMTPEngine:
 
         """
         self.radial_basis_funcs = None
+        self.radial_basis_dfdrs = None
         self.parameters = {}
         if mtp_parameters is not None:
             self.update(mtp_parameters)
@@ -93,15 +105,18 @@ class NumpyMTPEngine:
             self.parameters["species"] = species
         if "radial_coeffs" in self.parameters:
             if self.radial_basis_funcs is None:
-                self.radial_basis_funcs = init_radial_basis_functions(
-                    self.parameters["radial_coeffs"],
-                    self.parameters["min_dist"],
-                    self.parameters["max_dist"],
+                self.radial_basis_funcs, self.radial_basis_dfdrs = (
+                    init_radial_basis_functions(
+                        self.parameters["radial_coeffs"],
+                        self.parameters["min_dist"],
+                        self.parameters["max_dist"],
+                    )
                 )
             else:
                 update_radial_basis_coefficients(
                     self.parameters["radial_coeffs"],
                     self.radial_basis_funcs,
+                    self.radial_basis_dfdrs,
                 )
 
     def calc_radial_basis(
@@ -112,6 +127,7 @@ class NumpyMTPEngine:
     ) -> tuple[np.ndarray, np.ndarray]:
         return calc_radial_basis(
             self.radial_basis_funcs,
+            self.radial_basis_dfdrs,
             r_abs,
             itype,
             jtypes,

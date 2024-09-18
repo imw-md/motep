@@ -230,14 +230,15 @@ def test_radial_funcs(
     jtypes: list[int],
 ):
     radial_funcs_count = radial_coeffs.shape[2]
-    radial_basis_functions = init_radial_basis_functions(
+    radial_basis_funcs, radial_basis_dfdrs = init_radial_basis_functions(
         radial_coeffs,
         min_dist=2.0,
         max_dist=5.0,
     )
     r_abs = np.linalg.norm(r_ijs, axis=1)
     _, radial_basis_derivs = calc_radial_basis(
-        radial_basis_functions,
+        radial_basis_funcs,
+        radial_basis_dfdrs,
         r_abs,
         0,
         jtypes=jtypes,
@@ -250,7 +251,8 @@ def test_radial_funcs(
     r_ijs_p = r_ijs + [[dx, 0.0, 0.0]]
     r_abs_p = np.linalg.norm(r_ijs_p, axis=1)
     radial_basis_values_p, _ = calc_radial_basis(
-        radial_basis_functions,
+        radial_basis_funcs,
+        radial_basis_dfdrs,
         r_abs_p,
         0,
         jtypes=jtypes,
@@ -261,7 +263,8 @@ def test_radial_funcs(
     r_ijs_m = r_ijs - [[dx, 0.0, 0.0]]
     r_abs_m = np.linalg.norm(r_ijs_m, axis=1)
     radial_basis_values_m, _ = calc_radial_basis(
-        radial_basis_functions,
+        radial_basis_funcs,
+        radial_basis_dfdrs,
         r_abs_m,
         0,
         jtypes=jtypes,
