@@ -43,7 +43,7 @@ class MTP(Calculator):
 
     def update_parameters(self, parameters: dict[str, Any]):
         self.engine.update(parameters)
-        self.atoms = None  # trigger new calculation
+        self.results = {}  # trigger new calculation
 
     def calculate(
         self,
@@ -53,7 +53,6 @@ class MTP(Calculator):
     ):
         super().calculate(atoms, properties, system_changes)
 
-        self.engine._initiate_neighbor_list(self.atoms)
         energy, forces, stress = self.engine.get_energy(self.atoms)
 
         self.results["energy"] = self.results["free_energy"] = energy
