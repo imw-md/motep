@@ -157,8 +157,8 @@ class NumpyMTPEngine:
             np.tensordot(moment_coeffs, basis_derivs, axes=(0, 0)),
         )
 
-    def get_energy(self, atoms: Atoms):
-        """Calculate the energy of the given system."""
+    def calculate(self, atoms: Atoms) -> tuple:
+        """Calculate properties of the given system."""
         self.update_neighbor_list(atoms)
         energies = np.zeros(len(atoms))
         forces = np.zeros((len(atoms), 3))
