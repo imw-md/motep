@@ -180,9 +180,9 @@ class NumpyMTPEngine:
         if atoms.cell.rank == 3:
             stress = (stress + stress.T) * 0.5  # symmetrize
             stress /= atoms.get_volume()
-            self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
         else:
-            self.results["stress"] = np.full(6, np.nan)
+            stress[:, :] = np.nan
+        self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return self.results["energy"], self.results["forces"], self.results["stress"]
 
