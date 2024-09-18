@@ -79,7 +79,7 @@ def calc_radial_basis(
     return rb_values, rb_derivs
 
 
-class NumpyMTPEngine:
+class EngineBase:
     def __init__(self, mtp_parameters: dict[str, Any] | None = None):
         """MLIP-2 MTP.
 
@@ -118,6 +118,42 @@ class NumpyMTPEngine:
                     self.radial_basis_funcs,
                     self.radial_basis_dfdrs,
                 )
+
+    def update_neighbor_list(self, atoms: Atoms):
+        if self._neighbor_list is None:
+            self._initiate_neighbor_list(atoms)
+        else:
+            if self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
+                self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
+
+    def _initiate_neighbor_list(self, atoms: Atoms):
+        self._neighbor_list = PrimitiveNeighborList(
+            cutoffs=[self.parameters["max_dist"]] * len(atoms),
+            skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
+            self_interaction=False,  # Exclude [0, 0, 0]
+            bothways=True,  # return both ij and ji
+        )
+        self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
+        self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
+
+    def _get_distances(
+        self,
+        atoms: Atoms,
+        index: int,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        indices_js, _ = self._neighbor_list.get_neighbors(index)
+        offsets = self.precomputed_offsets[index]
+        pos_js = atoms.positions[indices_js] + offsets
+        dist_vectors = atoms.positions[index] - pos_js
+        return indices_js, dist_vectors.T
+
+
+def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
+    cell = atoms.cell
+    return [nl.get_neighbors(j)[1] @ cell for j in range(len(atoms))]
+
+
+class NumpyMTPEngine(EngineBase):
 
     def calc_radial_basis(
         self,
@@ -186,40 +222,10 @@ class NumpyMTPEngine:
 
         return self.results["energy"], self.results["forces"], self.results["stress"]
 
-    def _initiate_neighbor_list(self, atoms: Atoms):
-        self._neighbor_list = PrimitiveNeighborList(
-            cutoffs=[self.parameters["max_dist"]] * len(atoms),
-            skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
-            self_interaction=False,  # Exclude [0, 0, 0]
-            bothways=True,  # return both ij and ji
-        )
-        self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
-        self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
 
-    def update_neighbor_list(self, atoms: Atoms):
-        if self._neighbor_list is None:
-            self._initiate_neighbor_list(atoms)
-        else:
-            if self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
-                self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
-
-    def _get_distances(
-        self,
-        atoms: Atoms,
-        index: int,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        indices_js, _ = self._neighbor_list.get_neighbors(index)
-        offsets = self.precomputed_offsets[index]
-        pos_js = atoms.positions[indices_js] + offsets
-        dist_vectors = atoms.positions[index] - pos_js
-        return indices_js, dist_vectors.T
-
-
-def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
-    cell = atoms.cell
-    return [nl.get_neighbors(j)[1] @ cell for j in range(len(atoms))]
-
-
+#
+# Numpy implemented functions for radial basis and moment basis evaluation:
+#
 def calc_moment_basis(
     r_ijs: np.ndarray,  # (3, neighbors)
     r_abs: np.ndarray,  # (neighbors)
@@ -279,3 +285,34 @@ def calc_moment_basis(
     basis_vals = moment_components[alpha_moment_mapping]
     basis_ders = moment_jacobian[alpha_moment_mapping]
     return basis_vals, basis_ders
+
+
+#
+# Class for Numba implementation
+#
+class NumbaMTPEngine(EngineBase):
+
+    def get_energy(self, atoms: Atoms):
+        self.update_neighbor_list(atoms)
+        energy, forces = self.numba_calc_energy_and_forces(atoms)
+        return energy, forces
+
+    def numba_calc_energy_and_forces(self, atoms):
+        from motep.numba import numba_calc_energy_and_forces
+
+        mlip_params = self.parameters["from_mlip"]
+        energy, forces = numba_calc_energy_and_forces(
+            self,
+            atoms,
+            mlip_params["alpha_moments_count"],
+            mlip_params["alpha_moment_mapping"],
+            mlip_params["alpha_index_basic"],
+            mlip_params["alpha_index_times"],
+            mlip_params["scaling"],
+            mlip_params["min_dist"],
+            mlip_params["max_dist"],
+            mlip_params["species_coeffs"],
+            mlip_params["moment_coeffs"],
+            mlip_params["radial_coeffs"][(0, 0)],
+        )
+        return energy, forces
