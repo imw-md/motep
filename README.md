@@ -8,6 +8,13 @@ pip install git+https://github.tik.uni-stuttgart.de/ac144228/MTP_train.git
 
 Optionally [our modified version of `mlippy`](https://gitlab.com/yuzie007/mlip-2/-/tree/mlippy) can be used.
 
+Two calculator:
+
+
+a) Mlippy based on python wrapper around mlip code
+
+b) Numpy based calculator
+
 ## Usage
 
 ### `motep train`
@@ -32,7 +39,7 @@ engine = 'numpy'  # {'numpy', 'mlippy'}
 energy-weight = 1.0
 force-weight = 0.01
 stress-weight = 0.0
-steps = ['GA', 'Nelder-Mead']
+steps = ['L-BFGS-B', 'Nelder-Mead']
 ```
 
 If some of the following parameters are already given in `initial.mtp`,
@@ -51,7 +58,9 @@ What This code do
 - Uses python based optimization code to reduce the function value (errors)
 - Can switch to different optimizer and any stage
 - Can provide configurational weight to each atomic configurations
-- You can optimize any force-field 
+- Can optimize MTPs (You can optimize any force-field)
+- New python based MTP calculator
+- Switch to different radial basis type other then chebyshev such as Legendre/Cubic-spline/B-spline
 
 ````
 

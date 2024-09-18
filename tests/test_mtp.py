@@ -242,7 +242,6 @@ def test_radial_funcs(
         0,
         jtypes=jtypes,
         scaling=1.0,
-        min_dist=2.0,
         max_dist=5.0,
         radial_funcs_count=radial_funcs_count,
     )
@@ -256,7 +255,6 @@ def test_radial_funcs(
         0,
         jtypes=jtypes,
         scaling=1.0,
-        min_dist=2.0,
         max_dist=5.0,
         radial_funcs_count=radial_funcs_count,
     )
@@ -268,7 +266,6 @@ def test_radial_funcs(
         0,
         jtypes=jtypes,
         scaling=1.0,
-        min_dist=2.0,
         max_dist=5.0,
         radial_funcs_count=radial_funcs_count,
     )

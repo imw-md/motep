@@ -29,17 +29,28 @@ def init_radial_basis_functions(
     return np.array(radial_basis_funcs).reshape(shape)
 
 
+def update_radial_basis_coefficients(
+    radial_coeffs: np.ndarray,
+    radial_basis_funcs: np.ndarray,  # array of Chebyshev objects
+) -> None:
+    """Update radial basis coefficients."""
+    nspecies, _, nmu, _ = radial_coeffs.shape
+    for i0 in range(nspecies):
+        for i1 in range(nspecies):
+            for i2 in range(nmu):
+                radial_basis_funcs[i0, i1, i2].coef = radial_coeffs[i0, i1, i2]
+
+
 def calc_radial_basis(
     radial_basis_funcs: np.ndarray,  # array of Chebyshev objects
     r_abs: np.ndarray,
     itype: int,
     jtypes: list[int],
     scaling: float,
-    min_dist: float,
     max_dist: float,
     radial_funcs_count: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    is_within_cutoff = (min_dist < r_abs) & (r_abs < max_dist)
+    is_within_cutoff = r_abs < max_dist
     smooth_values = scaling * (max_dist - r_abs) ** 2
     smooth_derivs = -2.0 * scaling * (max_dist - r_abs)
     rb_values = np.zeros((radial_funcs_count, r_abs.size))
@@ -67,6 +78,7 @@ class NumpyMTPEngine:
             Parameters in the MLIP .mtp file.
 
         """
+        self.radial_basis_funcs = None
         self.parameters = {}
         if mtp_parameters is not None:
             self.update(mtp_parameters)
@@ -74,16 +86,23 @@ class NumpyMTPEngine:
         self._neighbor_list = None
 
     def update(self, parameters: dict[str, Any]) -> None:
+        """Update MTP parameters."""
         self.parameters = parameters
         if "species" not in self.parameters:
             species = {_: _ for _ in range(self.parameters["species_count"])}
             self.parameters["species"] = species
         if "radial_coeffs" in self.parameters:
-            self.radial_basis_funcs = init_radial_basis_functions(
-                self.parameters["radial_coeffs"],
-                self.parameters["min_dist"],
-                self.parameters["max_dist"],
-            )
+            if self.radial_basis_funcs is None:
+                self.radial_basis_funcs = init_radial_basis_functions(
+                    self.parameters["radial_coeffs"],
+                    self.parameters["min_dist"],
+                    self.parameters["max_dist"],
+                )
+            else:
+                update_radial_basis_coefficients(
+                    self.parameters["radial_coeffs"],
+                    self.radial_basis_funcs,
+                )
 
     def calc_radial_basis(
         self,
@@ -97,7 +116,6 @@ class NumpyMTPEngine:
             itype,
             jtypes,
             self.parameters["scaling"],
-            self.parameters["min_dist"],
             self.parameters["max_dist"],
             self.parameters["radial_funcs_count"],
         )
