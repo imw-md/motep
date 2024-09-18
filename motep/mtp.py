@@ -160,10 +160,11 @@ class NumpyMTPEngine:
     def calculate(self, atoms: Atoms) -> tuple:
         """Calculate properties of the given system."""
         self.update_neighbor_list(atoms)
-        energies = np.zeros(len(atoms))
-        forces = np.zeros((len(atoms), 3))
+        number_of_atoms = len(atoms)
+        energies = np.zeros(number_of_atoms)
+        forces = np.zeros((number_of_atoms, 3))
         stress = np.zeros((3, 3))
-        for i in range(len(atoms)):
+        for i in range(number_of_atoms):
             js, r_ijs = self._get_distances(atoms, i)
             e, gradient = self._get_local_energy(atoms, i, js, r_ijs)
             itype = self.parameters["species"][atoms.numbers[i]]
