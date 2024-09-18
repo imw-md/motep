@@ -9,6 +9,8 @@ pip install git+https://github.tik.uni-stuttgart.de/ac144228/MTP_train.git
 Optionally [our modified version of `mlippy`](https://gitlab.com/yuzie007/mlip-2/-/tree/mlippy) can be used.
 
 Two calculator:
+
+
 a) Mlippy based on python wrapper around mlip code
 
 b) Numpy based calculator
