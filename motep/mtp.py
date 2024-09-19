@@ -80,7 +80,7 @@ class NumpyMTPEngine(EngineBase):
             Parameters in the MLIP .mtp file.
 
         """
-        super().__init__(self, mtp_parameters)
+        super().__init__(mtp_parameters)
         self.radial_basis_funcs = None
         self.radial_basis_dfdrs = None
 
