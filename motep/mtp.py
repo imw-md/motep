@@ -307,6 +307,21 @@ def calc_moment_basis(
 #
 class NumbaMTPEngine(EngineBase):
 
+    def update(self, parameters: dict[str, Any]) -> None:
+        """Update MTP parameters."""
+
+        cast_as_int = ["alpha_moment_mapping", "alpha_index_basic", "alpha_index_times"]
+        cast_as_float = ["species_coeffs", "moment_coeffs", "radial_coeffs"]
+        casted_parameters = {}
+        for k, v in parameters.items():
+            if k in cast_as_int:
+                casted_parameters[k] = np.array(v, dtype=int)
+            elif k in cast_as_float:
+                casted_parameters[k] = np.array(v, dtype=float)
+            else:
+                casted_parameters[k] = v
+        super().update(casted_parameters)
+
     def calculate(self, atoms: Atoms):
         self.update_neighbor_list(atoms)
         return self.numba_calc_energy_and_forces(atoms)
@@ -319,9 +334,9 @@ class NumbaMTPEngine(EngineBase):
             self,
             atoms,
             mlip_params["alpha_moments_count"],
-            np.array(mlip_params["alpha_moment_mapping"], dtype=int),
-            np.array(mlip_params["alpha_index_basic"], dtype=int),
-            np.array(mlip_params["alpha_index_times"], dtype=int),
+            mlip_params["alpha_moment_mapping"],
+            mlip_params["alpha_index_basic"],
+            mlip_params["alpha_index_times"],
             mlip_params["scaling"],
             mlip_params["min_dist"],
             mlip_params["max_dist"],
