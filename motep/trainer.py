@@ -10,7 +10,7 @@ from mpi4py import MPI
 
 from motep.ga import optimization_GA
 from motep.initializer import Initializer
-from motep.io.mlip.cfg import read_cfg
+from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss_function import LossFunction
 from motep.opt import optimization_bfgs, optimization_nelder
@@ -64,6 +64,13 @@ def run(args: argparse.Namespace) -> None:
 
     species = setting.get("species")
     images = read_cfg(cfg_file, index=":", species=species)
+    species = list(_get_species(images)) if species is None else species
+
+    initializer = Initializer(images, species, setting["seed"])
+    parameters, bounds = initializer.initialize(
+        read_mtp(untrained_mtp),
+        setting["optimized"],
+    )
 
     if setting["engine"] == "mlippy":
         from motep.mlippy_loss_function import MlippyLossFunction
@@ -72,12 +79,6 @@ def run(args: argparse.Namespace) -> None:
     else:
         engine = setting["engine"]
         fitness = LossFunction(images, untrained_mtp, setting, comm, engine=engine)
-
-    initializer = Initializer(setting["seed"])
-    parameters, bounds = initializer.initialize(
-        read_mtp(untrained_mtp),
-        setting["optimized"],
-    )
 
     funs = {
         "GA": optimization_GA,
