@@ -12,6 +12,168 @@ from ase.neighborlist import PrimitiveNeighborList
 from numpy.polynomial import Chebyshev
 
 
+class EngineBase:
+    def __init__(self, mtp_parameters: dict[str, Any] | None = None):
+        """MLIP-2 MTP.
+
+        Parameters
+        ----------
+        mtp_parameters : dict[str, Any]
+            Parameters in the MLIP .mtp file.
+
+        """
+        self.parameters = {}
+        if mtp_parameters is not None:
+            self.update(mtp_parameters)
+        self.results = {}
+        self._neighbor_list = None
+
+    def update(self, parameters: dict[str, Any]) -> None:
+        """Update MTP parameters."""
+        self.parameters = parameters
+        if "species" not in self.parameters:
+            species = {_: _ for _ in range(self.parameters["species_count"])}
+            self.parameters["species"] = species
+
+    def update_neighbor_list(self, atoms: Atoms):
+        if self._neighbor_list is None:
+            self._initiate_neighbor_list(atoms)
+        else:
+            if self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
+                self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
+
+    def _initiate_neighbor_list(self, atoms: Atoms):
+        self._neighbor_list = PrimitiveNeighborList(
+            cutoffs=[self.parameters["max_dist"]] * len(atoms),
+            skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
+            self_interaction=False,  # Exclude [0, 0, 0]
+            bothways=True,  # return both ij and ji
+        )
+        self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
+        self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
+
+    def _get_distances(
+        self,
+        atoms: Atoms,
+        index: int,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        indices_js, _ = self._neighbor_list.get_neighbors(index)
+        offsets = self.precomputed_offsets[index]
+        pos_js = atoms.positions[indices_js] + offsets
+        dist_vectors = atoms.positions[index] - pos_js
+        return indices_js, dist_vectors.T
+
+
+def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
+    cell = atoms.cell
+    return [nl.get_neighbors(j)[1] @ cell for j in range(len(atoms))]
+
+
+class NumpyMTPEngine(EngineBase):
+
+    def __init__(self, mtp_parameters: dict[str, Any] | None = None):
+        """MLIP-2 MTP.
+
+        Parameters
+        ----------
+        mtp_parameters : dict[str, Any]
+            Parameters in the MLIP .mtp file.
+
+        """
+        self.radial_basis_funcs = None
+        self.radial_basis_dfdrs = None
+        super().__init__(mtp_parameters)
+
+    def update(self, parameters: dict[str, Any]) -> None:
+        """Update MTP parameters."""
+        super().update(parameters)
+        if "radial_coeffs" in self.parameters:
+            if self.radial_basis_funcs is None:
+                self.radial_basis_funcs, self.radial_basis_dfdrs = (
+                    init_radial_basis_functions(
+                        self.parameters["radial_coeffs"],
+                        self.parameters["min_dist"],
+                        self.parameters["max_dist"],
+                    )
+                )
+            else:
+                update_radial_basis_coefficients(
+                    self.parameters["radial_coeffs"],
+                    self.radial_basis_funcs,
+                    self.radial_basis_dfdrs,
+                )
+
+    def _calc_radial_basis(
+        self,
+        r_abs: np.ndarray,
+        itype: int,
+        jtypes: list[int],
+    ) -> tuple[np.ndarray, np.ndarray]:
+        return calc_radial_basis(
+            self.radial_basis_funcs,
+            self.radial_basis_dfdrs,
+            r_abs,
+            itype,
+            jtypes,
+            self.parameters["scaling"],
+            self.parameters["max_dist"],
+            self.parameters["radial_funcs_count"],
+        )
+
+    def _calc_local_energy(self, atoms: Atoms, i: int, js: list[int], r_ijs):
+        itype = self.parameters["species"][atoms.numbers[i]]
+        jtypes = [self.parameters["species"][atoms.numbers[j]] for j in js]
+        r_abs = np.linalg.norm(r_ijs, axis=0)
+        rb_values, rb_derivs = self._calc_radial_basis(r_abs, itype, jtypes)
+        basis_values, basis_derivs = calc_moment_basis(
+            r_ijs,
+            r_abs,
+            rb_values,
+            rb_derivs,
+            self.parameters["alpha_moments_count"],
+            self.parameters["alpha_index_basic"],
+            self.parameters["alpha_index_times"],
+            self.parameters["alpha_moment_mapping"],
+        )
+        moment_coeffs = self.parameters["moment_coeffs"]
+        return (
+            moment_coeffs @ basis_values,
+            np.tensordot(moment_coeffs, basis_derivs, axes=(0, 0)),
+        )
+
+    def calculate(self, atoms: Atoms) -> tuple:
+        """Calculate properties of the given system."""
+        self.update_neighbor_list(atoms)
+        number_of_atoms = len(atoms)
+        energies = np.zeros(number_of_atoms)
+        forces = np.zeros((number_of_atoms, 3))
+        stress = np.zeros((3, 3))
+        for i in range(number_of_atoms):
+            js, r_ijs = self._get_distances(atoms, i)
+            e, gradient = self._calc_local_energy(atoms, i, js, r_ijs)
+            itype = self.parameters["species"][atoms.numbers[i]]
+            energies[i] = e + self.parameters["species_coeffs"][itype]
+            for k, j in enumerate(js):
+                forces[i] -= gradient[:, k]
+                forces[j] += gradient[:, k]
+            stress += r_ijs @ gradient.T
+        self.results["energies"] = energies
+        self.results["energy"] = self.results["energies"].sum()
+        self.results["forces"] = forces
+
+        if atoms.cell.rank == 3:
+            stress = (stress + stress.T) * 0.5  # symmetrize
+            stress /= atoms.get_volume()
+        else:
+            stress[:, :] = np.nan
+        self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
+
+        return self.results["energy"], self.results["forces"], self.results["stress"]
+
+
+#
+# Numpy implemented functions for radial basis and moment basis evaluation:
+#
 def init_radial_basis_functions(
     radial_coeffs: np.ndarray,
     min_dist: float,
@@ -79,147 +241,6 @@ def calc_radial_basis(
     return rb_values, rb_derivs
 
 
-class NumpyMTPEngine:
-    def __init__(self, mtp_parameters: dict[str, Any] | None = None):
-        """MLIP-2 MTP.
-
-        Parameters
-        ----------
-        mtp_parameters : dict[str, Any]
-            Parameters in the MLIP .mtp file.
-
-        """
-        self.radial_basis_funcs = None
-        self.radial_basis_dfdrs = None
-        self.parameters = {}
-        if mtp_parameters is not None:
-            self.update(mtp_parameters)
-        self.results = {}
-        self._neighbor_list = None
-
-    def update(self, parameters: dict[str, Any]) -> None:
-        """Update MTP parameters."""
-        self.parameters = parameters
-        if "species" not in self.parameters:
-            species = {_: _ for _ in range(self.parameters["species_count"])}
-            self.parameters["species"] = species
-        if "radial_coeffs" in self.parameters:
-            if self.radial_basis_funcs is None:
-                self.radial_basis_funcs, self.radial_basis_dfdrs = (
-                    init_radial_basis_functions(
-                        self.parameters["radial_coeffs"],
-                        self.parameters["min_dist"],
-                        self.parameters["max_dist"],
-                    )
-                )
-            else:
-                update_radial_basis_coefficients(
-                    self.parameters["radial_coeffs"],
-                    self.radial_basis_funcs,
-                    self.radial_basis_dfdrs,
-                )
-
-    def calc_radial_basis(
-        self,
-        r_abs: np.ndarray,
-        itype: int,
-        jtypes: list[int],
-    ) -> tuple[np.ndarray, np.ndarray]:
-        return calc_radial_basis(
-            self.radial_basis_funcs,
-            self.radial_basis_dfdrs,
-            r_abs,
-            itype,
-            jtypes,
-            self.parameters["scaling"],
-            self.parameters["max_dist"],
-            self.parameters["radial_funcs_count"],
-        )
-
-    def _get_local_energy(self, atoms: Atoms, i: int, js: list[int], r_ijs):
-        itype = self.parameters["species"][atoms.numbers[i]]
-        jtypes = [self.parameters["species"][atoms.numbers[j]] for j in js]
-        r_abs = np.linalg.norm(r_ijs, axis=0)
-        rb_values, rb_derivs = self.calc_radial_basis(r_abs, itype, jtypes)
-        basis_values, basis_derivs = calc_moment_basis(
-            r_ijs,
-            r_abs,
-            rb_values,
-            rb_derivs,
-            self.parameters["alpha_moments_count"],
-            self.parameters["alpha_index_basic"],
-            self.parameters["alpha_index_times"],
-            self.parameters["alpha_moment_mapping"],
-        )
-        moment_coeffs = self.parameters["moment_coeffs"]
-        return (
-            moment_coeffs @ basis_values,
-            np.tensordot(moment_coeffs, basis_derivs, axes=(0, 0)),
-        )
-
-    def calculate(self, atoms: Atoms) -> tuple:
-        """Calculate properties of the given system."""
-        self.update_neighbor_list(atoms)
-        number_of_atoms = len(atoms)
-        energies = np.zeros(number_of_atoms)
-        forces = np.zeros((number_of_atoms, 3))
-        stress = np.zeros((3, 3))
-        for i in range(number_of_atoms):
-            js, r_ijs = self._get_distances(atoms, i)
-            e, gradient = self._get_local_energy(atoms, i, js, r_ijs)
-            itype = self.parameters["species"][atoms.numbers[i]]
-            energies[i] = e + self.parameters["species_coeffs"][itype]
-            for k, j in enumerate(js):
-                forces[i] -= gradient[:, k]
-                forces[j] += gradient[:, k]
-            stress += r_ijs @ gradient.T
-        self.results["energies"] = energies
-        self.results["energy"] = self.results["energies"].sum()
-        self.results["forces"] = forces
-
-        if atoms.cell.rank == 3:
-            stress = (stress + stress.T) * 0.5  # symmetrize
-            stress /= atoms.get_volume()
-        else:
-            stress[:, :] = np.nan
-        self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
-
-        return self.results["energy"], self.results["forces"], self.results["stress"]
-
-    def _initiate_neighbor_list(self, atoms: Atoms):
-        self._neighbor_list = PrimitiveNeighborList(
-            cutoffs=[self.parameters["max_dist"]] * len(atoms),
-            skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
-            self_interaction=False,  # Exclude [0, 0, 0]
-            bothways=True,  # return both ij and ji
-        )
-        self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
-        self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
-
-    def update_neighbor_list(self, atoms: Atoms):
-        if self._neighbor_list is None:
-            self._initiate_neighbor_list(atoms)
-        else:
-            if self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
-                self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
-
-    def _get_distances(
-        self,
-        atoms: Atoms,
-        index: int,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        indices_js, _ = self._neighbor_list.get_neighbors(index)
-        offsets = self.precomputed_offsets[index]
-        pos_js = atoms.positions[indices_js] + offsets
-        dist_vectors = atoms.positions[index] - pos_js
-        return indices_js, dist_vectors.T
-
-
-def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
-    cell = atoms.cell
-    return [nl.get_neighbors(j)[1] @ cell for j in range(len(atoms))]
-
-
 def calc_moment_basis(
     r_ijs: np.ndarray,  # (3, neighbors)
     r_abs: np.ndarray,  # (neighbors)
@@ -279,3 +300,33 @@ def calc_moment_basis(
     basis_vals = moment_components[alpha_moment_mapping]
     basis_ders = moment_jacobian[alpha_moment_mapping]
     return basis_vals, basis_ders
+
+
+#
+# Class for Numba implementation
+#
+class NumbaMTPEngine(EngineBase):
+
+    def calculate(self, atoms: Atoms):
+        self.update_neighbor_list(atoms)
+        return self.numba_calc_energy_and_forces(atoms)
+
+    def numba_calc_energy_and_forces(self, atoms):
+        from motep.numba import numba_calc_energy_and_forces
+
+        mlip_params = self.parameters
+        energy, forces, stress = numba_calc_energy_and_forces(
+            self,
+            atoms,
+            mlip_params["alpha_moments_count"],
+            np.array(mlip_params["alpha_moment_mapping"], dtype=int),
+            np.array(mlip_params["alpha_index_basic"], dtype=int),
+            np.array(mlip_params["alpha_index_times"], dtype=int),
+            mlip_params["scaling"],
+            mlip_params["min_dist"],
+            mlip_params["max_dist"],
+            mlip_params["species_coeffs"],
+            mlip_params["moment_coeffs"],
+            mlip_params["radial_coeffs"],
+        )
+        return energy, forces, stress

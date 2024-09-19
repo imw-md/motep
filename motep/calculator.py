@@ -15,6 +15,10 @@ def make_mtp_engine(engine: str = "numpy"):
         from .mtp import NumpyMTPEngine
 
         return NumpyMTPEngine()
+    elif engine == "numba":
+        from .mtp import NumbaMTPEngine
+
+        return NumbaMTPEngine()
     else:
         raise ValueError(engine)
 

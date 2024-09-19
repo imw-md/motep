@@ -1,13 +1,19 @@
 """Tests for PyMTP."""
 
 import pathlib
+from typing import Any
 
 import numpy as np
 import pytest
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.mtp import NumpyMTPEngine, calc_radial_basis, init_radial_basis_functions
+from motep.mtp import (
+    NumbaMTPEngine,
+    NumpyMTPEngine,
+    calc_radial_basis,
+    init_radial_basis_functions,
+)
 
 
 def get_scale(component: str, dx: float) -> np.ndarray:
@@ -31,20 +37,24 @@ def get_scale(component: str, dx: float) -> np.ndarray:
     ("molecule", "species"),
     [(762, {1: 0}), (291, {6: 0, 1: 1}), (14214, {9: 0, 1: 1}), (23208, {8: 0})],
 )
+@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
 # @pytest.mark.parametrize("molecule", [762])
 def test_molecules(
     molecule: int,
     species: dict[int, int],
     level: int,
+    engine: Any,
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
+    if engine == NumbaMTPEngine and level == 2:
+        pytest.skip()
     path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
-    mtp = NumpyMTPEngine(parameters)
+    mtp = engine(parameters)
     images = [read_cfg(path / "out.cfg", index=0)]
     mtp._initiate_neighbor_list(images[0])
 
@@ -65,20 +75,24 @@ def test_molecules(
     ("crystal", "species"),
     [("cubic", {29: 0}), ("noncubic", {29: 0})],
 )
+@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
 def test_crystals(
     crystal: int,
     species: dict[int, int],
     level: int,
     index: int,
+    engine: Any,
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
+    if engine == NumbaMTPEngine and level == 2:
+        pytest.skip()
     path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
-    mtp = NumpyMTPEngine(parameters)
+    mtp = engine(parameters)
     images = [read_cfg(path / "out.cfg", index=index)]
     mtp._initiate_neighbor_list(images[0])
 
@@ -104,19 +118,23 @@ def test_crystals(
     "molecule, species",
     [(762, {1: 0}), (291, {6: 0, 1: 1}), (14214, {9: 0, 1: 1}), (23208, {8: 0})],
 )
+@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
 def test_forces(
     molecule: int,
     species: dict[int, int],
     level: int,
+    engine: Any,
     data_path: pathlib.Path,
 ) -> None:
     """Test if forces are consistent with finite-difference values."""
+    if engine == NumbaMTPEngine and level == 2:
+        pytest.skip()
     path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
-    mtp = NumpyMTPEngine(parameters)
+    mtp = engine(parameters)
     atoms_ref = read_cfg(path / "out.cfg", index=-1)
     mtp._initiate_neighbor_list(atoms_ref)
 
@@ -146,10 +164,12 @@ def test_forces(
     ("crystal", "species"),
     [("cubic", {29: 0}), ("noncubic", {29: 0})],
 )
+@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
 def test_stress(
     crystal: int,
     species: dict[int, int],
     level: int,
+    engine: Any,
     index: int,
     component: str,
     data_path: pathlib.Path,
@@ -162,12 +182,14 @@ def test_stress(
     atomic positions). The reason is not yet clear and to be fixed later.
 
     """
+    if engine == NumbaMTPEngine and level == 2:
+        pytest.skip()
     path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
-    mtp = NumpyMTPEngine(parameters)
+    mtp = engine(parameters)
     atoms_ref = read_cfg(path / "out.cfg", index=index)
     mtp._initiate_neighbor_list(atoms_ref)
 
