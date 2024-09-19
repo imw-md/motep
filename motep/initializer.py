@@ -5,60 +5,76 @@ from typing import Any
 import numpy as np
 
 
-def init_parameters(
-    data: dict[str, Any],
-    optimized: list[str],
-    seed: int | None,
-) -> tuple[list[float], list[tuple[float, float]]]:
-    """Initialize MTP parameters.
+class Initializer:
+    """Class to initialize MTP parameters."""
 
-    Parameters
-    ----------
-    data : dict[str, Any]
-        Data in the .mtp file.
-    optimized : list[str]
-        Parameters to be optimized.
-    seed : int | None
-        Seed of the pseudo-random-number generator.
+    def __init__(self, rng: np.random.Generator | int | None) -> None:
+        """Initialize Initializer.
 
-    Returns
-    -------
-    parameters : list[float]
-        Initial parameters.
-    bounds : list[tuple[float, float]]
-        Bounds of the parameters.
+        Parameters
+        ----------
+        rng : np.random.Generator | int | None, default = None
+            Pseudo-random-number generator (PRNG) with the NumPy API.
+            If ``int`` or ``None``, they are treated as the seed of the NumPy
+            default PRNG.
 
-    """
-    rng = np.random.default_rng(seed)
-    parameters_scaling, bounds_scaling = _init_scaling(data, optimized)
-    parameters_moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
-        data,
-        optimized,
-        rng,
-    )
-    parameters_species_coeffs, bounds_species_coeffs = _init_species_coeffs(
-        data,
-        optimized,
-        rng,
-    )
-    parameters_radial_coeffs, bounds_radial_coeffs = _init_radial_coeffs(
-        data,
-        optimized,
-        rng,
-    )
-    parameters = (
-        parameters_scaling
-        + parameters_moment_coeffs
-        + parameters_species_coeffs
-        + parameters_radial_coeffs
-    )
-    bounds = (
-        bounds_scaling
-        + bounds_moment_coeffs
-        + bounds_species_coeffs
-        + bounds_radial_coeffs
-    )
-    return parameters, bounds
+        """
+        if isinstance(rng, int | None):
+            self.rng = np.random.default_rng(rng)
+        else:
+            self.rng = rng
+
+    def initialize(
+        self,
+        data: dict[str, Any],
+        optimized: list[str],
+    ) -> tuple[list[float], list[tuple[float, float]]]:
+        """Initialize MTP parameters.
+
+        Parameters
+        ----------
+        data : dict[str, Any]
+            Data in the .mtp file.
+        optimized : list[str]
+            Parameters to be optimized.
+
+        Returns
+        -------
+        parameters : list[float]
+            Initial parameters.
+        bounds : list[tuple[float, float]]
+            Bounds of the parameters.
+
+        """
+        parameters_scaling, bounds_scaling = _init_scaling(data, optimized)
+        parameters_moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
+            data,
+            optimized,
+            self.rng,
+        )
+        parameters_species_coeffs, bounds_species_coeffs = _init_species_coeffs(
+            data,
+            optimized,
+            self.rng,
+        )
+        parameters_radial_coeffs, bounds_radial_coeffs = _init_radial_coeffs(
+            data,
+            optimized,
+            self.rng,
+        )
+        parameters = (
+            parameters_scaling
+            + parameters_moment_coeffs
+            + parameters_species_coeffs
+            + parameters_radial_coeffs
+        )
+        bounds = (
+            bounds_scaling
+            + bounds_moment_coeffs
+            + bounds_species_coeffs
+            + bounds_radial_coeffs
+        )
+        return parameters, bounds
 
 
 def _init_scaling(

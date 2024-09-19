@@ -9,7 +9,8 @@ from typing import Any
 from mpi4py import MPI
 
 from motep.ga import optimization_GA
-from motep.initializer import init_parameters
+from motep.initializer import Initializer
+from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss_function import LossFunction
 from motep.opt import optimization_bfgs, optimization_nelder
@@ -72,10 +73,10 @@ def run(args: argparse.Namespace) -> None:
         engine = setting["engine"]
         fitness = LossFunction(images, untrained_mtp, setting, comm, engine=engine)
 
-    parameters, bounds = init_parameters(
+    initializer = Initializer(setting["seed"])
+    parameters, bounds = initializer.initialize(
         read_mtp(untrained_mtp),
         setting["optimized"],
-        setting["seed"],
     )
 
     funs = {
