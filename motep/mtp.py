@@ -16,8 +16,10 @@ def init_radial_basis_functions(
     radial_coeffs: np.ndarray,
     min_dist: float,
     max_dist: float,
-) -> np.ndarray:  # array of Chebyshev objects
+) -> tuple[np.ndarray, np.ndarray]:  # array of Chebyshev objects
+    """Initialize radial basis functions."""
     radial_basis_funcs = []
+    radial_basis_dfdrs = []  # derivatives
     domain = [min_dist, max_dist]
     nspecies, _, nmu, _ = radial_coeffs.shape
     for i0 in range(nspecies):
@@ -25,24 +27,32 @@ def init_radial_basis_functions(
             for i2 in range(nmu):
                 p = Chebyshev(radial_coeffs[i0, i1, i2], domain=domain)
                 radial_basis_funcs.append(p)
+                radial_basis_dfdrs.append(p.deriv())
     shape = nspecies, nspecies, nmu
-    return np.array(radial_basis_funcs).reshape(shape)
+    return (
+        np.array(radial_basis_funcs).reshape(shape),
+        np.array(radial_basis_dfdrs).reshape(shape),
+    )
 
 
 def update_radial_basis_coefficients(
     radial_coeffs: np.ndarray,
     radial_basis_funcs: np.ndarray,  # array of Chebyshev objects
+    radial_basis_dfdrs: np.ndarray,  # array of Chebyshev objects
 ) -> None:
     """Update radial basis coefficients."""
     nspecies, _, nmu, _ = radial_coeffs.shape
     for i0 in range(nspecies):
         for i1 in range(nspecies):
             for i2 in range(nmu):
-                radial_basis_funcs[i0, i1, i2].coef = radial_coeffs[i0, i1, i2]
+                p = radial_basis_funcs[i0, i1, i2]
+                p.coef = radial_coeffs[i0, i1, i2]
+                radial_basis_dfdrs[i0, i1, i2] = p.deriv()
 
 
 def calc_radial_basis(
     radial_basis_funcs: np.ndarray,  # array of Chebyshev objects
+    radial_basis_dfdrs: np.ndarray,  # array of Chebyshev objects
     r_abs: np.ndarray,
     itype: int,
     jtypes: list[int],
@@ -58,11 +68,12 @@ def calc_radial_basis(
     for mu in range(radial_funcs_count):
         for j, jtype in enumerate(jtypes):
             if is_within_cutoff[j]:
-                rb_funcs = radial_basis_funcs[itype, jtype, mu]
-                v = rb_funcs(r_abs[j]) * smooth_values[j]
+                rb_func = radial_basis_funcs[itype, jtype, mu]
+                rb_dfdr = radial_basis_dfdrs[itype, jtype, mu]
+                v = rb_func(r_abs[j]) * smooth_values[j]
                 rb_values[mu, j] = v
-                d0 = rb_funcs.deriv()(r_abs[j]) * smooth_values[j]
-                d1 = rb_funcs(r_abs[j]) * smooth_derivs[j]
+                d0 = rb_dfdr(r_abs[j]) * smooth_values[j]
+                d1 = rb_func(r_abs[j]) * smooth_derivs[j]
                 d = d0 + d1
                 rb_derivs[mu, j] = d
     return rb_values, rb_derivs
@@ -79,6 +90,7 @@ class NumpyMTPEngine:
 
         """
         self.radial_basis_funcs = None
+        self.radial_basis_dfdrs = None
         self.parameters = {}
         if mtp_parameters is not None:
             self.update(mtp_parameters)
@@ -93,15 +105,18 @@ class NumpyMTPEngine:
             self.parameters["species"] = species
         if "radial_coeffs" in self.parameters:
             if self.radial_basis_funcs is None:
-                self.radial_basis_funcs = init_radial_basis_functions(
-                    self.parameters["radial_coeffs"],
-                    self.parameters["min_dist"],
-                    self.parameters["max_dist"],
+                self.radial_basis_funcs, self.radial_basis_dfdrs = (
+                    init_radial_basis_functions(
+                        self.parameters["radial_coeffs"],
+                        self.parameters["min_dist"],
+                        self.parameters["max_dist"],
+                    )
                 )
             else:
                 update_radial_basis_coefficients(
                     self.parameters["radial_coeffs"],
                     self.radial_basis_funcs,
+                    self.radial_basis_dfdrs,
                 )
 
     def calc_radial_basis(
@@ -112,6 +127,7 @@ class NumpyMTPEngine:
     ) -> tuple[np.ndarray, np.ndarray]:
         return calc_radial_basis(
             self.radial_basis_funcs,
+            self.radial_basis_dfdrs,
             r_abs,
             itype,
             jtypes,
@@ -141,13 +157,14 @@ class NumpyMTPEngine:
             np.tensordot(moment_coeffs, basis_derivs, axes=(0, 0)),
         )
 
-    def get_energy(self, atoms: Atoms):
-        """Calculate the energy of the given system."""
+    def calculate(self, atoms: Atoms) -> tuple:
+        """Calculate properties of the given system."""
         self.update_neighbor_list(atoms)
-        energies = np.zeros(len(atoms))
-        forces = np.zeros((len(atoms), 3))
+        number_of_atoms = len(atoms)
+        energies = np.zeros(number_of_atoms)
+        forces = np.zeros((number_of_atoms, 3))
         stress = np.zeros((3, 3))
-        for i in range(len(atoms)):
+        for i in range(number_of_atoms):
             js, r_ijs = self._get_distances(atoms, i)
             e, gradient = self._get_local_energy(atoms, i, js, r_ijs)
             itype = self.parameters["species"][atoms.numbers[i]]
@@ -163,9 +180,9 @@ class NumpyMTPEngine:
         if atoms.cell.rank == 3:
             stress = (stress + stress.T) * 0.5  # symmetrize
             stress /= atoms.get_volume()
-            self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
         else:
-            self.results["stress"] = np.full(6, np.nan)
+            stress[:, :] = np.nan
+        self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return self.results["energy"], self.results["forces"], self.results["stress"]
 
@@ -213,50 +230,43 @@ def calc_moment_basis(
     alpha_index_times: int,
     alpha_moment_mapping: np.ndarray,
 ):
+    r_ijs_unit = r_ijs / r_abs
     moment_components = np.zeros(alpha_moments_count)
     moment_jacobian = np.zeros((alpha_moments_count, *r_ijs.shape))  # dEi/dxj
     # Precompute powers
     max_pow = np.max(alpha_index_basic)
-    abs_pows = np.ones((max_pow + 1, *r_abs.shape))
     val_pows = np.ones((max_pow + 1, *r_ijs.shape))
     for pow in range(1, max_pow + 1):
-        abs_pows[pow] = abs_pows[pow - 1] * r_abs
-        val_pows[pow] = val_pows[pow - 1] * r_ijs
+        val_pows[pow] = val_pows[pow - 1] * r_ijs_unit
     # Compute basic moments
     for i, aib in enumerate(alpha_index_basic):
         mu, xpow, ypow, zpow = aib
         k = xpow + ypow + zpow
-        mult0 = (
-            1.0
-            * val_pows[xpow, 0]
-            * val_pows[ypow, 1]
-            * val_pows[zpow, 2]
-            / abs_pows[k]
-        )
+        mult0 = val_pows[xpow, 0] * val_pows[ypow, 1] * val_pows[zpow, 2]
         val = rb_values[mu] * mult0
-        der = rb_derivs[mu] * mult0 * r_ijs / r_abs
-        der -= val * k * r_ijs / (r_abs**2)
+        der = rb_derivs[mu] * mult0 * r_ijs_unit
+        der -= val * k * r_ijs_unit / r_abs
         if xpow != 0:
             der[0] += (
                 rb_values[mu]
                 * (xpow * val_pows[xpow - 1, 0])
                 * val_pows[ypow, 1]
                 * val_pows[zpow, 2]
-            ) / abs_pows[k]
+            ) / r_abs
         if ypow != 0:
             der[1] += (
                 rb_values[mu]
                 * val_pows[xpow, 0]
                 * (ypow * val_pows[ypow - 1, 1])
                 * val_pows[zpow, 2]
-            ) / abs_pows[k]
+            ) / r_abs
         if zpow != 0:
             der[2] += (
                 rb_values[mu]
                 * val_pows[xpow, 0]
                 * val_pows[ypow, 1]
                 * (zpow * val_pows[zpow - 1, 2])
-            ) / abs_pows[k]
+            ) / r_abs
         moment_components[i] = val.sum()
         moment_jacobian[i] = der
     # Compute contractions

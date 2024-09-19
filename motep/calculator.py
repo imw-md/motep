@@ -53,7 +53,7 @@ class MTP(Calculator):
     ):
         super().calculate(atoms, properties, system_changes)
 
-        energy, forces, stress = self.engine.get_energy(self.atoms)
+        energy, forces, stress = self.engine.calculate(self.atoms)
 
         self.results["energy"] = self.results["free_energy"] = energy
         self.results["forces"] = forces
