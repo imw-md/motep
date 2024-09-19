@@ -105,13 +105,13 @@ def _nb_calc_local_energy_and_derivs(
         alpha_index_times,
     )
     energy, derivs = _nb_convolve_with_coeffs(
-        basis, bderiv, species_coeffs, moment_coeffs
+        basis, bderiv, itype, species_coeffs, moment_coeffs
     )
     return energy, derivs
 
 
 # @nb.njit
-def _nb_convolve_with_coeffs(basis, bderiv, species_coeffs, moment_coeffs):
+def _nb_convolve_with_coeffs(basis, bderiv, itype, species_coeffs, moment_coeffs):
     # nrs = bderiv.shape[2]
     # nbasis = bderiv.shape[1]
     # energy = species_coeffs[0]
@@ -121,7 +121,7 @@ def _nb_convolve_with_coeffs(basis, bderiv, species_coeffs, moment_coeffs):
     #         energy += moment_coeffs[i] * basis[i]
     #         for j in range(nrs):
     #             derivs[j, k] += moment_coeffs[i] * bderiv[k, i, j]
-    energy = species_coeffs[0] * 1 + np.dot(moment_coeffs, basis)
+    energy = species_coeffs[itype] * 1 + np.dot(moment_coeffs, basis)
     derivs = np.dot(moment_coeffs, bderiv.T)
     # np.dot(moment_coeffs, bderiv.T, out=derivs)
     return energy, derivs
