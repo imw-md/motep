@@ -187,7 +187,7 @@ class NumpyMTPEngine(EngineBase):
             self.parameters["radial_funcs_count"],
         )
 
-    def _get_local_energy(self, atoms: Atoms, i: int, js: list[int], r_ijs):
+    def _calc_local_energy(self, atoms: Atoms, i: int, js: list[int], r_ijs):
         itype = self.parameters["species"][atoms.numbers[i]]
         jtypes = [self.parameters["species"][atoms.numbers[j]] for j in js]
         r_abs = np.linalg.norm(r_ijs, axis=0)
@@ -217,7 +217,7 @@ class NumpyMTPEngine(EngineBase):
         stress = np.zeros((3, 3))
         for i in range(number_of_atoms):
             js, r_ijs = self._get_distances(atoms, i)
-            e, gradient = self._get_local_energy(atoms, i, js, r_ijs)
+            e, gradient = self._calc_local_energy(atoms, i, js, r_ijs)
             itype = self.parameters["species"][atoms.numbers[i]]
             energies[i] = e + self.parameters["species_coeffs"][itype]
             for k, j in enumerate(js):
