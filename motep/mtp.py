@@ -89,8 +89,6 @@ class EngineBase:
             Parameters in the MLIP .mtp file.
 
         """
-        self.radial_basis_funcs = None
-        self.radial_basis_dfdrs = None
         self.parameters = {}
         if mtp_parameters is not None:
             self.update(mtp_parameters)
@@ -103,21 +101,6 @@ class EngineBase:
         if "species" not in self.parameters:
             species = {_: _ for _ in range(self.parameters["species_count"])}
             self.parameters["species"] = species
-        if "radial_coeffs" in self.parameters:
-            if self.radial_basis_funcs is None:
-                self.radial_basis_funcs, self.radial_basis_dfdrs = (
-                    init_radial_basis_functions(
-                        self.parameters["radial_coeffs"],
-                        self.parameters["min_dist"],
-                        self.parameters["max_dist"],
-                    )
-                )
-            else:
-                update_radial_basis_coefficients(
-                    self.parameters["radial_coeffs"],
-                    self.radial_basis_funcs,
-                    self.radial_basis_dfdrs,
-                )
 
     def update_neighbor_list(self, atoms: Atoms):
         if self._neighbor_list is None:
@@ -154,6 +137,38 @@ def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
 
 
 class NumpyMTPEngine(EngineBase):
+
+    def __init__(self, mtp_parameters: dict[str, Any] | None = None):
+        """MLIP-2 MTP.
+
+        Parameters
+        ----------
+        mtp_parameters : dict[str, Any]
+            Parameters in the MLIP .mtp file.
+
+        """
+        super().__init__(self, mtp_parameters)
+        self.radial_basis_funcs = None
+        self.radial_basis_dfdrs = None
+
+    def update(self, parameters: dict[str, Any]) -> None:
+        """Update MTP parameters."""
+        super().update(parameters)
+        if "radial_coeffs" in self.parameters:
+            if self.radial_basis_funcs is None:
+                self.radial_basis_funcs, self.radial_basis_dfdrs = (
+                    init_radial_basis_functions(
+                        self.parameters["radial_coeffs"],
+                        self.parameters["min_dist"],
+                        self.parameters["max_dist"],
+                    )
+                )
+            else:
+                update_radial_basis_coefficients(
+                    self.parameters["radial_coeffs"],
+                    self.radial_basis_funcs,
+                    self.radial_basis_dfdrs,
+                )
 
     def calc_radial_basis(
         self,
