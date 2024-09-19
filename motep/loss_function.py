@@ -179,21 +179,21 @@ class LossFunctionBase(ABC):
     def calc_loss_function(self, energies, forces, stresses) -> float:
         # Calculate the energy difference
         energy_ses = (energies - self.target_energies) ** 2
-        energy_mse = (self.configuration_weight**2) @ energy_ses
+        energy_mse = self.configuration_weight @ energy_ses
 
         # Calculate the force difference
         force_ses = [
             np.sum((forces[i] - self.target_forces[i]) ** 2)
             for i in range(len(self.target_forces))
         ]
-        force_mse = (self.configuration_weight**2) @ force_ses
+        force_mse = self.configuration_weight @ force_ses
 
         # Calculate the stress difference
         stress_ses = [
             np.sum((stresses[i] - self.target_stresses[i]) ** 2)
             for i in range(len(self.target_stresses))
         ]
-        stress_mse = (self.configuration_weight**2) @ stress_ses
+        stress_mse = self.configuration_weight @ stress_ses
 
         return (
             self.setting["energy-weight"] * energy_mse
