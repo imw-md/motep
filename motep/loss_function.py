@@ -1,38 +1,70 @@
 """Loss function."""
 
+import copy
+from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
 from ase import Atoms
+from mpi4py import MPI
 from scipy.constants import eV
 
 from motep.calculator import MTP
-from motep.io.mlip.cfg import _get_species, read_cfg
+from motep.io.mlip.cfg import _get_species
 from motep.io.mlip.mtp import read_mtp, write_mtp
 
 
-def fetch_target_values(
+def calc_properties(
     images: list[Atoms],
+    comm: MPI.Comm,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Fetch energies, forces, and stresses from the training dataset."""
-    energies = [atoms.get_potential_energy(force_consistent=True) for atoms in images]
-    forces = [atoms.get_forces() for atoms in images]
-    stresses = [
-        atoms.get_stress(voigt=False)
-        if "stress" in atoms.calc.results
-        else np.zeros((3, 3))
-        for atoms in images
-    ]
-    return np.array(energies), forces, stresses
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    # Initialize lists to store energies, forces, and stresses
+    current_energies = []
+    current_forces = []
+    current_stress = []
+
+    # Determine the chunk of atoms to process for each MPI process
+    chunk_size = len(images) // size
+    remainder = len(images) % size
+    start_idx = rank * chunk_size
+    end_idx = (rank + 1) * chunk_size + (remainder if rank == size - 1 else 0)
+    local_atoms = images[start_idx:end_idx]
+
+    # Perform local calculations
+    local_results = []
+    for atoms in local_atoms:
+        local_results.append(calculate_energy_force_stress(atoms))
+
+    # Gather results from all processes
+    all_results = comm.gather(local_results, root=0)
+
+    # Process results on root process
+    if rank == 0:
+        for result_list in all_results:
+            for energy, force, stress in result_list:
+                current_energies.append(energy)
+                current_forces.append(force)
+                current_stress.append(stress)
+
+    # Broadcast the processed results to all processes
+    current_energies = comm.bcast(current_energies, root=0)
+    current_forces = comm.bcast(current_forces, root=0)
+    current_stress = comm.bcast(current_stress, root=0)
+
+    return np.array(current_energies), current_forces, current_stress
 
 
 def calculate_energy_force_stress(atoms: Atoms):
     energy = atoms.get_potential_energy()
     forces = atoms.get_forces()
-    try:
-        stress = atoms.get_stress(voigt=False)
-    except NotImplementedError:
-        stress = np.zeros((3, 3))
+    stress = (
+        atoms.get_stress(voigt=False)
+        if "stress" in atoms.calc.results
+        else np.zeros((3, 3))
+    )
     return energy, forces, stress
 
 
@@ -71,25 +103,25 @@ def update_mtp(
 
 def calc_rmses(
     images: list[Atoms],
-    current_energies: np.ndarray,
+    energies: np.ndarray,
     target_energies: np.ndarray,
-    current_forces: np.ndarray,
+    forces: np.ndarray,
     target_forces: np.ndarray,
-    current_stress: np.ndarray,
-    target_stress: np.ndarray,
-):
+    stresses: np.ndarray,
+    target_stresses: np.ndarray,
+) -> None:
     """Calculate RMSEs."""
     se_energies = [
-        ((current_energies[i] - target_energies[i]) / len(atoms)) ** 2
+        ((energies[i] - target_energies[i]) / len(atoms)) ** 2
         for i, atoms in enumerate(images)
     ]
     total_number_of_atoms = sum(len(atoms) for atoms in images)
     se_forces = [
-        np.sum((current_forces[i] - target_forces[i]) ** 2) / 3.0
+        np.sum((forces[i] - target_forces[i]) ** 2) / 3.0
         for i, atoms in enumerate(images)
     ]
     se_stress = [
-        np.sum((current_stress[i] - target_stress[i]) ** 2) / 9.0
+        np.sum((stresses[i] - target_stresses[i]) ** 2) / 9.0
         for i, atoms in enumerate(images)
     ]
 
@@ -102,54 +134,64 @@ def calc_rmses(
     print("RMSE stress per component (GPa):", rmse_stress * eV * 1e21)
 
 
-class LossFunction:
+class LossFunctionBase(ABC):
     """Loss function."""
 
     def __init__(
         self,
-        cfg_file: str,
+        images: list[Atoms],
         untrained_mtp: str,
-        engine: str,
         setting: dict[str, Any],
-    ):
+        comm: MPI.Comm,
+    ) -> None:
+        """Loss function.
+
+        Parameters
+        ----------
+        images : list[Atoms]
+            List of ASE Atoms objects for the training dataset.
+        untrained_mtp: str
+            Filename of the untrained MTP potential in the MLIP format.
+        setting : dict[str, Any]
+            Setting for the training.
+        comm : MPI.Comm
+            MPI.Comm object.
+
+        """
+        self.images = images
         self.untrained_mtp = untrained_mtp
-        self.engine = engine
-        species = setting.get("species")
-        self.images = read_cfg(cfg_file, index=":", species=species)
-        self.species = list(_get_species(self.images)) if species is None else species
         self.setting = setting
-        self.target_energies, self.target_forces, self.target_stress = (
-            fetch_target_values(self.images)
+        self.comm = comm
+
+        species = setting.get("species")
+        self.species = list(_get_species(self.images)) if species is None else species
+
+        self.target_energies, self.target_forces, self.target_stresses = (
+            calc_properties(self.images, self.comm)
         )
-        for atoms in self.images:
-            atoms.calc = MTP(
-                engine=self.engine,
-                mtp_parameters=read_mtp(untrained_mtp),
-            )
 
         self.configuration_weight = np.ones(len(self.images))
 
-    def __call__(self, parameters: list[float]):
-        for atoms in self.images:
-            data = update_mtp(atoms.calc.engine.parameters, parameters)
-            atoms.calc.update_parameters(data)
-        current_energies, current_forces, current_stress = self.calc_current_values()
+    @abstractmethod
+    def __call__(self, parameters: list[float]) -> float:
+        """Evaluate the loss function."""
 
+    def calc_loss_function(self, energies, forces, stresses) -> float:
         # Calculate the energy difference
-        energy_ses = (current_energies - self.target_energies) ** 2
+        energy_ses = (energies - self.target_energies) ** 2
         energy_mse = (self.configuration_weight**2) @ energy_ses
 
         # Calculate the force difference
         force_ses = [
-            np.sum((current_forces[i] - self.target_forces[i]) ** 2)
+            np.sum((forces[i] - self.target_forces[i]) ** 2)
             for i in range(len(self.target_forces))
         ]
         force_mse = (self.configuration_weight**2) @ force_ses
 
         # Calculate the stress difference
         stress_ses = [
-            np.sum((current_stress[i] - self.target_stress[i]) ** 2)
-            for i in range(len(self.target_stress))
+            np.sum((stresses[i] - self.target_stresses[i]) ** 2)
+            for i in range(len(self.target_stresses))
         ]
         stress_mse = (self.configuration_weight**2) @ stress_ses
 
@@ -159,40 +201,44 @@ class LossFunction:
             + self.setting["stress-weight"] * stress_mse
         )
 
-    def calc_current_values(self) -> tuple[list, list, list]:
-        local_results = []
-        for atoms in self.images:
-            local_results.append(calculate_energy_force_stress(atoms))
-
-        current_energies = []
-        current_forces = []
-        current_stress = []
-        for energy, force, stress in local_results:
-            current_energies.append(energy)
-            current_forces.append(force)
-            current_stress.append(stress)
-
-        return np.array(current_energies), current_forces, current_stress
-
     def calc_rmses(self, parameters: list[float]) -> None:
-        """Calculate RMSEs."""
+        energies, forces, stresses = calc_properties(self.images, self.comm)
+
+        calc_rmses(
+            self.images,
+            energies,
+            self.target_energies,
+            forces,
+            self.target_forces,
+            stresses,
+            self.target_stresses,
+        )
+
+
+class LossFunction(LossFunctionBase):
+    """Loss function."""
+
+    def __init__(self, *args: tuple, engine: str, **kwargs: dict) -> None:
+        super().__init__(*args, **kwargs)
+        self.engine = engine
         for atoms in self.images:
             atoms.calc = MTP(
                 engine=self.engine,
                 mtp_parameters=read_mtp(self.untrained_mtp),
             )
+
+        self.configuration_weight = np.ones(len(self.images))
+
+    def __call__(self, parameters: list[float]):
+        for atoms in self.images:
             data = update_mtp(atoms.calc.engine.parameters, parameters)
             atoms.calc.update_parameters(data)
-        current_energies, current_forces, current_stress = self.calc_current_values()
+        energies, forces, stresses = calc_properties(self.images, self.comm)
+        return self.calc_loss_function(energies, forces, stresses)
 
-        calc_rmses(
-            self.images,
-            current_energies,
-            self.target_energies,
-            current_forces,
-            self.target_forces,
-            current_stress,
-            self.target_stress,
-        )
-
+    def calc_rmses(self, parameters: list[float]) -> None:
+        """Calculate RMSEs."""
+        data = copy.deepcopy(self.images[0].calc.engine.parameters)
+        data = update_mtp(data, parameters)
         write_mtp(self.setting["potential_final"], data)
+        super().calc_rmses(parameters)
