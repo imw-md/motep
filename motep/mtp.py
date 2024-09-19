@@ -170,7 +170,7 @@ class NumpyMTPEngine(EngineBase):
                     self.radial_basis_dfdrs,
                 )
 
-    def calc_radial_basis(
+    def _calc_radial_basis(
         self,
         r_abs: np.ndarray,
         itype: int,
@@ -191,7 +191,7 @@ class NumpyMTPEngine(EngineBase):
         itype = self.parameters["species"][atoms.numbers[i]]
         jtypes = [self.parameters["species"][atoms.numbers[j]] for j in js]
         r_abs = np.linalg.norm(r_ijs, axis=0)
-        rb_values, rb_derivs = self.calc_radial_basis(r_abs, itype, jtypes)
+        rb_values, rb_derivs = self._calc_radial_basis(r_abs, itype, jtypes)
         basis_values, basis_derivs = calc_moment_basis(
             r_ijs,
             r_abs,
