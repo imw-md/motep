@@ -307,7 +307,7 @@ def calc_moment_basis(
 #
 class NumbaMTPEngine(EngineBase):
 
-    def get_energy(self, atoms: Atoms):
+    def calculate(self, atoms: Atoms):
         self.update_neighbor_list(atoms)
         return self.numba_calc_energy_and_forces(atoms)
 
