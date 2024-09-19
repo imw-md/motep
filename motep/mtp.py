@@ -80,9 +80,9 @@ class NumpyMTPEngine(EngineBase):
             Parameters in the MLIP .mtp file.
 
         """
-        super().__init__(mtp_parameters)
         self.radial_basis_funcs = None
         self.radial_basis_dfdrs = None
+        super().__init__(mtp_parameters)
 
     def update(self, parameters: dict[str, Any]) -> None:
         """Update MTP parameters."""
