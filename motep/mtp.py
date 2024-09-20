@@ -44,7 +44,7 @@ class EngineBase:
 
     def _initiate_neighbor_list(self, atoms: Atoms):
         self._neighbor_list = PrimitiveNeighborList(
-            cutoffs=[self.parameters["max_dist"]] * len(atoms),
+            cutoffs=[0.5 * self.parameters["max_dist"]] * len(atoms),
             skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
             self_interaction=False,  # Exclude [0, 0, 0]
             bothways=True,  # return both ij and ji
