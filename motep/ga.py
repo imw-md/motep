@@ -14,7 +14,7 @@ class GeneticAlgorithm:
         mutation_rate=0.1,
         elitism_rate=0.1,
         crossover_probability=0.7,
-        superhuman=True,
+        superhuman = True,
     ):
         self.fitness_function = fitness_function
         self.population_size = population_size
@@ -25,7 +25,7 @@ class GeneticAlgorithm:
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
         self.population = []
-        self.superhuman=superhuman
+        self.superhuman = superhuman
 
     def initialize_population(self):
         self.population = [
