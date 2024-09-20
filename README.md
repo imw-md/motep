@@ -8,12 +8,11 @@ pip install git+https://github.tik.uni-stuttgart.de/ac144228/MTP_train.git
 
 Optionally [our modified version of `mlippy`](https://gitlab.com/yuzie007/mlip-2/-/tree/mlippy) can be used.
 
-Two calculator:
+As of 2024-09-20, three "engines" are implemented.
 
-
-a) Mlippy based on python wrapper around mlip code
-
-b) Numpy based calculator
+1. Mlippy based on python wrapper around mlip code
+2. Numpy based calculator
+3. Numba based calculator
 
 ## Usage
 
@@ -35,15 +34,34 @@ where the setting file `motep.toml` is like
 configurations = 'training.cfg'
 potential_initial = 'initial.mtp'
 potential_final = 'final.mtp'
-engine = 'numpy'  # {'numpy', 'mlippy'}
+
+# seed = 10  # random seed for initializing MTP paramters
+
+engine = 'numpy'  # {'numpy', 'numba', 'mlippy'}
+
 energy-weight = 1.0
 force-weight = 0.01
 stress-weight = 0.0
-steps = ['L-BFGS-B', 'Nelder-Mead']
+
+# optimization steps
+
+# style 1: simple
+# steps = ['L-BFGS-B', 'Nelder-Mead']
+
+# style 2: sophisticated
+# "optimized" specifies which parameters are optimized at the step.
+[[step]]
+method = 'L-BFGS-B'
+optimized = ['scaling', 'species_coeffs', 'radial_coeffs', 'moment_coeffs']
+
+[[step]]
+method = 'Nelder-Mead'
+optimized = ['scaling', 'species_coeffs', 'radial_coeffs', 'moment_coeffs']
 ```
 
 If some of the following parameters are already given in `initial.mtp`,
-they are read and kept fixed during training.
+they are treated as the initial guess, which may or may not be optimized
+depending on the above setting.
 
 - `scaling`
 - `radial_coeffs`
