@@ -116,6 +116,14 @@ if __name__ == "__main__":
                 f" with level {level}:"
             )
             pot_path = path / "pot.mtp"
+            # To test with previous codes traj and pot
+            # images = [
+            #     ase.io.read("/Users/axelforslund/python_mtp/misc/md_atoms.traj")
+            #     for _ in range(10)
+            # ]
+            # rng = np.random.default_rng()
+            # [_.rattle(rng=rng) for _ in images]
+            # pot_path = "/Users/axelforslund/direct-upsampling/directupsampling/tests/resources/Al_mtps/Al_fcc_pbe_10g.mtp"
             e_ref = time_mlippy(pot_path, images)
             e_numpy = time_numpy(pot_path, images)
             np.testing.assert_allclose(e_numpy, e_ref)
