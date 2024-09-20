@@ -3,6 +3,7 @@
 import argparse
 import pathlib
 import time
+from pprint import pprint
 
 from mpi4py import MPI
 
@@ -27,7 +28,7 @@ def run(args: argparse.Namespace) -> None:
 
     setting = make_default_setting()
     setting.update(parse_setting(args.setting))
-    print(setting)
+    pprint(setting, sort_dicts=False)
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
