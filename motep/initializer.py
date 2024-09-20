@@ -124,7 +124,7 @@ def _init_scaling(
     key = "scaling"
     v = data.get(key, 1.0)
     parameters_scaling = [v]
-    bounds_scaling = [(0.0, 1000.0)] if key in optimized else [(v, v)]
+    bounds_scaling = [(0.0, 1e6)] if key in optimized else [(v, v)]
     return parameters_scaling, bounds_scaling
 
 
