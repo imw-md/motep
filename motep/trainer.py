@@ -3,45 +3,17 @@
 import argparse
 import pathlib
 import time
-import tomllib
-from typing import Any
 
 from mpi4py import MPI
 
 from motep.ga import optimization_GA
 from motep.initializer import Initializer
 from motep.io.mlip.cfg import _get_species, read_cfg
-from motep.io.mlip.mtp import read_mtp
-from motep.loss_function import LossFunction
+from motep.io.mlip.mtp import read_mtp, write_mtp
+from motep.loss_function import LossFunction, update_mtp
 from motep.opt import optimization_bfgs, optimization_nelder
+from motep.setting import make_default_setting, parse_setting
 from motep.utils import cd
-
-
-def make_default_setting() -> dict[str, Any]:
-    """Make default setting."""
-    return {
-        "configurations": "training.cfg",
-        "potential_initial": "initial.mtp",
-        "potential_final": "final.mtp",
-        "optimized": [
-            "scaling",
-            "radial_coeffs",
-            "species_coeffs",
-            "moment_coeffs",
-        ],
-        "seed": None,
-        "engine": "numpy",
-        "energy-weight": 1.0,
-        "force-weight": 0.01,
-        "stress-weight": 0.0,
-        "steps": ["GA", "Nelder-Mead"],
-    }
-
-
-def parse_setting(filename: str) -> dict:
-    """Parse setting file."""
-    with pathlib.Path(filename).open("rb") as f:
-        return tomllib.load(f)
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -67,10 +39,6 @@ def run(args: argparse.Namespace) -> None:
     species = list(_get_species(images)) if species is None else species
 
     initializer = Initializer(images, species, setting["seed"])
-    parameters, bounds = initializer.initialize(
-        read_mtp(untrained_mtp),
-        setting["optimized"],
-    )
 
     if setting["engine"] == "mlippy":
         from motep.mlippy_loss_function import MlippyLossFunction
@@ -90,10 +58,15 @@ def run(args: argparse.Namespace) -> None:
     folder_name = f"rank_{rank}"
     pathlib.Path(folder_name).mkdir(parents=True, exist_ok=True)
 
+    data = read_mtp(untrained_mtp)
+
     # Change working directory to the created folder
     with cd(folder_name):
-        for step in setting["steps"]:
-            parameters = funs[step](fitness, parameters, bounds)
+        for i, step in enumerate(setting["steps"]):
+            parameters, bounds = initializer.initialize(data, step["optimized"])
+            parameters = funs[step["method"]](fitness, parameters, bounds)
+            data = update_mtp(data, parameters)
+            write_mtp(f"intermediate_{i}.mtp", data)
         fitness.calc_rmses(parameters)
 
     end_time = time.time()
