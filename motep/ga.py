@@ -74,7 +74,6 @@ class GeneticAlgorithm:
             mutated_parameter.append(param)
         return mutated_parameter
 
-
     def select_elite(self, fitness_scores):
         sorted_indices = sorted(
             range(len(fitness_scores)), key=lambda i: fitness_scores[i], reverse=False
