@@ -1,7 +1,7 @@
 import random
 
 import numpy as np
-
+from scipy.optimize import minimize
 
 class GeneticAlgorithm:
     def __init__(
@@ -10,10 +10,11 @@ class GeneticAlgorithm:
         parameter,
         lower_bound,
         upper_bound,
-        population_size=15,
+        population_size=40,
         mutation_rate=0.1,
         elitism_rate=0.1,
-        crossover_probability=0.8,
+        crossover_probability=0.7,
+        superhuman = True,
     ):
         self.fitness_function = fitness_function
         self.population_size = population_size
@@ -24,6 +25,7 @@ class GeneticAlgorithm:
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
         self.population = []
+        self.superhuman = superhuman
 
     def initialize_population(self):
         self.population = [
@@ -37,12 +39,29 @@ class GeneticAlgorithm:
             for lower, upper in zip(self.lower_bound, self.upper_bound)
         ]
 
+    def supermutation(self, elite_individuals, steps=20):
+        refined_elites = []
+        
+        for elite in elite_individuals:
+            result = minimize(
+                self.fitness_function,
+                elite,
+                method='Nelder-Mead',
+                options={'maxiter':steps}
+            )
+            refined_elites.append(result.x)  # Store the optimized solution
+        
+        return refined_elites
+
     def crossover(self, parent1, parent2):
         if random.random() < self.crossover_probability:
-            crossover_point = random.randint(1, self.parameter_length - 1)
-            child1 = parent1[:crossover_point] + parent2[crossover_point:]
-            child2 = parent2[:crossover_point] + parent1[crossover_point:]
-            return child1, child2
+                d = abs(np.array(parent1) - np.array(parent2))
+                alpha = 0.5
+                lower = np.minimum(parent1, parent2) - alpha * d
+                upper = np.maximum(parent1, parent2) + alpha * d
+                child1 = random.uniform(lower, upper)
+                child2 = random.uniform(lower, upper)
+                return list(child1), list(child2)
         else:
             return parent1, parent2
 
@@ -70,6 +89,8 @@ class GeneticAlgorithm:
                 fitness_function(parameter) for parameter in self.population
             ]
             elite = self.select_elite(fitness_scores)
+            if self.superhuman:
+                elite = self.supermutation(elite)
             best_index = np.argmin(fitness_scores)
             if fitness_scores[best_index] < best_fitness:
                 best_fitness = fitness_scores[best_index]
@@ -91,6 +112,8 @@ class GeneticAlgorithm:
             fitness_scores = [
                 fitness_function(parameter) for parameter in self.population
             ]
+            if self.superhuman:
+                elite = self.supermutation(elite)
             elite = self.select_elite(fitness_scores)
             best_index = np.argmin(fitness_scores)
             if fitness_scores[best_index] < best_fitness:
@@ -118,6 +141,8 @@ class GeneticAlgorithm:
             if fitness_scores[best_index] < best_fitness:
                 best_fitness = fitness_scores[best_index]
                 best_solution = self.population[best_index]
+            if self.superhuman:
+                elite = self.supermutation(elite)
             offspring = elite[:]
             while len(offspring) < self.population_size:
                 parent1 = random.choice(
@@ -145,7 +170,8 @@ class GeneticAlgorithm:
                 fitness_function(parameter) for parameter in self.population
             ]
             elite = self.select_elite(fitness_scores)
-
+            if self.superhuman:
+                elite = self.supermutation(elite)
             # Find the best solution in the current generation
             best_index = np.argmin(fitness_scores)
             if fitness_scores[best_index] < best_fitness:
@@ -191,15 +217,17 @@ def optimization_GA(mytarget, initial_guess, bounds):
         initial_guess,
         lower_bound,
         upper_bound,
-        population_size=200,
+        population_size=30,
         mutation_rate=0.1,
         elitism_rate=0.1,
         crossover_probability=0.8,
+        superhuman=True,
     )
     ga.initialize_population()
-    best_solution = ga.evolve_with_elites(
-        mytarget, generations=100, elite_callback=elite_callback
+    best_solution = ga.evolve_with_mix(
+        mytarget, generations=30, elite_callback=elite_callback
     )
+
     return best_solution
 
 
