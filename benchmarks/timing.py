@@ -16,6 +16,8 @@ from motep.calculator import MTP
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 
+fmt = "{:10s}"
+
 
 class Timer:
     def __init__(self, name="", print=True):
@@ -34,68 +36,88 @@ class Timer:
             print(self.readout)
 
 
-def init_mlippy(pot_path: pathlib.Path):
+def init_mlippy(pot_path: pathlib.Path, atom_number_list: list[int]):
     tmp_path = pathlib.Path("/tmp/motep_benchmarks/")
     os.makedirs(tmp_path, exist_ok=True)
     shutil.copy2(pot_path, tmp_path / "pot.mtp")
     pot = mlippy.mtp(str(tmp_path / "pot.mtp"))
-    for _ in range(1):
-        pot.add_atomic_type(_)
+    for atomic_number in atom_number_list:
+        pot.add_atomic_type(atomic_number)
 
     calc = mlippy.MLIP_Calculator(pot, {})
+    calc.use_cache = False
     return calc
 
 
 def time_mlippy(
     pot_path: pathlib.Path,
     images: list[ase.atoms.Atoms],
-) -> None:
-    calc = init_mlippy(pot_path)
+):
+    atom_number_list = []
+    for n in images[0].get_atomic_numbers():
+        if n not in atom_number_list:
+            atom_number_list.append(n)
+    calc = init_mlippy(pot_path, atom_number_list)
     # Make initial calc to not time things like compile time and things that are cachable
     calc.get_potential_energy(images[-1])
-    with Timer("mlippy"):
-        np.array([calc.get_potential_energy(_) for _ in images])
+    with Timer(fmt.format("mlippy")):
+        energies = [calc.get_potential_energy(_) for _ in images]
+    return np.array(energies)
 
 
 def time_mtp(
     pot_path: pathlib.Path,
     images: list[ase.atoms.Atoms],
     engine: str,
-) -> None:
+):
     parameters = read_mtp(pot_path)
+    parameters["species"] = {}
+    for i, atomic_number in enumerate(images[0].get_atomic_numbers()):
+        if not atomic_number in parameters["species"]:
+            parameters["species"][atomic_number] = i
     calc = MTP(parameters, engine=engine)
+    calc.use_cache = False
     # Make initial calc to not time things like compile time and things that are cachable
     calc.get_potential_energy(images[-1])
-    with Timer(engine):
-        np.array([calc.get_potential_energy(_) for _ in images])
+    with Timer(fmt.format(engine)):
+        energies = [calc.get_potential_energy(_) for _ in images]
+    return np.array(energies)
 
 
 def time_numpy(
     pot_path: pathlib.Path,
     images: list[ase.atoms.Atoms],
-) -> None:
-    time_mtp(pot_path, images, "numpy")
+):
+    return time_mtp(pot_path, images, "numpy")
 
 
 def time_numba(
     pot_path: pathlib.Path,
     images: list[ase.atoms.Atoms],
-) -> None:
-    time_mtp(pot_path, images, "numba")
+):
+    return time_mtp(pot_path, images, "numba")
 
 
 if __name__ == "__main__":
     data_path = pathlib.Path("tests/data_path")
     crystal = "cubic"
-    for level in [2, 4, 6, 8, 10]:
-        path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
-        cfg_path = path / "out.cfg"
-        if not cfg_path.is_file():
-            continue
-        index = slice(0, 10)  # ":"
-        images = read_cfg(cfg_path, index=index)
-        print(f"Timing for {len(images)} images with level {level}:")
-        time_mlippy(path / "pot.mtp", images)
-        time_numpy(path / "pot.mtp", images)
-        time_numba(path / "pot.mtp", images)
-        print()
+    for level in [2, 4, 6, 10]:
+        for size_reps in [1, 2]:
+            path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
+            cfg_path = path / "out.cfg"
+            if not cfg_path.is_file():
+                continue
+            index = slice(0, 10)  # ":"
+            images = read_cfg(cfg_path, index=index)
+            images = [_.repeat(size_reps) for _ in images]
+            print(
+                f"\nTiming for {len(images)} images"
+                f" of {len(images[0])} atoms"
+                f" with level {level}:"
+            )
+            pot_path = path / "pot.mtp"
+            e_ref = time_mlippy(pot_path, images)
+            e_numpy = time_numpy(pot_path, images)
+            np.testing.assert_allclose(e_numpy, e_ref)
+            e_numba = time_numba(pot_path, images)
+            np.testing.assert_allclose(e_numba, e_ref)
