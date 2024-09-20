@@ -56,7 +56,7 @@ class GeneticAlgorithm:
     def crossover(self, parent1, parent2):
         if random.random() < self.crossover_probability:
                 d = abs(np.array(parent1) - np.array(parent2))
-                alpha=0.5
+                alpha = 0.5
                 lower = np.minimum(parent1, parent2) - alpha * d
                 upper = np.maximum(parent1, parent2) + alpha * d
                 child1 = random.uniform(lower, upper)
