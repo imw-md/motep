@@ -77,8 +77,11 @@ def time_mtp(
             parameters["species"][atomic_number] = i
     calc = MTP(parameters, engine=engine)
     calc.use_cache = False
+
     # Make initial calc to not time things like compile time and things that are cachable
-    calc.get_potential_energy(images[-1])
+    with Timer("0th run with: " + fmt.format(engine)):
+        calc.get_potential_energy(images[-1])
+
     with Timer(fmt.format(engine)):
         energies = [calc.get_potential_energy(_) for _ in images]
     return np.array(energies)
