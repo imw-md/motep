@@ -1,6 +1,5 @@
 import numba as nb
 import numpy as np
-from numba import float64, int64
 
 
 def numba_calc_energy_and_forces(
@@ -39,8 +38,10 @@ def numba_calc_energy_and_forces(
         r_ijs = all_r_ijs[i]
         itype = self.parameters["species"][atoms.numbers[i]]
         jtypes = np.array([self.parameters["species"][atoms.numbers[j]] for j in js])
+        r_abs = np.linalg.norm(r_ijs, axis=0)
         loc_energy, loc_gradient = _nb_calc_local_energy_and_derivs(
             r_ijs,
+            r_abs,
             itype,
             jtypes,
             radial_coeffs,
@@ -74,9 +75,10 @@ def numba_calc_energy_and_forces(
     return energy, forces, stress
 
 
-# @nb.njit
+@nb.njit
 def _nb_calc_local_energy_and_derivs(
     r_ijs,
+    r_abs,
     itype,
     jtypes,
     radial_coeffs,
@@ -90,7 +92,6 @@ def _nb_calc_local_energy_and_derivs(
     species_coeffs,
     moment_coeffs,
 ):
-    r_abs = np.linalg.norm(r_ijs, axis=0)
     rb_values, rb_derivs = _nb_calc_radial_basis_and_deriv(
         r_abs, itype, jtypes, radial_coeffs, scaling, min_dist, max_dist
     )
@@ -110,20 +111,17 @@ def _nb_calc_local_energy_and_derivs(
     return energy, derivs
 
 
-# @nb.njit
+@nb.njit
 def _nb_convolve_with_coeffs(basis, bderiv, itype, species_coeffs, moment_coeffs):
-    # nrs = bderiv.shape[2]
-    # nbasis = bderiv.shape[1]
-    # energy = species_coeffs[0]
-    # derivs = np.zeros((nrs, 3))
-    # for i in range(nbasis):
-    #     for k in range(3):
-    #         energy += moment_coeffs[i] * basis[i]
-    #         for j in range(nrs):
-    #             derivs[j, k] += moment_coeffs[i] * bderiv[k, i, j]
-    energy = species_coeffs[itype] * 1 + np.dot(moment_coeffs, basis)
-    derivs = np.dot(moment_coeffs, bderiv.T)
-    # np.dot(moment_coeffs, bderiv.T, out=derivs)
+    nrs = bderiv.shape[2]
+    nbasis = bderiv.shape[1]
+    energy = species_coeffs[itype]
+    derivs = np.zeros((nrs, 3))
+    for i in range(nbasis):
+        energy += moment_coeffs[i] * basis[i]
+        for k in range(3):
+            for j in range(nrs):
+                derivs[j, k] += moment_coeffs[i] * bderiv[k, i, j]
     return energy, derivs
 
 
@@ -171,16 +169,15 @@ def _nb_calc_radial_basis_and_deriv(
 
 
 @nb.njit(
-    # float64[:](
-    (
-        float64[:, :],
-        float64[:],
-        float64[:, :],
-        float64[:, :],
-        int64,
-        int64[:],
-        int64[:, :],
-        int64[:, :],
+    nb.types.Tuple((nb.float64[:], nb.float64[:, :, :]))(
+        nb.float64[:, :],
+        nb.float64[:],
+        nb.float64[:, :],
+        nb.float64[:, :],
+        nb.int64,
+        nb.int64[:],
+        nb.int64[:, :],
+        nb.int64[:, :],
     )
 )
 def _nb_calc_moment_basis_and_deriv(
@@ -291,14 +288,14 @@ def _nb_calc_moment_basis_and_deriv(
 # Energy only numba implementation for moment basis
 #
 @nb.njit(
-    float64[:](
-        float64[:, :],
-        float64[:],
-        float64[:, :],
-        int64,
-        int64[:],
-        int64[:, :],
-        int64[:, :],
+    nb.float64[:](
+        nb.float64[:, :],
+        nb.float64[:],
+        nb.float64[:, :],
+        nb.int64,
+        nb.int64[:],
+        nb.int64[:, :],
+        nb.int64[:, :],
     )
 )
 def numba_calc_moment_basis(
