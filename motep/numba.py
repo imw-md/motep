@@ -18,7 +18,7 @@ def numba_calc_energy_and_forces(
 ):
     assert len(alpha_index_times.shape) == 2
     number_of_atoms = len(atoms)
-    # TODO: take out engine from here and precompute distances and send in indices.
+    # TODO: precompute distances and send in indices.
     # See also jax implementation of full tensor version
     max_number_of_js = 0
     for i in range(number_of_atoms):
@@ -28,20 +28,16 @@ def numba_calc_energy_and_forces(
             max_number_of_js = number_of_js
     shape = (max_number_of_js, number_of_atoms)
     all_js = np.zeros(shape, dtype=int)
-
     all_r_ijs = []
-    max_njs = 0
     for i in range(number_of_atoms):
         js, r_ijs = engine._get_distances(atoms, i)
-        if len(js) > max_njs:
-            max_njs = len(js)
         all_r_ijs.append(r_ijs)
         (number_of_js,) = js.shape
         all_js[:number_of_js, i] = js
 
     energy = 0
     stress = np.zeros((3, 3))
-    gradient = np.zeros((number_of_atoms, max_njs, 3))
+    gradient = np.zeros((number_of_atoms, max_number_of_js, 3))
     for i in range(number_of_atoms):
         js = all_js[:, i]
         r_ijs = all_r_ijs[i]
@@ -80,6 +76,140 @@ def numba_calc_energy_and_forces(
         stress = np.full(6, np.nan)
 
     return energy, forces, stress
+
+
+#
+# The below implementation is from some reason slightly slower up to level 10 for larger systems.
+# This should be tested again for higher levels
+#
+# def numba_calc_energy_and_forces__full_arrays(
+#     engine,
+#     atoms,
+#     alpha_moments_count,
+#     alpha_moment_mapping,
+#     alpha_index_basic,
+#     alpha_index_times,
+#     scaling,
+#     min_dist,
+#     max_dist,
+#     species_coeffs,
+#     moment_coeffs,
+#     radial_coeffs,
+# ):
+#     assert len(alpha_index_times.shape) == 2
+#     number_of_atoms = len(atoms)
+#     # TODO: take out engine from here and precompute distances and send in indices.
+#     # See also jax implementation of full tensor version
+#     max_number_of_js = 0
+#     for i in range(number_of_atoms):
+#         js, r_ijs = engine._get_distances(atoms, i)
+#         (number_of_js,) = js.shape
+#         if number_of_js > max_number_of_js:
+#             max_number_of_js = number_of_js
+#     shape = (max_number_of_js, number_of_atoms)
+#     all_js = np.zeros(shape, dtype=int)
+#     all_r_ijs = np.zeros((3,) + shape, dtype=float)
+#     all_r_abs = -1 * np.ones(shape, dtype=float)
+#     all_itypes = np.empty(number_of_atoms, dtype=int)
+#     all_jtypes = np.zeros(shape, dtype=int)
+#     for i in range(number_of_atoms):
+#         js, r_ijs = engine._get_distances(atoms, i)
+#         r_abs = np.linalg.norm(r_ijs, axis=0)
+#         itype = engine.parameters["species"][atoms.numbers[i]]
+#         jtypes = np.array([engine.parameters["species"][atoms.numbers[j]] for j in js])
+#         (number_of_js,) = js.shape
+#         all_js[:number_of_js, i] = js
+#         all_r_ijs[:, :number_of_js, i] = r_ijs
+#         all_r_abs[:number_of_js, i] = r_abs
+#         all_itypes[i] = itype
+#         all_jtypes[:number_of_js, i] = jtypes
+#
+#     all_js = all_js
+#
+#     energy, gradient = _nb_calc_energy_and_gradient(
+#         # energy, gradient = _nb_calc_energy_and_gradient__sequential(
+#         all_r_ijs,
+#         all_r_abs,
+#         all_itypes,
+#         all_jtypes,
+#         alpha_moments_count,
+#         alpha_moment_mapping,
+#         alpha_index_basic,
+#         alpha_index_times,
+#         scaling,
+#         min_dist,
+#         max_dist,
+#         radial_coeffs,
+#         species_coeffs,
+#         moment_coeffs,
+#         number_of_atoms,
+#         max_number_of_js,
+#     )
+#     stress = np.zeros((3, 3))
+#     for i in range(number_of_atoms):
+#         r_ijs = all_r_ijs[:, :, i]
+#         loc_gradient = gradient[i, : r_ijs.shape[1], :]
+#         stress += r_ijs @ loc_gradient
+#
+#     forces = _nb_forces_from_gradient(
+#         gradient, all_js, number_of_atoms, max_number_of_js
+#     )
+#
+#     if atoms.cell.rank == 3:
+#         stress = (stress + stress.T) * 0.5  # symmetrize
+#         stress /= atoms.get_volume()
+#         stress = stress.flat[[0, 4, 8, 5, 2, 1]]
+#     else:
+#         stress = np.full(6, np.nan)
+#
+#     return energy, forces, stress
+#
+#
+# @nb.njit
+# def _nb_calc_energy_and_gradient(
+#     all_r_ijs,
+#     all_r_abs,
+#     all_itypes,
+#     all_jtypes,
+#     alpha_moments_count,
+#     alpha_moment_mapping,
+#     alpha_index_basic,
+#     alpha_index_times,
+#     scaling,
+#     min_dist,
+#     max_dist,
+#     radial_coeffs,
+#     species_coeffs,
+#     moment_coeffs,
+#     number_of_atoms,
+#     max_number_of_js,
+# ):
+#     energy = 0
+#     gradient = np.zeros((number_of_atoms, max_number_of_js, 3))
+#     for i in range(number_of_atoms):
+#         r_ijs = all_r_ijs[:, :, i]
+#         r_abs = all_r_abs[:, i]
+#         itype = all_itypes[i]
+#         jtypes = all_jtypes[:, i]
+#         loc_energy, loc_gradient = _nb_calc_local_energy_and_derivs(
+#             r_ijs,
+#             r_abs,
+#             itype,
+#             jtypes,
+#             alpha_moments_count,
+#             alpha_moment_mapping,
+#             alpha_index_basic,
+#             alpha_index_times,
+#             scaling,
+#             min_dist,
+#             max_dist,
+#             radial_coeffs,
+#             species_coeffs,
+#             moment_coeffs,
+#         )
+#         energy += loc_energy
+#         gradient[i, : loc_gradient.shape[0], :] = loc_gradient
+#     return energy, gradient
 
 
 @nb.njit
@@ -173,6 +303,8 @@ def _nb_calc_radial_basis_and_deriv(
     derivs = np.zeros((nmu, nrs))
     for j in range(nrs):
         is_within_cutoff = r_abs[j] < max_dist
+        # The below is for the "full_array" implementation
+        # is_within_cutoff = 0 < r_abs[j] and r_abs[j] < max_dist
         if is_within_cutoff:
             smoothing = (max_dist - r_abs[j]) ** 2
             smooth_deriv = -2 * (max_dist - r_abs[j])
