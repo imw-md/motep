@@ -218,21 +218,9 @@ def _nb_calc_moment_basis_and_deriv(
                 / dist_pows[pow, j]
             )
             moment_components[i] += val
-            # TODO: profile with for loop
-            der = (
-                (
-                    rb_derivs[mu, j] / dist_pows[pow, j]
-                    - pow * rb_values[mu, j] / dist_pows[pow, j] / r_abs[j]
-                )
-                * (
-                    coord_pows[xpow, 0, j]
-                    * coord_pows[ypow, 1, j]
-                    * coord_pows[zpow, 2, j]
-                    / r_abs[j]
-                )
-                * r_ijs[:, j]
-            )
-            der[0] += (
+
+            der = np.empty(3)
+            der[0] = (
                 rb_values[mu, j]
                 / dist_pows[pow, j]
                 * xpow
@@ -242,7 +230,7 @@ def _nb_calc_moment_basis_and_deriv(
                     * coord_pows[zpow, 2, j]
                 )
             )
-            der[1] += (
+            der[1] = (
                 rb_values[mu, j]
                 / dist_pows[pow, j]
                 * ypow
@@ -252,7 +240,7 @@ def _nb_calc_moment_basis_and_deriv(
                     * coord_pows[zpow, 2, j]
                 )
             )
-            der[2] += (
+            der[2] = (
                 rb_values[mu, j]
                 / dist_pows[pow, j]
                 * zpow
@@ -262,18 +250,32 @@ def _nb_calc_moment_basis_and_deriv(
                     * coord_pows[zpow - 1, 2, j]
                 )
             )
-            moment_jacobian[:, i, j] += der
+            for k in range(3):
+                der[k] += (
+                    (
+                        rb_derivs[mu, j] / dist_pows[pow, j]
+                        - pow * rb_values[mu, j] / dist_pows[pow, j] / r_abs[j]
+                    )
+                    * (
+                        coord_pows[xpow, 0, j]
+                        * coord_pows[ypow, 1, j]
+                        * coord_pows[zpow, 2, j]
+                        / r_abs[j]
+                    )
+                    * r_ijs[k, j]
+                )
+                moment_jacobian[k, i, j] += der[k]
     # Compute contractions
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
         moment_components[i3] += mult * moment_components[i1] * moment_components[i2]
         # TODO: Test performance of backwards propagation
         for j in range(nrs):
-            moment_jacobian[:, i3, j] += mult * (
-                moment_jacobian[:, i1, j] * moment_components[i2]
-                + moment_components[i1] * moment_jacobian[:, i2, j]
-            )
-    # Compute basis
+            for k in range(3):
+                moment_jacobian[k, i3, j] += mult * (
+                    moment_jacobian[k, i1, j] * moment_components[i2]
+                    + moment_components[i1] * moment_jacobian[k, i2, j]
+                )  # Compute basis
     nmoments = alpha_moment_mapping.shape[0]
     basis = np.empty(nmoments)
     deriv = np.empty((3, nmoments, nrs))
