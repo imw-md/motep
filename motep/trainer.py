@@ -13,6 +13,7 @@ from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss_function import LossFunction, update_mtp
 from motep.opt import optimization_bfgs, optimization_nelder
+from motep.optimizers.lls import optimization_lls
 from motep.setting import make_default_setting, parse_setting
 from motep.utils import cd
 
@@ -53,6 +54,7 @@ def run(args: argparse.Namespace) -> None:
         "GA": optimization_GA,
         "Nelder-Mead": optimization_nelder,
         "L-BFGS-B": optimization_bfgs,
+        "LLS": optimization_lls,
     }
 
     # Create folders for each rank
