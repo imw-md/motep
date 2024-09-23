@@ -3,7 +3,7 @@ import numpy as np
 
 
 def numba_calc_energy_and_forces(
-    self,
+    engine,
     atoms,
     alpha_moments_count,
     alpha_moment_mapping,
@@ -17,27 +17,36 @@ def numba_calc_energy_and_forces(
     radial_coeffs,
 ):
     assert len(alpha_index_times.shape) == 2
+    number_of_atoms = len(atoms)
     # TODO: take out self from here and precompute distances and send in indices.
     # See also jax implementation of full tensor version
-    all_js = []
+    max_number_of_js = 0
+    for i in range(number_of_atoms):
+        js, r_ijs = engine._get_distances(atoms, i)
+        (number_of_js,) = js.shape
+        if number_of_js > max_number_of_js:
+            max_number_of_js = number_of_js
+    shape = (max_number_of_js, number_of_atoms)
+    all_js = np.zeros(shape, dtype=int)
+
     all_r_ijs = []
     max_njs = 0
-    for i in range(len(atoms)):
-        js, r_ijs = self._get_distances(atoms, i)
+    for i in range(number_of_atoms):
+        js, r_ijs = engine._get_distances(atoms, i)
         if len(js) > max_njs:
             max_njs = len(js)
-        all_js.append(js)
         all_r_ijs.append(r_ijs)
+        (number_of_js,) = js.shape
+        all_js[:number_of_js, i] = js
 
     energy = 0
-    forces = np.zeros((len(atoms), 3))
     stress = np.zeros((3, 3))
-    gradient = np.zeros((len(atoms), max_njs, 3))
-    for i in range(len(atoms)):
-        js = all_js[i]
+    gradient = np.zeros((number_of_atoms, max_njs, 3))
+    for i in range(number_of_atoms):
+        js = all_js[:, i]
         r_ijs = all_r_ijs[i]
-        itype = self.parameters["species"][atoms.numbers[i]]
-        jtypes = np.array([self.parameters["species"][atoms.numbers[j]] for j in js])
+        itype = engine.parameters["species"][atoms.numbers[i]]
+        jtypes = np.array([engine.parameters["species"][atoms.numbers[j]] for j in js])
         r_abs = np.linalg.norm(r_ijs, axis=0)
         loc_energy, loc_gradient = _nb_calc_local_energy_and_derivs(
             r_ijs,
@@ -59,11 +68,9 @@ def numba_calc_energy_and_forces(
         stress += r_ijs @ loc_gradient
         gradient[i, : loc_gradient.shape[0], :] = loc_gradient
 
-    for i in range(len(atoms)):
-        js, _ = self._neighbor_list.get_neighbors(i)
-        for i_j, j in enumerate(js):
-            forces[i, :] -= gradient[i, i_j, :]
-            forces[j, :] += gradient[i, i_j, :]
+    forces = _nb_forces_from_gradient(
+        gradient, all_js, number_of_atoms, max_number_of_js
+    )
 
     if atoms.cell.rank == 3:
         stress = (stress + stress.T) * 0.5  # symmetrize
@@ -73,6 +80,18 @@ def numba_calc_energy_and_forces(
         stress = np.full(6, np.nan)
 
     return energy, forces, stress
+
+
+@nb.njit
+def _nb_forces_from_gradient(gradient, all_js, number_of_atoms, max_number_of_js):
+    forces = np.zeros((number_of_atoms, 3))
+    for i in range(number_of_atoms):
+        for i_j in range(max_number_of_js):
+            j = all_js[i_j, i]
+            for k in range(3):
+                forces[i, k] -= gradient[i, i_j, k]
+                forces[j, k] += gradient[i, i_j, k]
+    return forces
 
 
 @nb.njit
