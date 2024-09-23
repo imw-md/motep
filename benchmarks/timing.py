@@ -113,9 +113,10 @@ if __name__ == "__main__":
             index = slice(0, 10)  # ":"
             images = read_cfg(cfg_path, index=index)
             images = [_.repeat(size_reps) for _ in images]
+            number_of_atoms = len(images[0])
             print(
                 f"\nTiming for {len(images)} images"
-                f" of {len(images[0])} atoms"
+                f" of {number_of_atoms} atoms"
                 f" with level {level}:"
             )
             pot_path = path / "pot.mtp"
@@ -128,7 +129,8 @@ if __name__ == "__main__":
             # [_.rattle(rng=rng) for _ in images]
             # pot_path = "/Users/axelforslund/direct-upsampling/directupsampling/tests/resources/Al_mtps/Al_fcc_pbe_10g.mtp"
             e_ref = time_mlippy(pot_path, images)
-            # e_numpy = time_numpy(pot_path, images)
-            # np.testing.assert_allclose(e_numpy, e_ref)
+            if number_of_atoms < 300:
+                e_numpy = time_numpy(pot_path, images)
+                np.testing.assert_allclose(e_numpy, e_ref)
             e_numba = time_numba(pot_path, images)
             np.testing.assert_allclose(e_numba, e_ref)
