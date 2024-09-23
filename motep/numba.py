@@ -18,7 +18,7 @@ def numba_calc_energy_and_forces(
 ):
     assert len(alpha_index_times.shape) == 2
     number_of_atoms = len(atoms)
-    # TODO: take out self from here and precompute distances and send in indices.
+    # TODO: take out engine from here and precompute distances and send in indices.
     # See also jax implementation of full tensor version
     max_number_of_js = 0
     for i in range(number_of_atoms):
@@ -53,7 +53,6 @@ def numba_calc_energy_and_forces(
             r_abs,
             itype,
             jtypes,
-            radial_coeffs,
             alpha_moments_count,
             alpha_moment_mapping,
             alpha_index_basic,
@@ -61,6 +60,7 @@ def numba_calc_energy_and_forces(
             scaling,
             min_dist,
             max_dist,
+            radial_coeffs,
             species_coeffs,
             moment_coeffs,
         )
@@ -100,7 +100,6 @@ def _nb_calc_local_energy_and_derivs(
     r_abs,
     itype,
     jtypes,
-    radial_coeffs,
     alpha_moments_count,
     alpha_moment_mapping,
     alpha_index_basic,
@@ -108,6 +107,7 @@ def _nb_calc_local_energy_and_derivs(
     scaling,
     min_dist,
     max_dist,
+    radial_coeffs,
     species_coeffs,
     moment_coeffs,
 ):
@@ -209,7 +209,7 @@ def _nb_calc_moment_basis_and_deriv(
     alpha_index_basic,
     alpha_index_times,
 ):
-    nrs = r_abs.shape[0]
+    (nrs,) = r_abs.shape
     max_pow = int(np.max(alpha_index_basic))
     moment_components = np.zeros(alpha_moments_count)
     moment_jacobian = np.zeros((3, alpha_moments_count, nrs))
@@ -291,7 +291,8 @@ def _nb_calc_moment_basis_and_deriv(
                 moment_jacobian[k, i3, j] += mult * (
                     moment_jacobian[k, i1, j] * moment_components[i2]
                     + moment_components[i1] * moment_jacobian[k, i2, j]
-                )  # Compute basis
+                )
+    # Compute basis
     nmoments = alpha_moment_mapping.shape[0]
     basis = np.empty(nmoments)
     deriv = np.empty((3, nmoments, nrs))
@@ -304,56 +305,56 @@ def _nb_calc_moment_basis_and_deriv(
 
 
 #
-# Energy only numba implementation for moment basis
+# Energy only numba implementation for moment basis (not used at the moment)
 #
-@nb.njit(
-    nb.float64[:](
-        nb.float64[:, :],
-        nb.float64[:],
-        nb.float64[:, :],
-        nb.int64,
-        nb.int64[:],
-        nb.int64[:, :],
-        nb.int64[:, :],
-    )
-)
-def numba_calc_moment_basis(
-    r_ijs,
-    r_abs,
-    rb_values,
-    alpha_moments_count,
-    alpha_moment_mapping,
-    alpha_index_basic,
-    alpha_index_times,
-):
-    nrs = r_abs.shape[0]
-    max_pow = int(np.max(alpha_index_basic))
-    r_ijs_unit = r_ijs / r_abs
-    moment_components = np.zeros(alpha_moments_count)
-    # Precompute powers
-    val_pows = np.ones((max_pow + 1, 3, nrs))
-    for pow in range(1, max_pow + 1):
-        for k in range(3):
-            for j in range(nrs):
-                val_pows[pow, k, j] = val_pows[pow - 1, k, j] * r_ijs_unit[k, j]
-    # Compute basic moments
-    for i, aib in enumerate(alpha_index_basic):
-        for j in range(nrs):
-            mu, xpow, ypow, zpow = aib
-            val = (
-                rb_values[mu, j]
-                * val_pows[xpow, 0, j]
-                * val_pows[ypow, 1, j]
-                * val_pows[zpow, 2, j]
-            )
-            moment_components[i] += val
-    # Compute contractions
-    for ait in alpha_index_times:
-        i1, i2, mult, i3 = ait
-        moment_components[i3] += mult * moment_components[i1] * moment_components[i2]
-    # Compute basis
-    nmoments = alpha_moment_mapping.shape[0]
-    basis = np.empty(nmoments)
-    for basis_i, moment_i in enumerate(alpha_moment_mapping):
-        basis[basis_i] = moment_components[moment_i]
-    return basis
+# @nb.njit(
+#     nb.float64[:](
+#         nb.float64[:, :],
+#         nb.float64[:],
+#         nb.float64[:, :],
+#         nb.int64,
+#         nb.int64[:],
+#         nb.int64[:, :],
+#         nb.int64[:, :],
+#     )
+# )
+# def numba_calc_moment_basis(
+#     r_ijs,
+#     r_abs,
+#     rb_values,
+#     alpha_moments_count,
+#     alpha_moment_mapping,
+#     alpha_index_basic,
+#     alpha_index_times,
+# ):
+#     nrs = r_abs.shape[0]
+#     max_pow = int(np.max(alpha_index_basic))
+#     r_ijs_unit = r_ijs / r_abs
+#     moment_components = np.zeros(alpha_moments_count)
+#     # Precompute powers
+#     val_pows = np.ones((max_pow + 1, 3, nrs))
+#     for pow in range(1, max_pow + 1):
+#         for k in range(3):
+#             for j in range(nrs):
+#                 val_pows[pow, k, j] = val_pows[pow - 1, k, j] * r_ijs_unit[k, j]
+#     # Compute basic moments
+#     for i, aib in enumerate(alpha_index_basic):
+#         for j in range(nrs):
+#             mu, xpow, ypow, zpow = aib
+#             val = (
+#                 rb_values[mu, j]
+#                 * val_pows[xpow, 0, j]
+#                 * val_pows[ypow, 1, j]
+#                 * val_pows[zpow, 2, j]
+#             )
+#             moment_components[i] += val
+#     # Compute contractions
+#     for ait in alpha_index_times:
+#         i1, i2, mult, i3 = ait
+#         moment_components[i3] += mult * moment_components[i1] * moment_components[i2]
+#     # Compute basis
+#     nmoments = alpha_moment_mapping.shape[0]
+#     basis = np.empty(nmoments)
+#     for basis_i, moment_i in enumerate(alpha_moment_mapping):
+#         basis[basis_i] = moment_components[moment_i]
+#     return basis
