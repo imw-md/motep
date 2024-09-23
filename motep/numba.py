@@ -1,10 +1,9 @@
 import numba as nb
 import numpy as np
-from numba import float64, int64
 
 
 def numba_calc_energy_and_forces(
-    self,
+    engine,
     atoms,
     alpha_moments_count,
     alpha_moment_mapping,
@@ -18,32 +17,38 @@ def numba_calc_energy_and_forces(
     radial_coeffs,
 ):
     assert len(alpha_index_times.shape) == 2
-    # TODO: take out self from here and precompute distances and send in indices.
+    number_of_atoms = len(atoms)
+    # TODO: precompute distances and send in indices.
     # See also jax implementation of full tensor version
-    all_js = []
+    max_number_of_js = 0
+    for i in range(number_of_atoms):
+        js, r_ijs = engine._get_distances(atoms, i)
+        (number_of_js,) = js.shape
+        if number_of_js > max_number_of_js:
+            max_number_of_js = number_of_js
+    shape = (max_number_of_js, number_of_atoms)
+    all_js = np.zeros(shape, dtype=int)
     all_r_ijs = []
-    max_njs = 0
-    for i in range(len(atoms)):
-        js, r_ijs = self._get_distances(atoms, i)
-        if len(js) > max_njs:
-            max_njs = len(js)
-        all_js.append(js)
+    for i in range(number_of_atoms):
+        js, r_ijs = engine._get_distances(atoms, i)
         all_r_ijs.append(r_ijs)
+        (number_of_js,) = js.shape
+        all_js[:number_of_js, i] = js
 
     energy = 0
-    forces = np.zeros((len(atoms), 3))
     stress = np.zeros((3, 3))
-    gradient = np.zeros((len(atoms), max_njs, 3))
-    for i in range(len(atoms)):
-        js = all_js[i]
+    gradient = np.zeros((number_of_atoms, max_number_of_js, 3))
+    for i in range(number_of_atoms):
+        js = all_js[:, i]
         r_ijs = all_r_ijs[i]
-        itype = self.parameters["species"][atoms.numbers[i]]
-        jtypes = np.array([self.parameters["species"][atoms.numbers[j]] for j in js])
+        itype = engine.parameters["species"][atoms.numbers[i]]
+        jtypes = np.array([engine.parameters["species"][atoms.numbers[j]] for j in js])
+        r_abs = np.linalg.norm(r_ijs, axis=0)
         loc_energy, loc_gradient = _nb_calc_local_energy_and_derivs(
             r_ijs,
+            r_abs,
             itype,
             jtypes,
-            radial_coeffs,
             alpha_moments_count,
             alpha_moment_mapping,
             alpha_index_basic,
@@ -51,6 +56,7 @@ def numba_calc_energy_and_forces(
             scaling,
             min_dist,
             max_dist,
+            radial_coeffs,
             species_coeffs,
             moment_coeffs,
         )
@@ -58,11 +64,9 @@ def numba_calc_energy_and_forces(
         stress += r_ijs @ loc_gradient
         gradient[i, : loc_gradient.shape[0], :] = loc_gradient
 
-    for i in range(len(atoms)):
-        js, _ = self._neighbor_list.get_neighbors(i)
-        for i_j, j in enumerate(js):
-            forces[i, :] -= gradient[i, i_j, :]
-            forces[j, :] += gradient[i, i_j, :]
+    forces = _nb_forces_from_gradient(
+        gradient, all_js, number_of_atoms, max_number_of_js
+    )
 
     if atoms.cell.rank == 3:
         stress = (stress + stress.T) * 0.5  # symmetrize
@@ -74,12 +78,158 @@ def numba_calc_energy_and_forces(
     return energy, forces, stress
 
 
+#
+# The below implementation is from some reason slightly slower up to level 10 for larger systems.
+# This should be tested again for higher levels
+#
+# def numba_calc_energy_and_forces__full_arrays(
+#     engine,
+#     atoms,
+#     alpha_moments_count,
+#     alpha_moment_mapping,
+#     alpha_index_basic,
+#     alpha_index_times,
+#     scaling,
+#     min_dist,
+#     max_dist,
+#     species_coeffs,
+#     moment_coeffs,
+#     radial_coeffs,
+# ):
+#     assert len(alpha_index_times.shape) == 2
+#     number_of_atoms = len(atoms)
+#     # TODO: take out engine from here and precompute distances and send in indices.
+#     # See also jax implementation of full tensor version
+#     max_number_of_js = 0
+#     for i in range(number_of_atoms):
+#         js, r_ijs = engine._get_distances(atoms, i)
+#         (number_of_js,) = js.shape
+#         if number_of_js > max_number_of_js:
+#             max_number_of_js = number_of_js
+#     shape = (max_number_of_js, number_of_atoms)
+#     all_js = np.zeros(shape, dtype=int)
+#     all_r_ijs = np.zeros((3,) + shape, dtype=float)
+#     all_r_abs = -1 * np.ones(shape, dtype=float)
+#     all_itypes = np.empty(number_of_atoms, dtype=int)
+#     all_jtypes = np.zeros(shape, dtype=int)
+#     for i in range(number_of_atoms):
+#         js, r_ijs = engine._get_distances(atoms, i)
+#         r_abs = np.linalg.norm(r_ijs, axis=0)
+#         itype = engine.parameters["species"][atoms.numbers[i]]
+#         jtypes = np.array([engine.parameters["species"][atoms.numbers[j]] for j in js])
+#         (number_of_js,) = js.shape
+#         all_js[:number_of_js, i] = js
+#         all_r_ijs[:, :number_of_js, i] = r_ijs
+#         all_r_abs[:number_of_js, i] = r_abs
+#         all_itypes[i] = itype
+#         all_jtypes[:number_of_js, i] = jtypes
+#
+#     all_js = all_js
+#
+#     energy, gradient = _nb_calc_energy_and_gradient(
+#         # energy, gradient = _nb_calc_energy_and_gradient__sequential(
+#         all_r_ijs,
+#         all_r_abs,
+#         all_itypes,
+#         all_jtypes,
+#         alpha_moments_count,
+#         alpha_moment_mapping,
+#         alpha_index_basic,
+#         alpha_index_times,
+#         scaling,
+#         min_dist,
+#         max_dist,
+#         radial_coeffs,
+#         species_coeffs,
+#         moment_coeffs,
+#         number_of_atoms,
+#         max_number_of_js,
+#     )
+#     stress = np.zeros((3, 3))
+#     for i in range(number_of_atoms):
+#         r_ijs = all_r_ijs[:, :, i]
+#         loc_gradient = gradient[i, : r_ijs.shape[1], :]
+#         stress += r_ijs @ loc_gradient
+#
+#     forces = _nb_forces_from_gradient(
+#         gradient, all_js, number_of_atoms, max_number_of_js
+#     )
+#
+#     if atoms.cell.rank == 3:
+#         stress = (stress + stress.T) * 0.5  # symmetrize
+#         stress /= atoms.get_volume()
+#         stress = stress.flat[[0, 4, 8, 5, 2, 1]]
+#     else:
+#         stress = np.full(6, np.nan)
+#
+#     return energy, forces, stress
+#
+#
 # @nb.njit
+# def _nb_calc_energy_and_gradient(
+#     all_r_ijs,
+#     all_r_abs,
+#     all_itypes,
+#     all_jtypes,
+#     alpha_moments_count,
+#     alpha_moment_mapping,
+#     alpha_index_basic,
+#     alpha_index_times,
+#     scaling,
+#     min_dist,
+#     max_dist,
+#     radial_coeffs,
+#     species_coeffs,
+#     moment_coeffs,
+#     number_of_atoms,
+#     max_number_of_js,
+# ):
+#     energy = 0
+#     gradient = np.zeros((number_of_atoms, max_number_of_js, 3))
+#     for i in range(number_of_atoms):
+#         r_ijs = all_r_ijs[:, :, i]
+#         r_abs = all_r_abs[:, i]
+#         itype = all_itypes[i]
+#         jtypes = all_jtypes[:, i]
+#         loc_energy, loc_gradient = _nb_calc_local_energy_and_derivs(
+#             r_ijs,
+#             r_abs,
+#             itype,
+#             jtypes,
+#             alpha_moments_count,
+#             alpha_moment_mapping,
+#             alpha_index_basic,
+#             alpha_index_times,
+#             scaling,
+#             min_dist,
+#             max_dist,
+#             radial_coeffs,
+#             species_coeffs,
+#             moment_coeffs,
+#         )
+#         energy += loc_energy
+#         gradient[i, : loc_gradient.shape[0], :] = loc_gradient
+#     return energy, gradient
+
+
+@nb.njit
+def _nb_forces_from_gradient(gradient, all_js, number_of_atoms, max_number_of_js):
+    forces = np.zeros((number_of_atoms, 3))
+    for i in range(number_of_atoms):
+        for i_j in range(max_number_of_js):
+            j = all_js[i_j, i]
+            for k in range(3):
+                forces[i, k] -= gradient[i, i_j, k]
+                forces[j, k] += gradient[i, i_j, k]
+    return forces
+
+
+@nb.njit
 def _nb_calc_local_energy_and_derivs(
     r_ijs,
+    r_abs,
     itype,
     jtypes,
-    radial_coeffs,
     alpha_moments_count,
     alpha_moment_mapping,
     alpha_index_basic,
@@ -87,10 +237,10 @@ def _nb_calc_local_energy_and_derivs(
     scaling,
     min_dist,
     max_dist,
+    radial_coeffs,
     species_coeffs,
     moment_coeffs,
 ):
-    r_abs = np.linalg.norm(r_ijs, axis=0)
     rb_values, rb_derivs = _nb_calc_radial_basis_and_deriv(
         r_abs, itype, jtypes, radial_coeffs, scaling, min_dist, max_dist
     )
@@ -110,20 +260,17 @@ def _nb_calc_local_energy_and_derivs(
     return energy, derivs
 
 
-# @nb.njit
+@nb.njit
 def _nb_convolve_with_coeffs(basis, bderiv, itype, species_coeffs, moment_coeffs):
-    # nrs = bderiv.shape[2]
-    # nbasis = bderiv.shape[1]
-    # energy = species_coeffs[0]
-    # derivs = np.zeros((nrs, 3))
-    # for i in range(nbasis):
-    #     for k in range(3):
-    #         energy += moment_coeffs[i] * basis[i]
-    #         for j in range(nrs):
-    #             derivs[j, k] += moment_coeffs[i] * bderiv[k, i, j]
-    energy = species_coeffs[itype] * 1 + np.dot(moment_coeffs, basis)
-    derivs = np.dot(moment_coeffs, bderiv.T)
-    # np.dot(moment_coeffs, bderiv.T, out=derivs)
+    nrs = bderiv.shape[2]
+    nbasis = bderiv.shape[1]
+    energy = species_coeffs[itype]
+    derivs = np.zeros((nrs, 3))
+    for i in range(nbasis):
+        energy += moment_coeffs[i] * basis[i]
+        for k in range(3):
+            for j in range(nrs):
+                derivs[j, k] += moment_coeffs[i] * bderiv[k, i, j]
     return energy, derivs
 
 
@@ -156,6 +303,8 @@ def _nb_calc_radial_basis_and_deriv(
     derivs = np.zeros((nmu, nrs))
     for j in range(nrs):
         is_within_cutoff = r_abs[j] < max_dist
+        # The below is for the "full_array" implementation
+        # is_within_cutoff = 0 < r_abs[j] and r_abs[j] < max_dist
         if is_within_cutoff:
             smoothing = (max_dist - r_abs[j]) ** 2
             smooth_deriv = -2 * (max_dist - r_abs[j])
@@ -171,16 +320,15 @@ def _nb_calc_radial_basis_and_deriv(
 
 
 @nb.njit(
-    # float64[:](
-    (
-        float64[:, :],
-        float64[:],
-        float64[:, :],
-        float64[:, :],
-        int64,
-        int64[:],
-        int64[:, :],
-        int64[:, :],
+    nb.types.Tuple((nb.float64[:], nb.float64[:, :, :]))(
+        nb.float64[:, :],
+        nb.float64[:],
+        nb.float64[:, :],
+        nb.float64[:, :],
+        nb.int64,
+        nb.int64[:],
+        nb.int64[:, :],
+        nb.int64[:, :],
     )
 )
 def _nb_calc_moment_basis_and_deriv(
@@ -193,7 +341,7 @@ def _nb_calc_moment_basis_and_deriv(
     alpha_index_basic,
     alpha_index_times,
 ):
-    nrs = r_abs.shape[0]
+    (nrs,) = r_abs.shape
     max_pow = int(np.max(alpha_index_basic))
     moment_components = np.zeros(alpha_moments_count)
     moment_jacobian = np.zeros((3, alpha_moments_count, nrs))
@@ -218,21 +366,9 @@ def _nb_calc_moment_basis_and_deriv(
                 / dist_pows[pow, j]
             )
             moment_components[i] += val
-            # TODO: profile with for loop
-            der = (
-                (
-                    rb_derivs[mu, j] / dist_pows[pow, j]
-                    - pow * rb_values[mu, j] / dist_pows[pow, j] / r_abs[j]
-                )
-                * (
-                    coord_pows[xpow, 0, j]
-                    * coord_pows[ypow, 1, j]
-                    * coord_pows[zpow, 2, j]
-                    / r_abs[j]
-                )
-                * r_ijs[:, j]
-            )
-            der[0] += (
+
+            der = np.empty(3)
+            der[0] = (
                 rb_values[mu, j]
                 / dist_pows[pow, j]
                 * xpow
@@ -242,7 +378,7 @@ def _nb_calc_moment_basis_and_deriv(
                     * coord_pows[zpow, 2, j]
                 )
             )
-            der[1] += (
+            der[1] = (
                 rb_values[mu, j]
                 / dist_pows[pow, j]
                 * ypow
@@ -252,7 +388,7 @@ def _nb_calc_moment_basis_and_deriv(
                     * coord_pows[zpow, 2, j]
                 )
             )
-            der[2] += (
+            der[2] = (
                 rb_values[mu, j]
                 / dist_pows[pow, j]
                 * zpow
@@ -262,17 +398,32 @@ def _nb_calc_moment_basis_and_deriv(
                     * coord_pows[zpow - 1, 2, j]
                 )
             )
-            moment_jacobian[:, i, j] += der
+            for k in range(3):
+                der[k] += (
+                    (
+                        rb_derivs[mu, j] / dist_pows[pow, j]
+                        - pow * rb_values[mu, j] / dist_pows[pow, j] / r_abs[j]
+                    )
+                    * (
+                        coord_pows[xpow, 0, j]
+                        * coord_pows[ypow, 1, j]
+                        * coord_pows[zpow, 2, j]
+                        / r_abs[j]
+                    )
+                    * r_ijs[k, j]
+                )
+                moment_jacobian[k, i, j] += der[k]
     # Compute contractions
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
         moment_components[i3] += mult * moment_components[i1] * moment_components[i2]
         # TODO: Test performance of backwards propagation
         for j in range(nrs):
-            moment_jacobian[:, i3, j] += mult * (
-                moment_jacobian[:, i1, j] * moment_components[i2]
-                + moment_components[i1] * moment_jacobian[:, i2, j]
-            )
+            for k in range(3):
+                moment_jacobian[k, i3, j] += mult * (
+                    moment_jacobian[k, i1, j] * moment_components[i2]
+                    + moment_components[i1] * moment_jacobian[k, i2, j]
+                )
     # Compute basis
     nmoments = alpha_moment_mapping.shape[0]
     basis = np.empty(nmoments)
@@ -286,56 +437,56 @@ def _nb_calc_moment_basis_and_deriv(
 
 
 #
-# Energy only numba implementation for moment basis
+# Energy only numba implementation for moment basis (not used at the moment)
 #
-@nb.njit(
-    float64[:](
-        float64[:, :],
-        float64[:],
-        float64[:, :],
-        int64,
-        int64[:],
-        int64[:, :],
-        int64[:, :],
-    )
-)
-def numba_calc_moment_basis(
-    r_ijs,
-    r_abs,
-    rb_values,
-    alpha_moments_count,
-    alpha_moment_mapping,
-    alpha_index_basic,
-    alpha_index_times,
-):
-    nrs = r_abs.shape[0]
-    max_pow = int(np.max(alpha_index_basic))
-    r_ijs_unit = r_ijs / r_abs
-    moment_components = np.zeros(alpha_moments_count)
-    # Precompute powers
-    val_pows = np.ones((max_pow + 1, 3, nrs))
-    for pow in range(1, max_pow + 1):
-        for k in range(3):
-            for j in range(nrs):
-                val_pows[pow, k, j] = val_pows[pow - 1, k, j] * r_ijs_unit[k, j]
-    # Compute basic moments
-    for i, aib in enumerate(alpha_index_basic):
-        for j in range(nrs):
-            mu, xpow, ypow, zpow = aib
-            val = (
-                rb_values[mu, j]
-                * val_pows[xpow, 0, j]
-                * val_pows[ypow, 1, j]
-                * val_pows[zpow, 2, j]
-            )
-            moment_components[i] += val
-    # Compute contractions
-    for ait in alpha_index_times:
-        i1, i2, mult, i3 = ait
-        moment_components[i3] += mult * moment_components[i1] * moment_components[i2]
-    # Compute basis
-    nmoments = alpha_moment_mapping.shape[0]
-    basis = np.empty(nmoments)
-    for basis_i, moment_i in enumerate(alpha_moment_mapping):
-        basis[basis_i] = moment_components[moment_i]
-    return basis
+# @nb.njit(
+#     nb.float64[:](
+#         nb.float64[:, :],
+#         nb.float64[:],
+#         nb.float64[:, :],
+#         nb.int64,
+#         nb.int64[:],
+#         nb.int64[:, :],
+#         nb.int64[:, :],
+#     )
+# )
+# def numba_calc_moment_basis(
+#     r_ijs,
+#     r_abs,
+#     rb_values,
+#     alpha_moments_count,
+#     alpha_moment_mapping,
+#     alpha_index_basic,
+#     alpha_index_times,
+# ):
+#     nrs = r_abs.shape[0]
+#     max_pow = int(np.max(alpha_index_basic))
+#     r_ijs_unit = r_ijs / r_abs
+#     moment_components = np.zeros(alpha_moments_count)
+#     # Precompute powers
+#     val_pows = np.ones((max_pow + 1, 3, nrs))
+#     for pow in range(1, max_pow + 1):
+#         for k in range(3):
+#             for j in range(nrs):
+#                 val_pows[pow, k, j] = val_pows[pow - 1, k, j] * r_ijs_unit[k, j]
+#     # Compute basic moments
+#     for i, aib in enumerate(alpha_index_basic):
+#         for j in range(nrs):
+#             mu, xpow, ypow, zpow = aib
+#             val = (
+#                 rb_values[mu, j]
+#                 * val_pows[xpow, 0, j]
+#                 * val_pows[ypow, 1, j]
+#                 * val_pows[zpow, 2, j]
+#             )
+#             moment_components[i] += val
+#     # Compute contractions
+#     for ait in alpha_index_times:
+#         i1, i2, mult, i3 = ait
+#         moment_components[i3] += mult * moment_components[i1] * moment_components[i2]
+#     # Compute basis
+#     nmoments = alpha_moment_mapping.shape[0]
+#     basis = np.empty(nmoments)
+#     for basis_i, moment_i in enumerate(alpha_moment_mapping):
+#         basis[basis_i] = moment_components[moment_i]
+#     return basis
