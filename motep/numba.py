@@ -99,10 +99,22 @@ def numba_calc_energy_and_forces(
 #     moment_coeffs,
 #     radial_coeffs,
 # ):
-#     assert len(alpha_index_times.shape) == 2
-#     number_of_atoms = len(atoms)
 #     # TODO: take out engine from here and precompute distances and send in indices.
 #     # See also jax implementation of full tensor version
+#     # Something like this:
+#      #####################
+#      positions = atoms.positions
+#      offsets = engine.precomputed_offsets
+#      indices = np.array(
+#          [engine._neighbor_list.get_neighbors(i)[0] for i in range(number_of_atoms)]
+#      )
+#      all_distances = (positions - positions[indices.T]).transpose(
+#          1, 2, 0
+#      ) - offsets.transpose(0, 2, 1)
+#      #####################
+#
+#     assert len(alpha_index_times.shape) == 2
+#     number_of_atoms = len(atoms)
 #     max_number_of_js = 0
 #     for i in range(number_of_atoms):
 #         js, r_ijs = engine._get_distances(atoms, i)
@@ -130,7 +142,6 @@ def numba_calc_energy_and_forces(
 #     all_js = all_js
 #
 #     energy, gradient = _nb_calc_energy_and_gradient(
-#         # energy, gradient = _nb_calc_energy_and_gradient__sequential(
 #         all_r_ijs,
 #         all_r_abs,
 #         all_itypes,
@@ -190,28 +201,30 @@ def numba_calc_energy_and_forces(
 #     energy = 0
 #     gradient = np.zeros((number_of_atoms, max_number_of_js, 3))
 #     for i in range(number_of_atoms):
-#         r_ijs = all_r_ijs[:, :, i]
-#         r_abs = all_r_abs[:, i]
-#         itype = all_itypes[i]
-#         jtypes = all_jtypes[:, i]
-#         loc_energy, loc_gradient = _nb_calc_local_energy_and_derivs(
-#             r_ijs,
-#             r_abs,
-#             itype,
-#             jtypes,
+#         rb_values, rb_derivs = _nb_calc_radial_basis(
+#             all_r_abs[:, i],
+#             all_itypes[i],
+#             all_jtypes[:, i],
+#             radial_coeffs,
+#             scaling,
+#             min_dist,
+#             max_dist,
+#         )
+#         loc_energy, loc_gradient = _nb_calc_local_energy_and_gradient(
+#             all_r_ijs[:, :, i],
+#             all_r_abs[:, i],
+#             rb_values,
+#             rb_derivs,
 #             alpha_moments_count,
 #             alpha_moment_mapping,
 #             alpha_index_basic,
 #             alpha_index_times,
-#             scaling,
-#             min_dist,
-#             max_dist,
-#             radial_coeffs,
+#             all_itypes[i],
 #             species_coeffs,
 #             moment_coeffs,
 #         )
 #         energy += loc_energy
-#         gradient[i, : loc_gradient.shape[0], :] = loc_gradient
+#         gradient[i, :, :] = loc_gradient.T
 #     return energy, gradient
 
 
