@@ -104,8 +104,8 @@ def time_numba(
 if __name__ == "__main__":
     data_path = pathlib.Path("tests/data_path")
     crystal = "cubic"
-    for level in [4, 10]:
-        for size_reps in [1, 4]:
+    for level in [6, 20]:
+        for size_reps in [1, 3]:
             path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
             cfg_path = path / "out.cfg"
             if not cfg_path.is_file():
