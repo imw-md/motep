@@ -432,3 +432,152 @@ def _nb_calc_local_energy_and_gradient(
                 gradient[k, j] += tmp_moment_ders[aib_i] * moment_jacobian[k, j, aib_i]
 
     return energy, gradient
+
+
+#
+# Energy-only numba implementation
+#
+def numba_calc_energy(
+    engine,
+    atoms,
+    alpha_moments_count,
+    alpha_moment_mapping,
+    alpha_index_basic,
+    alpha_index_times,
+    scaling,
+    min_dist,
+    max_dist,
+    species_coeffs,
+    moment_coeffs,
+    radial_coeffs,
+):
+    assert len(alpha_index_times.shape) == 2
+    number_of_atoms = len(atoms)
+    max_number_of_js = 0
+    for i in range(number_of_atoms):
+        js, r_ijs = engine._get_distances(atoms, i)
+        (number_of_js,) = js.shape
+        if number_of_js > max_number_of_js:
+            max_number_of_js = number_of_js
+    shape = (max_number_of_js, number_of_atoms)
+    all_js = np.zeros(shape, dtype=int)
+    all_r_ijs = []
+    for i in range(number_of_atoms):
+        js, r_ijs = engine._get_distances(atoms, i)
+        all_r_ijs.append(r_ijs)
+        (number_of_js,) = js.shape
+        all_js[:number_of_js, i] = js
+
+    energy = 0
+    for i in range(number_of_atoms):
+        js = all_js[:, i]
+        r_ijs = all_r_ijs[i]
+        (_, number_of_js) = r_ijs.shape
+        itype = engine.parameters["species"][atoms.numbers[i]]
+        jtypes = np.array([engine.parameters["species"][atoms.numbers[j]] for j in js])
+        r_abs = np.linalg.norm(r_ijs, axis=0)
+        rb_values = _nb_calc_radial_basis_ene_only(
+            r_abs, itype, jtypes, radial_coeffs, scaling, min_dist, max_dist
+        )
+        loc_energy = _nb_calc_local_energy_only(
+            r_ijs,
+            r_abs,
+            rb_values,
+            alpha_moments_count,
+            alpha_moment_mapping,
+            alpha_index_basic,
+            alpha_index_times,
+            itype,
+            species_coeffs,
+            moment_coeffs,
+        )
+        energy += loc_energy
+    return energy
+
+
+@nb.njit
+def _nb_calc_radial_basis_ene_only(
+    r_abs, itype, jtypes, radial_coeffs, scaling, min_dist, max_dist
+):
+    (nrs,) = r_abs.shape
+    _, _, nmu, rb_size = radial_coeffs.shape
+    values = np.zeros((nmu, nrs))
+    for j in range(nrs):
+        is_within_cutoff = r_abs[j] < max_dist
+        if is_within_cutoff:
+            smoothing = (max_dist - r_abs[j]) ** 2
+            rb_values = _nb_chebyshev_ene_only(r_abs[j], rb_size, min_dist, max_dist)
+            for i_mu in range(nmu):
+                for i_rb in range(rb_size):
+                    coeffs = scaling * radial_coeffs[itype, jtypes[j], i_mu, i_rb]
+                    values[i_mu, j] += coeffs * rb_values[i_rb] * smoothing
+    return values
+
+
+@nb.njit
+def _nb_chebyshev_ene_only(r, number_of_terms, min_dist, max_dist):
+    values = np.empty((number_of_terms))
+    r_scaled = (2 * r - (min_dist + max_dist)) / (max_dist - min_dist)
+    values[0] = 1
+    values[1] = r_scaled
+    for i in range(2, number_of_terms):
+        values[i] = 2 * r_scaled * values[i - 1] - values[i - 2]
+    return values
+
+
+@nb.njit(
+    nb.float64(
+        nb.float64[:, :],
+        nb.float64[:],
+        nb.float64[:, :],
+        nb.int64,
+        nb.int64[:],
+        nb.int64[:, :],
+        nb.int64[:, :],
+        nb.int64,
+        nb.float64[:],
+        nb.float64[:],
+    )
+)
+def _nb_calc_local_energy_only(
+    r_ijs,
+    r_abs,
+    rb_values,
+    alpha_moments_count,
+    alpha_moment_mapping,
+    alpha_index_basic,
+    alpha_index_times,
+    itype,
+    species_coeffs,
+    moment_coeffs,
+):
+    nrs = r_abs.shape[0]
+    max_pow = int(np.max(alpha_index_basic))
+    r_ijs_unit = r_ijs / r_abs
+    moment_components = np.zeros(alpha_moments_count)
+    # Precompute powers
+    r_ijs_pows = np.ones((3, nrs, max_pow + 1))
+    for pow in range(1, max_pow + 1):
+        for j in range(nrs):
+            for k in range(3):
+                r_ijs_pows[k, j, pow] = r_ijs_pows[k, j, pow - 1] * r_ijs_unit[k, j]
+    # Compute basic moment components
+    for i, aib in enumerate(alpha_index_basic):
+        for j in range(nrs):
+            mu, xpow, ypow, zpow = aib
+            val = (
+                rb_values[mu, j]
+                * r_ijs_pows[0, j, xpow]
+                * r_ijs_pows[1, j, ypow]
+                * r_ijs_pows[2, j, zpow]
+            )
+            moment_components[i] += val
+    # Compute moment contraction components
+    for ait in alpha_index_times:
+        i1, i2, mult, i3 = ait
+        moment_components[i3] += mult * moment_components[i1] * moment_components[i2]
+    # Extract basis elements and multiply with moment coefficients
+    energy = species_coeffs[itype]
+    for basis_i, moment_i in enumerate(alpha_moment_mapping):
+        energy += moment_coeffs[basis_i] * moment_components[moment_i]
+    return energy
