@@ -21,17 +21,19 @@ def numba_calc_energy_and_forces(
     # TODO: precompute distances and send in indices.
     # See also jax implementation of full tensor version
     max_number_of_js = 0
+    all_js_list = []
+    all_r_ijs = []
     for i in range(number_of_atoms):
         js, r_ijs = engine._get_distances(atoms, i)
+        all_js_list.append(js)
+        all_r_ijs.append(r_ijs)
         (number_of_js,) = js.shape
         if number_of_js > max_number_of_js:
             max_number_of_js = number_of_js
     shape = (max_number_of_js, number_of_atoms)
     all_js = np.zeros(shape, dtype=int)
-    all_r_ijs = []
     for i in range(number_of_atoms):
-        js, r_ijs = engine._get_distances(atoms, i)
-        all_r_ijs.append(r_ijs)
+        js = all_js_list[i]
         (number_of_js,) = js.shape
         all_js[:number_of_js, i] = js
 
