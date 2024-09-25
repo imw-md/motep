@@ -317,15 +317,17 @@ def _nb_calc_local_energy_and_gradient(
     (number_of_js,) = r_abs.shape
     max_pow = int(np.max(alpha_index_basic))
     moment_components = np.zeros(alpha_moments_count)
-    moment_jacobian = np.zeros((3, number_of_js, alpha_moments_count))
-    # Precompute powers
-    r_abs_pows = np.ones((number_of_js, max_pow + 1))
-    r_ijs_pows = np.ones((3, number_of_js, max_pow + 1))
+    moment_jacobian = np.empty((3, number_of_js, alpha_moments_count))
+    # Precompute unit vectors and its powers
+    r_unit = np.empty((3, number_of_js))
+    for j in range(number_of_js):
+        for k in range(3):
+            r_unit[k, j] = r_ijs[k, j] / r_abs[j]
+    r_unit_pows = np.ones((3, number_of_js, max_pow + 1))
     for pow in range(1, max_pow + 1):
         for j in range(number_of_js):
-            r_abs_pows[j, pow] = r_abs_pows[j, pow - 1] * r_abs[j]
             for k in range(3):
-                r_ijs_pows[k, j, pow] = r_ijs_pows[k, j, pow - 1] * r_ijs[k, j]
+                r_unit_pows[k, j, pow] = r_unit_pows[k, j, pow - 1] * r_unit[k, j]
     # Compute basic moment components and its jacobian wrt r_ijs
     for j in range(number_of_js):
         for aib_i, aib in enumerate(alpha_index_basic):
@@ -333,59 +335,44 @@ def _nb_calc_local_energy_and_gradient(
             pow = xpow + ypow + zpow
             val = (
                 rb_values[mu, j]
-                * r_ijs_pows[0, j, xpow]
-                * r_ijs_pows[1, j, ypow]
-                * r_ijs_pows[2, j, zpow]
-                / r_abs_pows[j, pow]
+                * r_unit_pows[0, j, xpow]
+                * r_unit_pows[1, j, ypow]
+                * r_unit_pows[2, j, zpow]
             )
             moment_components[aib_i] += val
 
-            der = np.empty(3)
-            der[0] = (
-                rb_values[mu, j]
-                / r_abs_pows[j, pow]
-                * xpow
-                * (
-                    r_ijs_pows[0, j, xpow - 1]
-                    * r_ijs_pows[1, j, ypow]
-                    * r_ijs_pows[2, j, zpow]
-                )
-            )
-            der[1] = (
-                rb_values[mu, j]
-                / r_abs_pows[j, pow]
-                * ypow
-                * (
-                    r_ijs_pows[0, j, xpow]
-                    * r_ijs_pows[1, j, ypow - 1]
-                    * r_ijs_pows[2, j, zpow]
-                )
-            )
-            der[2] = (
-                rb_values[mu, j]
-                / r_abs_pows[j, pow]
-                * zpow
-                * (
-                    r_ijs_pows[0, j, xpow]
-                    * r_ijs_pows[1, j, ypow]
-                    * r_ijs_pows[2, j, zpow - 1]
-                )
-            )
             for k in range(3):
-                der[k] += (
-                    (
-                        rb_derivs[mu, j] / r_abs_pows[j, pow]
-                        - pow * rb_values[mu, j] / r_abs_pows[j, pow] / r_abs[j]
-                    )
-                    * (
-                        r_ijs_pows[0, j, xpow]
-                        * r_ijs_pows[1, j, ypow]
-                        * r_ijs_pows[2, j, zpow]
+                moment_jacobian[k, j, aib_i] = (
+                    r_unit[k, j]
+                    * r_unit_pows[0, j, xpow]
+                    * r_unit_pows[1, j, ypow]
+                    * r_unit_pows[2, j, zpow]
+                    * (rb_derivs[mu, j] - pow * rb_values[mu, j] / r_abs[j])
+                )
+                if k == 0:
+                    moment_jacobian[k, j, aib_i] += (
+                        rb_values[mu, j]
+                        * (xpow * r_unit_pows[0, j, xpow - 1])
+                        * r_unit_pows[1, j, ypow]
+                        * r_unit_pows[2, j, zpow]
                         / r_abs[j]
                     )
-                    * r_ijs[k, j]
-                )
-                moment_jacobian[k, j, aib_i] += der[k]
+                elif k == 1:
+                    moment_jacobian[k, j, aib_i] += (
+                        rb_values[mu, j]
+                        * r_unit_pows[0, j, xpow]
+                        * (ypow * r_unit_pows[1, j, ypow - 1])
+                        * r_unit_pows[2, j, zpow]
+                        / r_abs[j]
+                    )
+                elif k == 2:
+                    moment_jacobian[k, j, aib_i] += (
+                        rb_values[mu, j]
+                        * r_unit_pows[0, j, xpow]
+                        * r_unit_pows[1, j, ypow]
+                        * (zpow * r_unit_pows[2, j, zpow - 1])
+                        / r_abs[j]
+                    )
 
     # For moments and energy:
     # Compute moment contraction components
