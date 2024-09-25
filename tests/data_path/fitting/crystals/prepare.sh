@@ -15,7 +15,7 @@ crystals=(cubic noncubic)
 species_counts=(["cubic"]=1 ["noncubic"]=1)
 
 for crystal in $crystals; do
-  for level in 02 04 06 08 10; do
+  for level in 20; do
     echo $crystal
     echo $level
     d=$crystal/$level
