@@ -102,16 +102,16 @@ def numba_calc_energy_and_forces(
 #     # TODO: take out engine from here and precompute distances and send in indices.
 #     # See also jax implementation of full tensor version
 #     # Something like this:
-#      #####################
-#      positions = atoms.positions
-#      offsets = engine.precomputed_offsets
-#      indices = np.array(
-#          [engine._neighbor_list.get_neighbors(i)[0] for i in range(number_of_atoms)]
-#      )
-#      all_distances = (positions - positions[indices.T]).transpose(
-#          1, 2, 0
-#      ) - offsets.transpose(0, 2, 1)
-#      #####################
+#     #####################
+#     # positions = atoms.positions
+#     # offsets = engine.precomputed_offsets
+#     # indices = np.array(
+#     #     [engine._neighbor_list.get_neighbors(i)[0] for i in range(number_of_atoms)]
+#     # )
+#     # all_distances = (positions - positions[indices.T]).transpose(
+#     #     1, 2, 0
+#     # ) - offsets.transpose(0, 2, 1)
+#     #####################
 #
 #     assert len(alpha_index_times.shape) == 2
 #     number_of_atoms = len(atoms)
@@ -179,7 +179,7 @@ def numba_calc_energy_and_forces(
 #     return energy, forces, stress
 #
 #
-# @nb.njit
+# @nb.njit(fastmath=True)
 # def _nb_calc_energy_and_gradient(
 #     all_r_ijs,
 #     all_r_abs,
@@ -224,7 +224,9 @@ def numba_calc_energy_and_forces(
 #             moment_coeffs,
 #         )
 #         energy += loc_energy
-#         gradient[i, :, :] = loc_gradient.T
+#         for j in range(max_number_of_js):
+#             for k in range(3):
+#                 gradient[i, j, k] = loc_gradient[k, j]
 #     return energy, gradient
 
 
@@ -324,7 +326,7 @@ def _nb_calc_local_energy_and_gradient(
             r_abs_pows[j, pow] = r_abs_pows[j, pow - 1] * r_abs[j]
             for k in range(3):
                 r_ijs_pows[k, j, pow] = r_ijs_pows[k, j, pow - 1] * r_ijs[k, j]
-    # Compute basic moment components
+    # Compute basic moment components and its jacobian wrt r_ijs
     for j in range(number_of_js):
         for aib_i, aib in enumerate(alpha_index_basic):
             mu, xpow, ypow, zpow = aib
@@ -385,7 +387,7 @@ def _nb_calc_local_energy_and_gradient(
                 )
                 moment_jacobian[k, j, aib_i] += der[k]
 
-    # For moments:
+    # For moments and energy:
     # Compute moment contraction components
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
@@ -395,7 +397,7 @@ def _nb_calc_local_energy_and_gradient(
     for basis_i, moment_i in enumerate(alpha_moment_mapping):
         energy += moment_coeffs[basis_i] * moment_components[moment_i]
 
-    # Same for gradient:
+    # Same for moment jacobian and gradient:
     # # contraction
     # deriv = np.empty((3, nmoments, nrs))
     # for ait in alpha_index_times:
