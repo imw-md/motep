@@ -70,7 +70,6 @@ def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
 
 
 class NumpyMTPEngine(EngineBase):
-
     def __init__(self, mtp_parameters: dict[str, Any] | None = None):
         """MLIP-2 MTP.
 
@@ -306,21 +305,7 @@ def calc_moment_basis(
 # Class for Numba implementation
 #
 class NumbaMTPEngine(EngineBase):
-
-    def update(self, parameters: dict[str, Any]) -> None:
-        """Update MTP parameters."""
-
-        cast_as_int = ["alpha_moment_mapping", "alpha_index_basic", "alpha_index_times"]
-        cast_as_float = ["species_coeffs", "moment_coeffs", "radial_coeffs"]
-        casted_parameters = {}
-        for k, v in parameters.items():
-            if k in cast_as_int:
-                casted_parameters[k] = np.array(v, dtype=int)
-            elif k in cast_as_float:
-                casted_parameters[k] = np.array(v, dtype=float)
-            else:
-                casted_parameters[k] = v
-        super().update(casted_parameters)
+    """MTP Engine based on Numba."""
 
     def calculate(self, atoms: Atoms):
         self.update_neighbor_list(atoms)

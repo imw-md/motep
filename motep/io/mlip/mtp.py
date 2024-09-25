@@ -1,4 +1,7 @@
+"""Parsers of MLIP .mtp files."""
+
 import itertools
+import os
 import pathlib
 from typing import Any, TextIO
 
@@ -25,28 +28,36 @@ def _parse_radial_coeffs(
     return np.array(coeffs).reshape(shape)
 
 
-def read_mtp(filename) -> dict[str, Any]:
+def read_mtp(file: os.PathLike) -> dict[str, Any]:
+    """Read an MLIP .mtp file."""
     data = {}
-    with pathlib.Path(filename).open("r", encoding="utf-8") as fd:
+    with pathlib.Path(file).open("r", encoding="utf-8") as fd:
         for line in fd:
             if line.strip() == "MTP":
                 continue
             if "=" in line:
-                key, value = [_.strip() for _ in line.strip().split("=")]
-                if key in ["scaling", "min_dist", "max_dist"]:
+                key, value = (_.strip() for _ in line.strip().split("="))
+                if key in {"scaling", "min_dist", "max_dist"}:
                     data[key] = float(value)
                 elif value.isdigit():
                     data[key] = int(value)
-                elif key in ["alpha_moment_mapping"]:
-                    data[key] = [int(_) for _ in value.strip("{}").split(",")]
-                elif key in ["species_coeffs", "moment_coeffs"]:
-                    data[key] = [float(_) for _ in value.strip().strip("{}").split(",")]
-                elif key in ["alpha_index_basic", "alpha_index_times"]:
+                elif key == "alpha_moment_mapping":
+                    data[key] = np.fromiter(
+                        (_ for _ in value.strip("{}").split(",")),
+                        dtype=int,
+                    )
+                elif key in {"species_coeffs", "moment_coeffs"}:
+                    data[key] = np.fromiter(
+                        (_ for _ in value.strip().strip("{}").split(",")),
+                        dtype=float,
+                    )
+                elif key in {"alpha_index_basic", "alpha_index_times"}:
                     data[key] = [
                         [int(_) for _ in _.split(",")]
                         for _ in value.strip("{}").split("}, {")
                         if _ != ""
                     ]
+                    data[key] = np.array(data[key])
                 else:
                     data[key] = value.strip()
             elif line.strip() == "radial_coeffs":
@@ -76,7 +87,8 @@ def _format_list(value: list) -> str:
     return "{" + ", ".join(f"{_format_value(_)}" for _ in value) + "}"
 
 
-def write_mtp(file, data: dict[str, Any]) -> None:
+def write_mtp(file: os.PathLike, data: dict[str, Any]) -> None:
+    """Write an MLIP .mtp file."""
     keys0 = [
         "version",
         "potential_name",
