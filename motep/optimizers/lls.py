@@ -6,7 +6,7 @@ import numpy as np
 from ase import Atoms
 
 from motep.loss_function import LossFunction, update_mtp
-from motep.opt import Callback
+from motep.optimizers.scipy import Callback
 
 
 class LLSOptimizer:
