@@ -214,7 +214,7 @@ def elite_callback(gen, elite):
     print(f"Generation {gen}: Top Elite - {elite}")
 
 
-def optimization_GA(
+def optimize_ga(
     fun: Callable,
     initial_guess: np.ndarray,
     bounds: np.ndarray,

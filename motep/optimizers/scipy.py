@@ -39,7 +39,7 @@ def print_result(result: OptimizeResult) -> None:
     print("  Final function value:", result.fun)
 
 
-def optimization_sa(
+def optimize_da(
     fun: Callable,
     initial_guess: np.ndarray,
     bounds: np.ndarray,
@@ -76,7 +76,7 @@ def optimize_minimize(
     return result.x
 
 
-def optimization_nelder(
+def optimize_nelder(
     fun: Callable,
     initial_guess: np.ndarray,
     bounds: np.ndarray,
@@ -91,7 +91,7 @@ def optimization_nelder(
     )
 
 
-def optimization_bfgs(
+def optimize_bfgs(
     fun: Callable,
     initial_guess: np.ndarray,
     bounds: np.ndarray,
@@ -106,7 +106,7 @@ def optimization_bfgs(
     )
 
 
-def optimization_DE(
+def optimize_de(
     fun: Callable,
     initial_guess: np.ndarray,
     bounds: np.ndarray,
