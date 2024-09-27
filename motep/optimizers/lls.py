@@ -21,6 +21,7 @@ class LLSOptimizer:
         fitness: LossFunction,
         parameters: np.ndarray,
         bounds: np.ndarray,
+        **kwargs,
     ) -> np.ndarray:
         """Optimize parameters.
 

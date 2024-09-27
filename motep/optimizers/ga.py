@@ -210,7 +210,7 @@ def elite_callback(gen, elite):
     print(f"Generation {gen}: Top Elite - {elite}")
 
 
-def optimization_GA(mytarget, initial_guess, bounds):
+def optimization_GA(mytarget, initial_guess, bounds, **kwargs) -> np.ndarray:
     lower_bound = [item[0] for item in bounds]
     upper_bound = [item[1] for item in bounds]
     ga = GeneticAlgorithm(

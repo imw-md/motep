@@ -24,7 +24,7 @@ class Callback:
         print("Function value:", fun)
 
 
-def print_result(result: OptimizeResult):
+def print_result(result: OptimizeResult) -> None:
     """Print `result`."""
     print("Optimization result:")
     print("  Message:", result.message)
@@ -36,7 +36,7 @@ def print_result(result: OptimizeResult):
     print("  Final function value:", result.fun)
 
 
-def optimization_sa(fun, initial_guess, bounds):
+def optimization_sa(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
     callback = Callback(fun)
     result = dual_annealing(
         fun,
@@ -49,36 +49,35 @@ def optimization_sa(fun, initial_guess, bounds):
     return result.x
 
 
-def optimization_nelder(fun, initial_guess, bounds):
+def optimization_nelder(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
     callback = Callback(fun)
     result = minimize(
         fun,
         initial_guess,
         bounds=bounds,
         method="Nelder-Mead",
-        tol=1e-7,
         callback=callback,
-        options={"maxiter": 100000},
+        **kwargs,
     )
     print_result(result)
     return result.x
 
 
-def optimization_bfgs(fun, initial_guess, bounds):
+def optimization_bfgs(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
     callback = Callback(fun)
     result = minimize(
         fun,
         initial_guess,
         bounds=bounds,
         method="L-BFGS-B",
-        tol=1e-7,
         callback=callback,
+        **kwargs,
     )
     print_result(result)
     return result.x
 
 
-def optimization_DE(fun, initial_guess, bounds):
+def optimization_DE(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
     callback = Callback(fun)
     result = differential_evolution(
         fun,

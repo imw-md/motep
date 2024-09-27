@@ -67,7 +67,9 @@ def run(args: argparse.Namespace) -> None:
     with cd(folder_name):
         for i, step in enumerate(setting["steps"]):
             parameters, bounds = initializer.initialize(data, step["optimized"])
-            parameters = funs[step["method"]](fitness, parameters, bounds)
+            optimize = funs[step["method"]]
+            kwargs = step.get("kwargs", {})
+            parameters = optimize(fitness, parameters, bounds, **kwargs)
             data = update_mtp(data, parameters)
             write_mtp(f"intermediate_{i}.mtp", data)
         fitness.calc_rmses(parameters)
