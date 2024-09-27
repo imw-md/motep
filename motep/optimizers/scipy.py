@@ -1,4 +1,7 @@
-from typing import Callable
+"""Optimizers based on SciPy."""
+
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 from scipy.optimize import (
@@ -49,32 +52,43 @@ def optimization_sa(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
     return result.x
 
 
-def optimization_nelder(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
+def optimize_minimize(
+    fun: Callable,
+    initial_guess: np.ndarray,
+    bounds: np.ndarray,
+    **kwargs: dict[str, Any],
+) -> np.ndarray:
+    """Optimizer using `scipy.optimize.minimize`."""
     callback = Callback(fun)
     result = minimize(
         fun,
         initial_guess,
         bounds=bounds,
-        method="Nelder-Mead",
         callback=callback,
         **kwargs,
     )
     print_result(result)
     return result.x
+
+
+def optimization_nelder(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
+    return optimize_minimize(
+        fun,
+        initial_guess,
+        bounds,
+        method="Nelder-Mead",
+        **kwargs,
+    )
 
 
 def optimization_bfgs(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
-    callback = Callback(fun)
-    result = minimize(
+    return optimize_minimize(
         fun,
         initial_guess,
-        bounds=bounds,
+        bounds,
         method="L-BFGS-B",
-        callback=callback,
         **kwargs,
     )
-    print_result(result)
-    return result.x
 
 
 def optimization_DE(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
