@@ -39,7 +39,12 @@ def print_result(result: OptimizeResult) -> None:
     print("  Final function value:", result.fun)
 
 
-def optimization_sa(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
+def optimization_sa(
+    fun: Callable,
+    initial_guess: np.ndarray,
+    bounds: np.ndarray,
+    **kwargs: dict[str, Any],
+) -> np.ndarray:
     callback = Callback(fun)
     result = dual_annealing(
         fun,
@@ -71,7 +76,12 @@ def optimize_minimize(
     return result.x
 
 
-def optimization_nelder(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
+def optimization_nelder(
+    fun: Callable,
+    initial_guess: np.ndarray,
+    bounds: np.ndarray,
+    **kwargs: dict[str, Any],
+) -> np.ndarray:
     return optimize_minimize(
         fun,
         initial_guess,
@@ -81,7 +91,12 @@ def optimization_nelder(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
     )
 
 
-def optimization_bfgs(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
+def optimization_bfgs(
+    fun: Callable,
+    initial_guess: np.ndarray,
+    bounds: np.ndarray,
+    **kwargs: dict[str, Any],
+) -> np.ndarray:
     return optimize_minimize(
         fun,
         initial_guess,
@@ -91,7 +106,12 @@ def optimization_bfgs(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
     )
 
 
-def optimization_DE(fun, initial_guess, bounds, **kwargs) -> np.ndarray:
+def optimization_DE(
+    fun: Callable,
+    initial_guess: np.ndarray,
+    bounds: np.ndarray,
+    **kwargs: dict[str, Any],
+) -> np.ndarray:
     callback = Callback(fun)
     result = differential_evolution(
         fun,

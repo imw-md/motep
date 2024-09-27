@@ -1,4 +1,8 @@
+"""Optiimzers based on genetic algorithm (GA)."""
+
 import random
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 from scipy.optimize import minimize
@@ -210,11 +214,16 @@ def elite_callback(gen, elite):
     print(f"Generation {gen}: Top Elite - {elite}")
 
 
-def optimization_GA(mytarget, initial_guess, bounds, **kwargs) -> np.ndarray:
+def optimization_GA(
+    fun: Callable,
+    initial_guess: np.ndarray,
+    bounds: np.ndarray,
+    **kwargs: dict[str, Any],
+) -> np.ndarray:
     lower_bound = [item[0] for item in bounds]
     upper_bound = [item[1] for item in bounds]
     ga = GeneticAlgorithm(
-        mytarget,
+        fun,
         initial_guess,
         lower_bound,
         upper_bound,
@@ -226,7 +235,7 @@ def optimization_GA(mytarget, initial_guess, bounds, **kwargs) -> np.ndarray:
     )
     ga.initialize_population()
     return ga.evolve_with_mix(
-        mytarget,
+        fun,
         generations=30,
         elite_callback=elite_callback,
     )
