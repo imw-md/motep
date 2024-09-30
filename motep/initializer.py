@@ -77,17 +77,21 @@ class Initializer:
             optimized,
             self.rng,
         )
-        parameters = (
-            parameters_scaling
-            + parameters_moment_coeffs
-            + parameters_species_coeffs
-            + parameters_radial_coeffs
+        parameters = np.hstack(
+            (
+                parameters_scaling,
+                parameters_moment_coeffs,
+                parameters_species_coeffs,
+                parameters_radial_coeffs.reshape(-1),
+            ),
         )
-        bounds = (
-            bounds_scaling
-            + bounds_moment_coeffs
-            + bounds_species_coeffs
-            + bounds_radial_coeffs
+        bounds = np.vstack(
+            (
+                bounds_scaling,
+                bounds_moment_coeffs,
+                bounds_species_coeffs,
+                bounds_radial_coeffs.reshape(-1, 2),
+            ),
         )
         return parameters, bounds
 
@@ -123,8 +127,8 @@ def _init_scaling(
 ) -> tuple[list[float], list[tuple[float, float]]]:
     key = "scaling"
     v = data.get(key, 1.0)
-    parameters_scaling = [v]
-    bounds_scaling = [(0.0, 1e6)] if key in optimized else [(v, v)]
+    parameters_scaling = np.array([v])
+    bounds_scaling = np.array([(0.0, 1e6)] if key in optimized else [(v, v)])
     return parameters_scaling, bounds_scaling
 
 
@@ -136,16 +140,15 @@ def _init_moment_coeffs(
     asm = data["alpha_scalar_moments"]
     key = "moment_coeffs"
     if key in data:
-        v = np.array(data[key])
+        parameters = np.asarray(data[key])
     else:
         lb, ub = -5.0, +5.0
-        v = rng.uniform(lb, ub, asm)
-    parameters = v.tolist()
+        parameters = rng.uniform(lb, ub, asm)
     if key in optimized:
         lb, ub = -5.0, +5.0
         bounds = [(lb, ub)] * asm
     else:
-        bounds = np.repeat(v[:, None], 2, axis=1).tolist()
+        bounds = np.repeat(parameters[:, None], 2, axis=1)
     return parameters, bounds
 
 
@@ -155,14 +158,12 @@ def _init_species_coeffs(
     optimized: list[str],
 ) -> tuple[list[float], list[tuple[float, float]]]:
     key = "species_coeffs"
-    v = np.asarray(data[key]) if key in data else species_coeffs_lstsq
-    parameters = v.tolist()
-    bounds = np.repeat(v[:, None], 2, axis=1)
+    parameters = np.asarray(data[key]) if key in data else species_coeffs_lstsq
+    bounds = np.repeat(parameters[:, None], 2, axis=1)
     if key in optimized:
         w = 5.0
         bounds[:, 0] -= w
         bounds[:, 1] += w
-    bounds = bounds.tolist()
     return parameters, bounds
 
 
@@ -177,14 +178,13 @@ def _init_radial_coeffs(
     n = species_count * species_count * rfc * rbs
     key = "radial_coeffs"
     if key in data:
-        v = np.array(data[key]).flatten()
+        parameters = np.asarray(data[key])
     else:
         lb, ub = -0.1, +0.1
-        v = rng.uniform(lb, ub, n)
-    parameters = v.tolist()
+        parameters = rng.uniform(lb, ub, n)
     if key in optimized:
         lb, ub = -0.1, +0.1
-        bounds = [(lb, ub)] * n
+        bounds = np.array([(lb, ub)] * n)
     else:
-        bounds = np.repeat(v[:, None], 2, axis=1).tolist()
+        bounds = np.repeat(parameters[:, None], 2, axis=1)
     return parameters, bounds

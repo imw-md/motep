@@ -124,7 +124,7 @@ class NumpyMTPEngine(EngineBase):
         jtypes = [self.parameters["species"][atoms.numbers[j]] for j in js]
         r_abs = np.linalg.norm(r_ijs, axis=0)
         rb_values, rb_derivs = self._calc_radial_basis(r_abs, itype, jtypes)
-        basis_values, basis_derivs = calc_moment_basis(
+        self.basis_values, self.basis_derivs = calc_moment_basis(
             r_ijs,
             r_abs,
             rb_values,
@@ -136,8 +136,8 @@ class NumpyMTPEngine(EngineBase):
         )
         moment_coeffs = self.parameters["moment_coeffs"]
         return (
-            moment_coeffs @ basis_values,
-            np.tensordot(moment_coeffs, basis_derivs, axes=(0, 0)),
+            moment_coeffs @ self.basis_values,
+            np.tensordot(moment_coeffs, self.basis_derivs, axes=(0, 0)),
         )
 
     def calculate(self, atoms: Atoms) -> tuple:
