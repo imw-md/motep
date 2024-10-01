@@ -136,9 +136,9 @@ class GeneticAlgorithm:
             fitness_scores = [
                 fitness_function(parameter) for parameter in self.population
             ]
+            elite = self.select_elite(fitness_scores)
             if self.superhuman:
                 elite = self.supermutation(elite)
-            elite = self.select_elite(fitness_scores)
             best_index = np.argmin(fitness_scores)
             if fitness_scores[best_index] < best_fitness:
                 best_fitness = fitness_scores[best_index]
