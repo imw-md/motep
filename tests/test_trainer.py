@@ -5,7 +5,7 @@ import pathlib
 from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
-from motep.mlippy_loss_function import calc_properties
+from motep.loss_function import calc_properties
 
 
 def test_current_value() -> None:
