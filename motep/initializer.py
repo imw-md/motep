@@ -128,7 +128,7 @@ def _init_scaling(
     key = "scaling"
     v = data.get(key, 1.0)
     parameters_scaling = np.array([v])
-    bounds_scaling = np.array([(0.0, 1e6)] if key in optimized else [(v, v)])
+    bounds_scaling = np.array([(0.0, np.inf)] if key in optimized else [(v, v)])
     return parameters_scaling, bounds_scaling
 
 
@@ -145,8 +145,7 @@ def _init_moment_coeffs(
         lb, ub = -5.0, +5.0
         parameters = rng.uniform(lb, ub, asm)
     if key in optimized:
-        lb, ub = -5.0, +5.0
-        bounds = [(lb, ub)] * asm
+        bounds = [(-np.inf, +np.inf)] * asm
     else:
         bounds = np.repeat(parameters[:, None], 2, axis=1)
     return parameters, bounds
@@ -157,13 +156,13 @@ def _init_species_coeffs(
     species_coeffs_lstsq: npt.NDArray[np.float64],
     optimized: list[str],
 ) -> tuple[list[float], list[tuple[float, float]]]:
+    species_count = data["species_count"]
     key = "species_coeffs"
     parameters = np.asarray(data[key]) if key in data else species_coeffs_lstsq
-    bounds = np.repeat(parameters[:, None], 2, axis=1)
     if key in optimized:
-        w = 5.0
-        bounds[:, 0] -= w
-        bounds[:, 1] += w
+        bounds = np.array([(-np.inf, +np.inf)] * species_count)
+    else:
+        bounds = np.repeat(parameters[:, None], 2, axis=1)
     return parameters, bounds
 
 
@@ -183,8 +182,7 @@ def _init_radial_coeffs(
         lb, ub = -0.1, +0.1
         parameters = rng.uniform(lb, ub, n)
     if key in optimized:
-        lb, ub = -0.1, +0.1
-        bounds = np.array([(lb, ub)] * n)
+        bounds = np.array([(-np.inf, +np.inf)] * n)
     else:
         bounds = np.repeat(parameters[:, None], 2, axis=1)
     return parameters, bounds

@@ -8,19 +8,27 @@ import numpy as np
 from scipy.optimize import minimize
 
 
+def _limit_bounds(bounds: np.ndarray) -> np.ndarray:
+    """Limit the bounds."""
+    m = float(np.finfo(dtype=np.float16).max)  # large but not causing overflow
+    bounds = np.where(bounds > +1.0 * m, +1.0 * m, bounds)
+    bounds = np.where(bounds < -1.0 * m, -1.0 * m, bounds)
+    return bounds
+
+
 class GeneticAlgorithm:
     def __init__(
         self,
-        fitness_function,
-        parameter,
-        lower_bound,
-        upper_bound,
-        population_size=40,
-        mutation_rate=0.1,
-        elitism_rate=0.1,
-        crossover_probability=0.7,
-        superhuman=True,
-    ):
+        fitness_function: Callable,
+        parameter: np.ndarray,
+        lower_bound: np.ndarray,
+        upper_bound: np.ndarray,
+        population_size: int = 40,
+        mutation_rate: float = 0.1,
+        elitism_rate: float = 0.1,
+        crossover_probability: float = 0.7,
+        superhuman: bool = True,
+    ) -> None:
         self.fitness_function = fitness_function
         self.population_size = population_size
         self.parameter_length = len(parameter)
@@ -32,19 +40,23 @@ class GeneticAlgorithm:
         self.population = []
         self.superhuman = superhuman
 
-    def initialize_population(self):
-        self.population = [
-            self.generate_random_parameter() for _ in range(self.population_size)
-        ]
-
-    def generate_random_parameter(self):
+    def initialize_population(self) -> None:
         random.seed(40)
-        return [
-            random.uniform(lower, upper)
-            for lower, upper in zip(self.lower_bound, self.upper_bound)
+        self.population = [
+            self.generate_random_parameters() for _ in range(self.population_size)
         ]
 
-    def supermutation(self, elite_individuals, steps=20):
+    def generate_random_parameters(self) -> list[float]:
+        return [
+            random.uniform(lb, ub) for lb, ub in zip(self.lower_bound, self.upper_bound)
+        ]
+
+    def supermutation(
+        self,
+        elite_individuals: list[np.ndarray],
+        steps: int = 20,
+    ) -> list[np.ndarray]:
+        """Optimize elites further using `scipy.optimize.minimize`."""
         refined_elites = []
 
         for elite in elite_individuals:
@@ -58,7 +70,11 @@ class GeneticAlgorithm:
 
         return refined_elites
 
-    def crossover(self, parent1, parent2):
+    def crossover(
+        self,
+        parent1: np.ndarray,
+        parent2: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
         if random.random() < self.crossover_probability:
             d = abs(np.array(parent1) - np.array(parent2))
             alpha = 0.5
@@ -70,7 +86,7 @@ class GeneticAlgorithm:
         else:
             return parent1, parent2
 
-    def mutate(self, parameter):
+    def mutate(self, parameter: np.ndarray) -> np.ndarray:
         mutated_parameter = []
         for param, lower, upper in zip(parameter, self.lower_bound, self.upper_bound):
             if random.random() < self.mutation_rate:
@@ -79,14 +95,21 @@ class GeneticAlgorithm:
             mutated_parameter.append(param)
         return mutated_parameter
 
-    def select_elite(self, fitness_scores):
-        sorted_indices = sorted(
-            range(len(fitness_scores)), key=lambda i: fitness_scores[i], reverse=False
-        )
+    def _get_indices_of_elites(self, fitness_scores: list[float]) -> list[int]:
+        """Get indices of elites."""
         elite_count = int(self.elitism_rate * len(fitness_scores))
-        return [self.population[i] for i in sorted_indices[:elite_count]]
+        return np.argsort(fitness_scores)[:elite_count]
 
-    def evolve_with_elites(self, fitness_function, generations, elite_callback=None):
+    def select_elite(self, fitness_scores: list[float]) -> list[np.ndarray]:
+        indices = self._get_indices_of_elites(fitness_scores)
+        return [self.population[i] for i in indices]
+
+    def evolve_with_elites(
+        self,
+        fitness_function: Callable,
+        generations: int,
+        elite_callback: Callable | None = None,
+    ) -> np.ndarray:
         best_solution = None
         best_fitness = float("inf")
         for gen in range(generations):
@@ -110,16 +133,21 @@ class GeneticAlgorithm:
                 elite_callback(gen, fitness_function(elite[0]))
         return best_solution
 
-    def evolve_with_common(self, fitness_function, generations, elite_callback=None):
+    def evolve_with_common(
+        self,
+        fitness_function: Callable,
+        generations: int,
+        elite_callback: Callable | None = None,
+    ) -> np.ndarray:
         best_solution = None
         best_fitness = float("inf")
         for gen in range(generations):
             fitness_scores = [
                 fitness_function(parameter) for parameter in self.population
             ]
+            elite = self.select_elite(fitness_scores)
             if self.superhuman:
                 elite = self.supermutation(elite)
-            elite = self.select_elite(fitness_scores)
             best_index = np.argmin(fitness_scores)
             if fitness_scores[best_index] < best_fitness:
                 best_fitness = fitness_scores[best_index]
@@ -134,7 +162,12 @@ class GeneticAlgorithm:
                 elite_callback(gen, fitness_function(elite[0]))
         return best_solution
 
-    def evolve_with_mix(self, fitness_function, generations, elite_callback=None):
+    def evolve_with_mix(
+        self,
+        fitness_function: Callable,
+        generations: int,
+        elite_callback: Callable | None = None,
+    ) -> np.ndarray:
         best_solution = None
         best_fitness = float("inf")
         for gen in range(generations):
@@ -166,7 +199,12 @@ class GeneticAlgorithm:
                 elite_callback(gen, fitness_function(elite[0]))
         return best_solution
 
-    def evolve_with_steady(self, fitness_function, generations, elite_callback=None):
+    def evolve_with_steady(
+        self,
+        fitness_function: Callable,
+        generations: int,
+        elite_callback: Callable | None = None,
+    ) -> np.ndarray:
         best_solution = None
         best_fitness = float("inf")
 
@@ -174,7 +212,8 @@ class GeneticAlgorithm:
             fitness_scores = [
                 fitness_function(parameter) for parameter in self.population
             ]
-            elite = self.select_elite(fitness_scores)
+            indices_elites = self._get_indices_of_elites(fitness_scores)
+            elite = [self.population[i] for i in indices_elites]
             if self.superhuman:
                 elite = self.supermutation(elite)
             # Find the best solution in the current generation
@@ -192,7 +231,9 @@ class GeneticAlgorithm:
 
             # Create a combined population of non-elite and offspring
             combined_population = [
-                ind for ind in self.population if ind not in elite
+                self.population[i]
+                for i in range(self.population_size)
+                if i not in indices_elites
             ] + offspring
 
             # Select a portion of combined population to replace the current population
@@ -210,60 +251,40 @@ class GeneticAlgorithm:
         return best_solution
 
 
-def elite_callback(gen, elite):
+def elite_callback(gen: int, elite: float) -> None:
     print(f"Generation {gen}: Top Elite - {elite}")
 
 
-def optimize_ga(
-    fun: Callable,
-    initial_guess: np.ndarray,
-    bounds: np.ndarray,
-    **kwargs: dict[str, Any],
-) -> np.ndarray:
-    lower_bound = [item[0] for item in bounds]
-    upper_bound = [item[1] for item in bounds]
-    ga = GeneticAlgorithm(
-        fun,
-        initial_guess,
-        lower_bound,
-        upper_bound,
-        population_size=30,
-        mutation_rate=0.1,
-        elitism_rate=0.1,
-        crossover_probability=0.8,
-        superhuman=True,
-    )
-    ga.initialize_population()
-    return ga.evolve_with_mix(
-        fun,
-        generations=30,
-        elite_callback=elite_callback,
-    )
+class GeneticAlgorithmOptimizer:
+    """Optimizer based on genetic algorithm (GA)."""
 
+    def __init__(self, data: dict[str, Any]) -> None:
+        """Initialize the optimizer."""
+        self.data = data
 
-# def f(x):
-#    #return np.sum(np.array(X)**2)
-#    n = len(x)
-#    sum1 = np.sum(np.square(x))
-#    sum2 = np.sum(np.cos(2 * np.pi * np.array(x)))
-#    return -20 * np.exp(-0.2 * np.sqrt(sum1 / n)) - np.exp(sum2 / n) + 20 + np.e
-#
-
-
-# Example usage
-# population_size = 100
-# initial_guess = [0] * 2
-# mutation_rate = 0.1
-# elitism_rate = 0.1
-# crossover_probability = 0.9
-# generations = 100
-# lower_bound = [0] * len(initial_guess)
-# upper_bound = [10] * len(initial_guess)
-#
-# ga = GeneticAlgorithm(f,initial_guess, population_size=population_size, mutation_rate=mutation_rate, elitism_rate=elitism_rate, crossover_probability=crossover_probability, lower_bound=lower_bound, upper_bound=upper_bound)
-# ga.initialize_population()
-# best_solution=ga.evolve_with_elites(f, generations, elite_callback)
-# best_solution=ga.evolve_with_common(f, generations, elite_callback)
-# best_solution=ga.evolve_with_mix(f, generations, elite_callback)
-# best_solution=ga.evolve_with_steady(f, generations, elite_callback)
-# print("Best solution found:", best_solution)
+    def __call__(
+        self,
+        fun: Callable,
+        initial_guess: np.ndarray,
+        bounds: np.ndarray,
+        **kwargs: dict[str, Any],
+    ) -> np.ndarray:
+        """Optimize parameters."""
+        bounds = _limit_bounds(bounds)
+        ga = GeneticAlgorithm(
+            fun,
+            initial_guess,
+            lower_bound=bounds[:, 0],
+            upper_bound=bounds[:, 1],
+            population_size=30,
+            mutation_rate=0.1,
+            elitism_rate=0.1,
+            crossover_probability=0.8,
+            superhuman=True,
+        )
+        ga.initialize_population()
+        return ga.evolve_with_mix(
+            fun,
+            generations=30,
+            elite_callback=elite_callback,
+        )
