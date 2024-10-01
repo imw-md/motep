@@ -33,15 +33,14 @@ class GeneticAlgorithm:
         self.superhuman = superhuman
 
     def initialize_population(self) -> None:
+        random.seed(40)
         self.population = [
-            self.generate_random_parameter() for _ in range(self.population_size)
+            self.generate_random_parameters() for _ in range(self.population_size)
         ]
 
-    def generate_random_parameter(self) -> list[float]:
-        random.seed(40)
+    def generate_random_parameters(self) -> list[float]:
         return [
-            random.uniform(lower, upper)
-            for lower, upper in zip(self.lower_bound, self.upper_bound)
+            random.uniform(lb, ub) for lb, ub in zip(self.lower_bound, self.upper_bound)
         ]
 
     def supermutation(
