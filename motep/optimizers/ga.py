@@ -8,6 +8,14 @@ import numpy as np
 from scipy.optimize import minimize
 
 
+def _limit_bounds(bounds: np.ndarray) -> np.ndarray:
+    """Limit the bounds."""
+    m = float(np.finfo(dtype=np.float16).max)  # large but not causing overflow
+    bounds = np.where(bounds > +1.0 * m, +1.0 * m, bounds)
+    bounds = np.where(bounds < -1.0 * m, -1.0 * m, bounds)
+    return bounds
+
+
 class GeneticAlgorithm:
     def __init__(
         self,
@@ -262,13 +270,12 @@ class GeneticAlgorithmOptimizer:
         **kwargs: dict[str, Any],
     ) -> np.ndarray:
         """Optimize parameters."""
-        lower_bound = [item[0] for item in bounds]
-        upper_bound = [item[1] for item in bounds]
+        bounds = _limit_bounds(bounds)
         ga = GeneticAlgorithm(
             fun,
             initial_guess,
-            lower_bound,
-            upper_bound,
+            lower_bound=bounds[:, 0],
+            upper_bound=bounds[:, 1],
             population_size=30,
             mutation_rate=0.1,
             elitism_rate=0.1,
