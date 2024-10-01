@@ -1,4 +1,7 @@
-from typing import Callable
+"""Optimizers based on SciPy."""
+
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 from scipy.optimize import (
@@ -24,7 +27,7 @@ class Callback:
         print("Function value:", fun)
 
 
-def print_result(result: OptimizeResult):
+def print_result(result: OptimizeResult) -> None:
     """Print `result`."""
     print("Optimization result:")
     print("  Message:", result.message)
@@ -36,7 +39,12 @@ def print_result(result: OptimizeResult):
     print("  Final function value:", result.fun)
 
 
-def optimization_sa(fun, initial_guess, bounds):
+def optimize_da(
+    fun: Callable,
+    initial_guess: np.ndarray,
+    bounds: np.ndarray,
+    **kwargs: dict[str, Any],
+) -> np.ndarray:
     callback = Callback(fun)
     result = dual_annealing(
         fun,
@@ -49,36 +57,61 @@ def optimization_sa(fun, initial_guess, bounds):
     return result.x
 
 
-def optimization_nelder(fun, initial_guess, bounds):
+def optimize_minimize(
+    fun: Callable,
+    initial_guess: np.ndarray,
+    bounds: np.ndarray,
+    **kwargs: dict[str, Any],
+) -> np.ndarray:
+    """Optimizer using `scipy.optimize.minimize`."""
     callback = Callback(fun)
     result = minimize(
         fun,
         initial_guess,
         bounds=bounds,
+        callback=callback,
+        **kwargs,
+    )
+    print_result(result)
+    return result.x
+
+
+def optimize_nelder(
+    fun: Callable,
+    initial_guess: np.ndarray,
+    bounds: np.ndarray,
+    **kwargs: dict[str, Any],
+) -> np.ndarray:
+    return optimize_minimize(
+        fun,
+        initial_guess,
+        bounds,
         method="Nelder-Mead",
-        tol=1e-7,
-        callback=callback,
-        options={"maxiter": 100000},
+        **kwargs,
     )
-    print_result(result)
-    return result.x
 
 
-def optimization_bfgs(fun, initial_guess, bounds):
-    callback = Callback(fun)
-    result = minimize(
+def optimize_bfgs(
+    fun: Callable,
+    initial_guess: np.ndarray,
+    bounds: np.ndarray,
+    **kwargs: dict[str, Any],
+) -> np.ndarray:
+    return optimize_minimize(
         fun,
         initial_guess,
-        bounds=bounds,
+        bounds,
         method="L-BFGS-B",
-        tol=1e-7,
-        callback=callback,
+        **kwargs,
     )
-    print_result(result)
-    return result.x
 
 
-def optimization_DE(fun, initial_guess, bounds):
+def optimize_de(
+    fun: Callable,
+    initial_guess: np.ndarray,
+    bounds: np.ndarray,
+    **kwargs: dict[str, Any],
+) -> np.ndarray:
     callback = Callback(fun)
     result = differential_evolution(
         fun,

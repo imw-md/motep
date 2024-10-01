@@ -50,13 +50,17 @@ stress-weight = 0.0
 
 # style 2: sophisticated
 # "optimized" specifies which parameters are optimized at the step.
-[[step]]
+[[steps]]
 method = 'L-BFGS-B'
 optimized = ['scaling', 'species_coeffs', 'radial_coeffs', 'moment_coeffs']
 
-[[step]]
+[[steps]]
 method = 'Nelder-Mead'
 optimized = ['scaling', 'species_coeffs', 'radial_coeffs', 'moment_coeffs']
+[steps.kwargs]
+tol = 1e-7
+[steps.kwargs.options]
+maxiter = 1000
 ```
 
 If some of the following parameters are already given in `initial.mtp`,

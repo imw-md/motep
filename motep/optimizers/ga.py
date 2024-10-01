@@ -1,7 +1,12 @@
+"""Optiimzers based on genetic algorithm (GA)."""
+
 import random
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 from scipy.optimize import minimize
+
 
 class GeneticAlgorithm:
     def __init__(
@@ -14,7 +19,7 @@ class GeneticAlgorithm:
         mutation_rate=0.1,
         elitism_rate=0.1,
         crossover_probability=0.7,
-        superhuman = True,
+        superhuman=True,
     ):
         self.fitness_function = fitness_function
         self.population_size = population_size
@@ -41,27 +46,27 @@ class GeneticAlgorithm:
 
     def supermutation(self, elite_individuals, steps=20):
         refined_elites = []
-        
+
         for elite in elite_individuals:
             result = minimize(
                 self.fitness_function,
                 elite,
-                method='Nelder-Mead',
-                options={'maxiter':steps}
+                method="Nelder-Mead",
+                options={"maxiter": steps},
             )
             refined_elites.append(result.x)  # Store the optimized solution
-        
+
         return refined_elites
 
     def crossover(self, parent1, parent2):
         if random.random() < self.crossover_probability:
-                d = abs(np.array(parent1) - np.array(parent2))
-                alpha = 0.5
-                lower = np.minimum(parent1, parent2) - alpha * d
-                upper = np.maximum(parent1, parent2) + alpha * d
-                child1 = random.uniform(lower, upper)
-                child2 = random.uniform(lower, upper)
-                return list(child1), list(child2)
+            d = abs(np.array(parent1) - np.array(parent2))
+            alpha = 0.5
+            lower = np.minimum(parent1, parent2) - alpha * d
+            upper = np.maximum(parent1, parent2) + alpha * d
+            child1 = random.uniform(lower, upper)
+            child2 = random.uniform(lower, upper)
+            return list(child1), list(child2)
         else:
             return parent1, parent2
 
@@ -209,11 +214,16 @@ def elite_callback(gen, elite):
     print(f"Generation {gen}: Top Elite - {elite}")
 
 
-def optimization_GA(mytarget, initial_guess, bounds):
+def optimize_ga(
+    fun: Callable,
+    initial_guess: np.ndarray,
+    bounds: np.ndarray,
+    **kwargs: dict[str, Any],
+) -> np.ndarray:
     lower_bound = [item[0] for item in bounds]
     upper_bound = [item[1] for item in bounds]
     ga = GeneticAlgorithm(
-        mytarget,
+        fun,
         initial_guess,
         lower_bound,
         upper_bound,
@@ -224,11 +234,11 @@ def optimization_GA(mytarget, initial_guess, bounds):
         superhuman=True,
     )
     ga.initialize_population()
-    best_solution = ga.evolve_with_mix(
-        mytarget, generations=30, elite_callback=elite_callback
+    return ga.evolve_with_mix(
+        fun,
+        generations=30,
+        elite_callback=elite_callback,
     )
-
-    return best_solution
 
 
 # def f(x):

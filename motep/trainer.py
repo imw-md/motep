@@ -11,9 +11,15 @@ from motep.initializer import Initializer
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss_function import LossFunction, update_mtp
-from motep.optimizers.ga import optimization_GA
+from motep.optimizers.ga import optimize_ga
 from motep.optimizers.lls import LLSOptimizer
-from motep.optimizers.scipy import optimization_bfgs, optimization_nelder
+from motep.optimizers.scipy import (
+    optimize_bfgs,
+    optimize_da,
+    optimize_de,
+    optimize_minimize,
+    optimize_nelder,
+)
 from motep.setting import make_default_setting, parse_setting
 from motep.utils import cd
 
@@ -57,9 +63,12 @@ def run(args: argparse.Namespace) -> None:
     data = read_mtp(untrained_mtp)
 
     funs = {
-        "GA": optimization_GA,
-        "Nelder-Mead": optimization_nelder,
-        "L-BFGS-B": optimization_bfgs,
+        "GA": optimize_ga,
+        "minimize": optimize_minimize,
+        "Nelder-Mead": optimize_nelder,
+        "L-BFGS-B": optimize_bfgs,
+        "DA": optimize_da,
+        "DE": optimize_de,
         "LLS": LLSOptimizer(data),
     }
 
@@ -67,7 +76,9 @@ def run(args: argparse.Namespace) -> None:
     with cd(folder_name):
         for i, step in enumerate(setting["steps"]):
             parameters, bounds = initializer.initialize(data, step["optimized"])
-            parameters = funs[step["method"]](fitness, parameters, bounds)
+            optimize = funs[step["method"]]
+            kwargs = step.get("kwargs", {})
+            parameters = optimize(fitness, parameters, bounds, **kwargs)
             data = update_mtp(data, parameters)
             write_mtp(f"intermediate_{i}.mtp", data)
         fitness.calc_rmses(parameters)
