@@ -88,12 +88,14 @@ class GeneticAlgorithm:
             mutated_parameter.append(param)
         return mutated_parameter
 
-    def select_elite(self, fitness_scores: list[float]) -> list[np.ndarray]:
-        sorted_indices = sorted(
-            range(len(fitness_scores)), key=lambda i: fitness_scores[i], reverse=False
-        )
+    def _get_indices_of_elites(self, fitness_scores: list[float]) -> list[int]:
+        """Get indices of elites."""
         elite_count = int(self.elitism_rate * len(fitness_scores))
-        return [self.population[i] for i in sorted_indices[:elite_count]]
+        return np.argsort(fitness_scores)[:elite_count]
+
+    def select_elite(self, fitness_scores: list[float]) -> list[np.ndarray]:
+        indices = self._get_indices_of_elites(fitness_scores)
+        return [self.population[i] for i in indices]
 
     def evolve_with_elites(
         self,
@@ -203,7 +205,8 @@ class GeneticAlgorithm:
             fitness_scores = [
                 fitness_function(parameter) for parameter in self.population
             ]
-            elite = self.select_elite(fitness_scores)
+            indices_elites = self._get_indices_of_elites(fitness_scores)
+            elite = [self.population[i] for i in indices_elites]
             if self.superhuman:
                 elite = self.supermutation(elite)
             # Find the best solution in the current generation
@@ -221,7 +224,9 @@ class GeneticAlgorithm:
 
             # Create a combined population of non-elite and offspring
             combined_population = [
-                ind for ind in self.population if ind not in elite
+                self.population[i]
+                for i in range(self.population_size)
+                if i not in indices_elites
             ] + offspring
 
             # Select a portion of combined population to replace the current population
