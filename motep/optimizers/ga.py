@@ -32,19 +32,24 @@ class GeneticAlgorithm:
         self.population = []
         self.superhuman = superhuman
 
-    def initialize_population(self):
+    def initialize_population(self) -> None:
         self.population = [
             self.generate_random_parameter() for _ in range(self.population_size)
         ]
 
-    def generate_random_parameter(self):
+    def generate_random_parameter(self) -> list[float]:
         random.seed(40)
         return [
             random.uniform(lower, upper)
             for lower, upper in zip(self.lower_bound, self.upper_bound)
         ]
 
-    def supermutation(self, elite_individuals, steps=20):
+    def supermutation(
+        self,
+        elite_individuals: list[np.ndarray],
+        steps: int = 20,
+    ) -> list[np.ndarray]:
+        """Optimize elites further using `scipy.optimize.minimize`."""
         refined_elites = []
 
         for elite in elite_individuals:
@@ -58,7 +63,11 @@ class GeneticAlgorithm:
 
         return refined_elites
 
-    def crossover(self, parent1, parent2):
+    def crossover(
+        self,
+        parent1: np.ndarray,
+        parent2: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
         if random.random() < self.crossover_probability:
             d = abs(np.array(parent1) - np.array(parent2))
             alpha = 0.5
@@ -70,7 +79,7 @@ class GeneticAlgorithm:
         else:
             return parent1, parent2
 
-    def mutate(self, parameter):
+    def mutate(self, parameter: np.ndarray) -> np.ndarray:
         mutated_parameter = []
         for param, lower, upper in zip(parameter, self.lower_bound, self.upper_bound):
             if random.random() < self.mutation_rate:
@@ -79,14 +88,19 @@ class GeneticAlgorithm:
             mutated_parameter.append(param)
         return mutated_parameter
 
-    def select_elite(self, fitness_scores):
+    def select_elite(self, fitness_scores: list[float]) -> list[np.ndarray]:
         sorted_indices = sorted(
             range(len(fitness_scores)), key=lambda i: fitness_scores[i], reverse=False
         )
         elite_count = int(self.elitism_rate * len(fitness_scores))
         return [self.population[i] for i in sorted_indices[:elite_count]]
 
-    def evolve_with_elites(self, fitness_function, generations, elite_callback=None):
+    def evolve_with_elites(
+        self,
+        fitness_function: Callable,
+        generations: int,
+        elite_callback: Callable | None = None,
+    ) -> np.ndarray:
         best_solution = None
         best_fitness = float("inf")
         for gen in range(generations):
@@ -110,7 +124,12 @@ class GeneticAlgorithm:
                 elite_callback(gen, fitness_function(elite[0]))
         return best_solution
 
-    def evolve_with_common(self, fitness_function, generations, elite_callback=None):
+    def evolve_with_common(
+        self,
+        fitness_function: Callable,
+        generations: int,
+        elite_callback: Callable | None = None,
+    ) -> np.ndarray:
         best_solution = None
         best_fitness = float("inf")
         for gen in range(generations):
@@ -134,7 +153,12 @@ class GeneticAlgorithm:
                 elite_callback(gen, fitness_function(elite[0]))
         return best_solution
 
-    def evolve_with_mix(self, fitness_function, generations, elite_callback=None):
+    def evolve_with_mix(
+        self,
+        fitness_function: Callable,
+        generations: int,
+        elite_callback: Callable | None = None,
+    ) -> np.ndarray:
         best_solution = None
         best_fitness = float("inf")
         for gen in range(generations):
@@ -166,7 +190,12 @@ class GeneticAlgorithm:
                 elite_callback(gen, fitness_function(elite[0]))
         return best_solution
 
-    def evolve_with_steady(self, fitness_function, generations, elite_callback=None):
+    def evolve_with_steady(
+        self,
+        fitness_function: Callable,
+        generations: int,
+        elite_callback: Callable | None = None,
+    ) -> np.ndarray:
         best_solution = None
         best_fitness = float("inf")
 
@@ -210,7 +239,7 @@ class GeneticAlgorithm:
         return best_solution
 
 
-def elite_callback(gen, elite):
+def elite_callback(gen: int, elite: float) -> None:
     print(f"Generation {gen}: Top Elite - {elite}")
 
 
