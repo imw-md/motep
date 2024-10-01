@@ -11,7 +11,7 @@ from motep.initializer import Initializer
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss_function import LossFunction, update_mtp
-from motep.optimizers.ga import optimize_ga
+from motep.optimizers.ga import GeneticAlgorithmOptimizer
 from motep.optimizers.lls import LLSOptimizer
 from motep.optimizers.scipy import (
     optimize_bfgs,
@@ -63,7 +63,7 @@ def run(args: argparse.Namespace) -> None:
     data = read_mtp(untrained_mtp)
 
     funs = {
-        "GA": optimize_ga,
+        "GA": GeneticAlgorithmOptimizer(data),
         "minimize": optimize_minimize,
         "Nelder-Mead": optimize_nelder,
         "L-BFGS-B": optimize_bfgs,

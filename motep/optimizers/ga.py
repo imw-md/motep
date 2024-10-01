@@ -11,16 +11,16 @@ from scipy.optimize import minimize
 class GeneticAlgorithm:
     def __init__(
         self,
-        fitness_function,
-        parameter,
-        lower_bound,
-        upper_bound,
-        population_size=40,
-        mutation_rate=0.1,
-        elitism_rate=0.1,
-        crossover_probability=0.7,
-        superhuman=True,
-    ):
+        fitness_function: Callable,
+        parameter: np.ndarray,
+        lower_bound: np.ndarray,
+        upper_bound: np.ndarray,
+        population_size: int = 40,
+        mutation_rate: float = 0.1,
+        elitism_rate: float = 0.1,
+        crossover_probability: float = 0.7,
+        superhuman: bool = True,
+    ) -> None:
         self.fitness_function = fitness_function
         self.population_size = population_size
         self.parameter_length = len(parameter)
@@ -214,31 +214,40 @@ def elite_callback(gen, elite):
     print(f"Generation {gen}: Top Elite - {elite}")
 
 
-def optimize_ga(
-    fun: Callable,
-    initial_guess: np.ndarray,
-    bounds: np.ndarray,
-    **kwargs: dict[str, Any],
-) -> np.ndarray:
-    lower_bound = [item[0] for item in bounds]
-    upper_bound = [item[1] for item in bounds]
-    ga = GeneticAlgorithm(
-        fun,
-        initial_guess,
-        lower_bound,
-        upper_bound,
-        population_size=30,
-        mutation_rate=0.1,
-        elitism_rate=0.1,
-        crossover_probability=0.8,
-        superhuman=True,
-    )
-    ga.initialize_population()
-    return ga.evolve_with_mix(
-        fun,
-        generations=30,
-        elite_callback=elite_callback,
-    )
+class GeneticAlgorithmOptimizer:
+    """Optimizer based on genetic algorithm (GA)."""
+
+    def __init__(self, data: dict[str, Any]) -> None:
+        """Initialize the optimizer."""
+        self.data = data
+
+    def __call__(
+        self,
+        fun: Callable,
+        initial_guess: np.ndarray,
+        bounds: np.ndarray,
+        **kwargs: dict[str, Any],
+    ) -> np.ndarray:
+        """Optimize parameters."""
+        lower_bound = [item[0] for item in bounds]
+        upper_bound = [item[1] for item in bounds]
+        ga = GeneticAlgorithm(
+            fun,
+            initial_guess,
+            lower_bound,
+            upper_bound,
+            population_size=30,
+            mutation_rate=0.1,
+            elitism_rate=0.1,
+            crossover_probability=0.8,
+            superhuman=True,
+        )
+        ga.initialize_population()
+        return ga.evolve_with_mix(
+            fun,
+            generations=30,
+            elite_callback=elite_callback,
+        )
 
 
 # def f(x):
