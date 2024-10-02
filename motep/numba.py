@@ -237,8 +237,8 @@ def _nb_forces_from_gradient(gradient, all_js, number_of_atoms, max_number_of_js
         for i_j in range(max_number_of_js):
             j = all_js[i_j, i]
             for k in range(3):
-                forces[i, k] -= gradient[i, i_j, k]
-                forces[j, k] += gradient[i, i_j, k]
+                forces[i, k] += gradient[i, i_j, k]
+                forces[j, k] -= gradient[i, i_j, k]
     return forces
 
 
