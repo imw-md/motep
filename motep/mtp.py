@@ -13,7 +13,24 @@ from numpy.polynomial import Chebyshev
 
 
 class EngineBase:
-    def __init__(self, mtp_parameters: dict[str, Any] | None = None):
+    """Engine to compute an MTP.
+
+    Attributes
+    ----------
+    basis_values : np.ndarray (alpha_moments_count)
+        Basis values summed over atoms.
+        This corresponds to b_j in Eq. (5) in [Podryabinkin_CMS_2017_Active]_.
+    basis_derivs : np.ndarray (alpha_moments_count, 3, number_of_atoms)
+        Derivatives of basis functions with respect to Cartesian coordinates of atoms
+        summed over atoms.
+        This corresponds to nabla b_j in Eq. (7a) in [Podryabinkin_CMS_2017_Active]_.
+
+    .. [Podryabinkin_CMS_2017_Active]
+       E. V. Podryabinkin and A. V. Shapeev, Comput. Mater. Sci. 140, 171 (2017).
+
+    """
+
+    def __init__(self, mtp_parameters: dict[str, Any] | None = None) -> None:
         """MLIP-2 MTP.
 
         Parameters
@@ -27,6 +44,8 @@ class EngineBase:
             self.update(mtp_parameters)
         self.results = {}
         self._neighbor_list = None
+        self.basis_values = None
+        self.basis_derivs = None
 
     def update(self, parameters: dict[str, Any]) -> None:
         """Update MTP parameters."""
@@ -52,6 +71,13 @@ class EngineBase:
         )
         self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
         self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
+
+        shape = self.parameters["alpha_scalar_moments"]
+        self.basis_values = np.full(shape, np.nan)
+
+        number_of_atoms = len(atoms)
+        shape = self.parameters["alpha_scalar_moments"], 3, number_of_atoms
+        self.basis_derivs = np.full(shape, np.nan)
 
     def _get_distances(
         self,
@@ -120,12 +146,18 @@ class NumpyMTPEngine(EngineBase):
             self.parameters["radial_funcs_count"],
         )
 
-    def _calc_local_energy(self, atoms: Atoms, i: int, js: list[int], r_ijs):
+    def _calc_basis(
+        self,
+        atoms: Atoms,
+        i: int,
+        js: list[int],
+        r_ijs: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
         itype = self.parameters["species"][atoms.numbers[i]]
         jtypes = [self.parameters["species"][atoms.numbers[j]] for j in js]
         r_abs = np.linalg.norm(r_ijs, axis=0)
         rb_values, rb_derivs = self._calc_radial_basis(r_abs, itype, jtypes)
-        self.basis_values, self.basis_derivs = calc_moment_basis(
+        return calc_moment_basis(
             r_ijs,
             r_abs,
             rb_values,
@@ -135,11 +167,6 @@ class NumpyMTPEngine(EngineBase):
             self.parameters["alpha_index_times"],
             self.parameters["alpha_moment_mapping"],
         )
-        moment_coeffs = self.parameters["moment_coeffs"]
-        return (
-            moment_coeffs @ self.basis_values,
-            np.tensordot(moment_coeffs, self.basis_derivs, axes=(0, 0)),
-        )
 
     def calculate(self, atoms: Atoms) -> tuple:
         """Calculate properties of the given system."""
@@ -148,11 +175,23 @@ class NumpyMTPEngine(EngineBase):
         energies = np.zeros(number_of_atoms)
         forces = np.zeros((number_of_atoms, 3))
         stress = np.zeros((3, 3))
+        self.basis_values[:] = 0.0
+        self.basis_derivs[:, :, :] = 0.0
+
+        moment_coeffs = self.parameters["moment_coeffs"]
+
         for i in range(number_of_atoms):
             js, r_ijs = self._get_distances(atoms, i)
-            e, gradient = self._calc_local_energy(atoms, i, js, r_ijs)
+            basis_values, basis_derivs = self._calc_basis(atoms, i, js, r_ijs)
+
+            self.basis_values += basis_values
+            self.basis_derivs[:, :, i] = basis_derivs.sum(axis=-1)  # sum over neighbors
+
+            site_energy = moment_coeffs @ basis_values
+            gradient = np.tensordot(moment_coeffs, basis_derivs, axes=(0, 0))
+
             itype = self.parameters["species"][atoms.numbers[i]]
-            energies[i] = e + self.parameters["species_coeffs"][itype]
+            energies[i] = site_energy + self.parameters["species_coeffs"][itype]
             # Calculate forces
             # Be careful that the derivative of the site energy of the j-th atom also
             # contributes to the forces on the i-th atom.
