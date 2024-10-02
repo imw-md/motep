@@ -60,7 +60,7 @@ class EngineBase:
         indices_js, _ = self._neighbor_list.get_neighbors(index)
         offsets = self.precomputed_offsets[index]
         pos_js = atoms.positions[indices_js] + offsets
-        dist_vectors = atoms.positions[index] - pos_js
+        dist_vectors = pos_js - atoms.positions[index]
         return indices_js, dist_vectors.T
 
 
@@ -152,9 +152,18 @@ class NumpyMTPEngine(EngineBase):
             e, gradient = self._calc_local_energy(atoms, i, js, r_ijs)
             itype = self.parameters["species"][atoms.numbers[i]]
             energies[i] = e + self.parameters["species_coeffs"][itype]
+            # Calculate forces
+            # Be careful that the derivative of the site energy of the j-th atom also
+            # contributes to the forces on the i-th atom.
+            # Be also careful that:
+            # 1. In `calc_moment_basis`, the derivatives with respect to the j-th atom
+            #    (not the center i-th) atom is computed.
+            # 2. The force on the i-th atom is defined as the negative of the gradient
+            #    with respect to the i-th atom.
+            # Thus, the negative signs of the two contributions are cancelled out below.
             for k, j in enumerate(js):
-                forces[i] -= gradient[:, k]
-                forces[j] += gradient[:, k]
+                forces[i] += gradient[:, k]
+                forces[j] -= gradient[:, k]
             stress += r_ijs @ gradient.T
         self.results["energies"] = energies
         self.results["energy"] = self.results["energies"].sum()
@@ -249,7 +258,23 @@ def calc_moment_basis(
     alpha_index_basic: int,
     alpha_index_times: int,
     alpha_moment_mapping: np.ndarray,
-):
+) -> tuple[np.ndarray, np.ndarray]:
+    r"""Calculate basis functions and their derivatives.
+
+    Parameters
+    ----------
+    r_ijs : np.ndarray
+        :math:`\mathbf{r}_j - \mathbf{r}_i`,
+        where i is the center atom, and j are the neighboring atoms.
+
+    Returns
+    -------
+    basis_vals : np.ndarray
+        Values of the basis functions.
+    basis_ders : np.ndarray
+        Derivatives of the basis functions with respect to :math:`x_j, y_j, z_j`.
+
+    """
     r_ijs_unit = r_ijs / r_abs
     moment_components = np.zeros(alpha_moments_count)
     moment_jacobian = np.zeros((alpha_moments_count, *r_ijs.shape))  # dEi/dxj
