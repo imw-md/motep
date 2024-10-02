@@ -35,14 +35,15 @@ class EngineBase:
             species = {_: _ for _ in range(self.parameters["species_count"])}
             self.parameters["species"] = species
 
-    def update_neighbor_list(self, atoms: Atoms):
+    def update_neighbor_list(self, atoms: Atoms) -> None:
+        """Update the ASE `PrimitiveNeighborList` object."""
         if self._neighbor_list is None:
             self._initiate_neighbor_list(atoms)
-        else:
-            if self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
-                self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
+        elif self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
+            self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
 
-    def _initiate_neighbor_list(self, atoms: Atoms):
+    def _initiate_neighbor_list(self, atoms: Atoms) -> None:
+        """Initialize the ASE `PrimitiveNeighborList` object."""
         self._neighbor_list = PrimitiveNeighborList(
             cutoffs=[0.5 * self.parameters["max_dist"]] * len(atoms),
             skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
@@ -269,9 +270,9 @@ def calc_moment_basis(
 
     Returns
     -------
-    basis_vals : np.ndarray
+    basis_vals : np.ndarray (alpha_moments_count)
         Values of the basis functions.
-    basis_ders : np.ndarray
+    basis_ders : np.ndarray (alpha_moments_count, 3, number_of_atoms)
         Derivatives of the basis functions with respect to :math:`x_j, y_j, z_j`.
 
     """
