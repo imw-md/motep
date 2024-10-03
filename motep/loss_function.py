@@ -1,6 +1,5 @@
 """Loss function."""
 
-import copy
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -11,7 +10,7 @@ from scipy.constants import eV
 
 from motep.calculator import MTP
 from motep.io.mlip.cfg import _get_species
-from motep.io.mlip.mtp import read_mtp, write_mtp
+from motep.io.mlip.mtp import read_mtp
 
 
 def calc_properties(
@@ -235,10 +234,3 @@ class LossFunction(LossFunctionBase):
             atoms.calc.update_parameters(data)
         energies, forces, stresses = calc_properties(self.images, self.comm)
         return self.calc_loss_function(energies, forces, stresses)
-
-    def calc_rmses(self, parameters: list[float]) -> None:
-        """Calculate RMSEs."""
-        data = copy.deepcopy(self.images[0].calc.engine.parameters)
-        data = update_mtp(data, parameters)
-        write_mtp(self.setting["potential_final"], data)
-        super().calc_rmses(parameters)

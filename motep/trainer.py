@@ -86,6 +86,8 @@ def run(args: argparse.Namespace) -> None:
             data = update_mtp(data, parameters)
             write_mtp(f"intermediate_{i}.mtp", data)
         fitness.calc_rmses(parameters)
+        data = update_mtp(data, parameters)
+        write_mtp(setting["potential_final"], data)
 
     end_time = time.time()
     print("Total time taken:", end_time - start_time, "seconds")

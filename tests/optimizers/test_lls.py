@@ -56,7 +56,9 @@ def test_molecules(
         engine=engine,
     )
     parameters = LLSOptimizer(data)(loss_function, parameters, bounds)
+
     printer.print(parameters)
+    loss_function.calc_rmses(parameters)
 
     # Check if `parameters` are updated.
     assert not np.allclose(parameters, parameters_ref)
