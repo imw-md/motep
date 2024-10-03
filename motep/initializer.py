@@ -7,11 +7,12 @@ import numpy.typing as npt
 from ase import Atoms
 
 
-class Initializer:
-    """Class to initialize MTP parameters."""
+class MTPData:
+    """Class to handle MTP parameters."""
 
     def __init__(
         self,
+        data: dict[str, Any],
         images: list[Atoms],
         species: list[str],
         rng: np.random.Generator | int | None,
@@ -20,6 +21,8 @@ class Initializer:
 
         Parameters
         ----------
+        data : dict[str, Any]
+            Data in the .mtp file.
         images : list[Atoms]
             List of ASE Atoms objects for the training dataset.
             They are used to determine the initial guess of `species_coeffs`.
@@ -31,23 +34,18 @@ class Initializer:
             default PRNG.
 
         """
+        self.data = data
         self.species_coeffs_lstsq = calc_species_coeffs_lstsq(images, species)
         if isinstance(rng, int | None):
             self.rng = np.random.default_rng(rng)
         else:
             self.rng = rng
 
-    def initialize(
-        self,
-        data: dict[str, Any],
-        optimized: list[str],
-    ) -> tuple[list[float], list[tuple[float, float]]]:
+    def initialize(self, optimized: list[str]) -> tuple[np.ndarray, np.ndarray]:
         """Initialize MTP parameters.
 
         Parameters
         ----------
-        data : dict[str, Any]
-            Data in the .mtp file.
         optimized : list[str]
             Parameters to be optimized.
 
@@ -59,8 +57,8 @@ class Initializer:
             Bounds of the parameters.
 
         """
+        data = self.data
         parameters_scaling, bounds_scaling = _init_scaling(data, optimized)
-        print("scaling:", *parameters_scaling)
         parameters_moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
             data,
             optimized,
@@ -71,12 +69,12 @@ class Initializer:
             self.species_coeffs_lstsq,
             optimized,
         )
-        print("species_coeffs:", parameters_species_coeffs)
         parameters_radial_coeffs, bounds_radial_coeffs = _init_radial_coeffs(
             data,
             optimized,
             self.rng,
         )
+
         parameters = np.hstack(
             (
                 parameters_scaling,
@@ -94,6 +92,47 @@ class Initializer:
             ),
         )
         return parameters, bounds
+
+    def update(self, parameters: list[float]) -> None:
+        """Update data in the .mtp file.
+
+        Parameters
+        ----------
+        parameters : list[float]
+            MTP parameters.
+
+        """
+        dict_mtp = self.data
+        species_count = dict_mtp["species_count"]
+        rfc = dict_mtp["radial_funcs_count"]
+        rbs = dict_mtp["radial_basis_size"]
+        asm = dict_mtp["alpha_scalar_moments"]
+
+        dict_mtp["scaling"] = parameters[0]
+        dict_mtp["moment_coeffs"] = parameters[1 : asm + 1]
+        dict_mtp["species_coeffs"] = parameters[asm + 1 : asm + 1 + species_count]
+        total_radial = parameters[asm + 1 + species_count :]
+        shape = species_count, species_count, rfc, rbs
+        dict_mtp["radial_coeffs"] = np.array(total_radial).reshape(shape)
+
+    def print(self, parameters: np.ndarray) -> None:
+        """Print parameters."""
+        species_count = self.data["species_count"]
+        rfc = self.data["radial_funcs_count"]
+        rbs = self.data["radial_basis_size"]
+        asm = self.data["alpha_scalar_moments"]
+
+        print("#" * 75)
+        print("scaling:", parameters[0])
+        print("moment_coeffs:")
+        print(parameters[1 : asm + 1])
+        print("species_coeffs:")
+        print(parameters[asm + 1 : asm + 1 + species_count])
+        shape = species_count, species_count, rfc, rbs
+        radial_coeffs = np.array(parameters[asm + 1 + species_count :]).reshape(shape)
+        print("radial_coeffs:")
+        print(radial_coeffs)
+        print()
 
 
 def calc_species_coeffs_lstsq(
@@ -117,7 +156,13 @@ def calc_species_coeffs_lstsq(
     energies /= ns
     species_coeffs_lstsq = np.linalg.lstsq(counts, energies, rcond=None)[0]
     rmse = np.sqrt(np.add.reduce((counts @ species_coeffs_lstsq - energies) ** 2))
+    print("#" * 75)
+    print(f"{__name__}.{calc_species_coeffs_lstsq.__name__}")
+    print("species_coeffs_lstsq:")
+    print(species_coeffs_lstsq)
     print("RMSE Energy per atom (eV/atom):", rmse)
+    print("The values are estimated assuming no interatomic forces.")
+    print()
     return species_coeffs_lstsq
 
 

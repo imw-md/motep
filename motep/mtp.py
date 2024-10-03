@@ -13,44 +13,71 @@ from numpy.polynomial import Chebyshev
 
 
 class EngineBase:
-    def __init__(self, mtp_parameters: dict[str, Any] | None = None):
+    """Engine to compute an MTP.
+
+    Attributes
+    ----------
+    basis_values : np.ndarray (alpha_moments_count)
+        Basis values summed over atoms.
+        This corresponds to b_j in Eq. (5) in [Podryabinkin_CMS_2017_Active]_.
+    basis_derivs : np.ndarray (alpha_moments_count, 3, number_of_atoms)
+        Derivatives of basis functions with respect to Cartesian coordinates of atoms
+        summed over atoms.
+        This corresponds to nabla b_j in Eq. (7a) in [Podryabinkin_CMS_2017_Active]_.
+
+    .. [Podryabinkin_CMS_2017_Active]
+       E. V. Podryabinkin and A. V. Shapeev, Comput. Mater. Sci. 140, 171 (2017).
+
+    """
+
+    def __init__(self, dict_mtp: dict[str, Any] | None = None) -> None:
         """MLIP-2 MTP.
 
         Parameters
         ----------
-        mtp_parameters : dict[str, Any]
+        dict_mtp : dict[str, Any]
             Parameters in the MLIP .mtp file.
 
         """
-        self.parameters = {}
-        if mtp_parameters is not None:
-            self.update(mtp_parameters)
+        self.dict_mtp = {}
+        if dict_mtp is not None:
+            self.update(dict_mtp)
         self.results = {}
         self._neighbor_list = None
+        self.basis_values = None
+        self.basis_derivs = None
 
-    def update(self, parameters: dict[str, Any]) -> None:
+    def update(self, dict_mtp: dict[str, Any]) -> None:
         """Update MTP parameters."""
-        self.parameters = parameters
-        if "species" not in self.parameters:
-            species = {_: _ for _ in range(self.parameters["species_count"])}
-            self.parameters["species"] = species
+        self.dict_mtp = dict_mtp
+        if "species" not in self.dict_mtp:
+            species = {_: _ for _ in range(self.dict_mtp["species_count"])}
+            self.dict_mtp["species"] = species
 
-    def update_neighbor_list(self, atoms: Atoms):
+    def update_neighbor_list(self, atoms: Atoms) -> None:
+        """Update the ASE `PrimitiveNeighborList` object."""
         if self._neighbor_list is None:
             self._initiate_neighbor_list(atoms)
-        else:
-            if self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
-                self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
+        elif self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
+            self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
 
-    def _initiate_neighbor_list(self, atoms: Atoms):
+    def _initiate_neighbor_list(self, atoms: Atoms) -> None:
+        """Initialize the ASE `PrimitiveNeighborList` object."""
         self._neighbor_list = PrimitiveNeighborList(
-            cutoffs=[0.5 * self.parameters["max_dist"]] * len(atoms),
+            cutoffs=[0.5 * self.dict_mtp["max_dist"]] * len(atoms),
             skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
             self_interaction=False,  # Exclude [0, 0, 0]
             bothways=True,  # return both ij and ji
         )
         self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
         self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
+
+        shape = self.dict_mtp["alpha_scalar_moments"]
+        self.basis_values = np.full(shape, np.nan)
+
+        number_of_atoms = len(atoms)
+        shape = self.dict_mtp["alpha_scalar_moments"], 3, number_of_atoms
+        self.basis_derivs = np.full(shape, np.nan)
 
     def _get_distances(
         self,
@@ -86,18 +113,18 @@ class NumpyMTPEngine(EngineBase):
     def update(self, parameters: dict[str, Any]) -> None:
         """Update MTP parameters."""
         super().update(parameters)
-        if "radial_coeffs" in self.parameters:
+        if "radial_coeffs" in self.dict_mtp:
             if self.radial_basis_funcs is None:
                 self.radial_basis_funcs, self.radial_basis_dfdrs = (
                     init_radial_basis_functions(
-                        self.parameters["radial_coeffs"],
-                        self.parameters["min_dist"],
-                        self.parameters["max_dist"],
+                        self.dict_mtp["radial_coeffs"],
+                        self.dict_mtp["min_dist"],
+                        self.dict_mtp["max_dist"],
                     )
                 )
             else:
                 update_radial_basis_coefficients(
-                    self.parameters["radial_coeffs"],
+                    self.dict_mtp["radial_coeffs"],
                     self.radial_basis_funcs,
                     self.radial_basis_dfdrs,
                 )
@@ -114,30 +141,31 @@ class NumpyMTPEngine(EngineBase):
             r_abs,
             itype,
             jtypes,
-            self.parameters["scaling"],
-            self.parameters["max_dist"],
-            self.parameters["radial_funcs_count"],
+            self.dict_mtp["scaling"],
+            self.dict_mtp["max_dist"],
+            self.dict_mtp["radial_funcs_count"],
         )
 
-    def _calc_local_energy(self, atoms: Atoms, i: int, js: list[int], r_ijs):
-        itype = self.parameters["species"][atoms.numbers[i]]
-        jtypes = [self.parameters["species"][atoms.numbers[j]] for j in js]
+    def _calc_basis(
+        self,
+        atoms: Atoms,
+        i: int,
+        js: list[int],
+        r_ijs: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        itype = self.dict_mtp["species"][atoms.numbers[i]]
+        jtypes = [self.dict_mtp["species"][atoms.numbers[j]] for j in js]
         r_abs = np.linalg.norm(r_ijs, axis=0)
         rb_values, rb_derivs = self._calc_radial_basis(r_abs, itype, jtypes)
-        self.basis_values, self.basis_derivs = calc_moment_basis(
+        return calc_moment_basis(
             r_ijs,
             r_abs,
             rb_values,
             rb_derivs,
-            self.parameters["alpha_moments_count"],
-            self.parameters["alpha_index_basic"],
-            self.parameters["alpha_index_times"],
-            self.parameters["alpha_moment_mapping"],
-        )
-        moment_coeffs = self.parameters["moment_coeffs"]
-        return (
-            moment_coeffs @ self.basis_values,
-            np.tensordot(moment_coeffs, self.basis_derivs, axes=(0, 0)),
+            self.dict_mtp["alpha_moments_count"],
+            self.dict_mtp["alpha_index_basic"],
+            self.dict_mtp["alpha_index_times"],
+            self.dict_mtp["alpha_moment_mapping"],
         )
 
     def calculate(self, atoms: Atoms) -> tuple:
@@ -147,11 +175,23 @@ class NumpyMTPEngine(EngineBase):
         energies = np.zeros(number_of_atoms)
         forces = np.zeros((number_of_atoms, 3))
         stress = np.zeros((3, 3))
+        self.basis_values[:] = 0.0
+        self.basis_derivs[:, :, :] = 0.0
+
+        moment_coeffs = self.dict_mtp["moment_coeffs"]
+
         for i in range(number_of_atoms):
             js, r_ijs = self._get_distances(atoms, i)
-            e, gradient = self._calc_local_energy(atoms, i, js, r_ijs)
-            itype = self.parameters["species"][atoms.numbers[i]]
-            energies[i] = e + self.parameters["species_coeffs"][itype]
+            basis_values, basis_derivs = self._calc_basis(atoms, i, js, r_ijs)
+
+            self.basis_values += basis_values
+            self.basis_derivs[:, :, i] = basis_derivs.sum(axis=-1)  # sum over neighbors
+
+            site_energy = moment_coeffs @ basis_values
+            gradient = np.tensordot(moment_coeffs, basis_derivs, axes=(0, 0))
+
+            itype = self.dict_mtp["species"][atoms.numbers[i]]
+            energies[i] = site_energy + self.dict_mtp["species_coeffs"][itype]
             # Calculate forces
             # Be careful that the derivative of the site energy of the j-th atom also
             # contributes to the forces on the i-th atom.
@@ -269,9 +309,9 @@ def calc_moment_basis(
 
     Returns
     -------
-    basis_vals : np.ndarray
+    basis_vals : np.ndarray (alpha_moments_count)
         Values of the basis functions.
-    basis_ders : np.ndarray
+    basis_ders : np.ndarray (alpha_moments_count, 3, number_of_atoms)
         Derivatives of the basis functions with respect to :math:`x_j, y_j, z_j`.
 
     """
@@ -339,7 +379,7 @@ class NumbaMTPEngine(EngineBase):
     def numba_calc_energy_and_forces(self, atoms):
         from motep.numba import numba_calc_energy_and_forces
 
-        mlip_params = self.parameters
+        mlip_params = self.dict_mtp
         energy, forces, stress = numba_calc_energy_and_forces(
             self,
             atoms,

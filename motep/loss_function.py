@@ -1,6 +1,5 @@
 """Loss function."""
 
-import copy
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -10,8 +9,8 @@ from mpi4py import MPI
 from scipy.constants import eV
 
 from motep.calculator import MTP
+from motep.initializer import MTPData
 from motep.io.mlip.cfg import _get_species
-from motep.io.mlip.mtp import read_mtp, write_mtp
 
 
 def calc_properties(
@@ -68,39 +67,6 @@ def calculate_energy_force_stress(atoms: Atoms):
     return energy, forces, stress
 
 
-def update_mtp(
-    data: dict[str, Any],
-    parameters: list[float],
-) -> dict[str, Any]:
-    """Update data in the .mtp file.
-
-    Parameters
-    ----------
-    data : dict[str, Any]
-        Data in the .mtp file.
-    parameters : list[float]
-        MTP parameters.
-
-    Returns
-    -------
-    data : dict[str, Any]
-        Updated data in the .mtp file.
-
-    """
-    species_count = data["species_count"]
-    rfc = data["radial_funcs_count"]
-    rbs = data["radial_basis_size"]
-    asm = data["alpha_scalar_moments"]
-
-    data["scaling"] = parameters[0]
-    data["moment_coeffs"] = parameters[1 : asm + 1]
-    data["species_coeffs"] = parameters[asm + 1 : asm + 1 + species_count]
-    total_radial = parameters[asm + 1 + species_count :]
-    shape = species_count, species_count, rfc, rbs
-    data["radial_coeffs"] = np.array(total_radial).reshape(shape)
-    return data
-
-
 def calc_rmses(
     images: list[Atoms],
     energies: np.ndarray,
@@ -140,18 +106,19 @@ class LossFunctionBase(ABC):
     def __init__(
         self,
         images: list[Atoms],
-        untrained_mtp: str,
+        data: MTPData,
         setting: dict[str, Any],
+        *,
         comm: MPI.Comm,
     ) -> None:
         """Loss function.
 
         Parameters
         ----------
+        data : :class:`motep.initializer.MTPData`
+            :class:`motep.initializer.MTPData` object.
         images : list[Atoms]
             List of ASE Atoms objects for the training dataset.
-        untrained_mtp: str
-            Filename of the untrained MTP potential in the MLIP format.
         setting : dict[str, Any]
             Setting for the training.
         comm : MPI.Comm
@@ -159,7 +126,7 @@ class LossFunctionBase(ABC):
 
         """
         self.images = images
-        self.untrained_mtp = untrained_mtp
+        self.data = data
         self.setting = setting
         self.comm = comm
 
@@ -222,23 +189,13 @@ class LossFunction(LossFunctionBase):
         super().__init__(*args, **kwargs)
         self.engine = engine
         for atoms in self.images:
-            atoms.calc = MTP(
-                engine=self.engine,
-                mtp_parameters=read_mtp(self.untrained_mtp),
-            )
+            atoms.calc = MTP(engine=self.engine, dict_mtp=self.data.data)
 
         self.configuration_weight = np.ones(len(self.images))
 
-    def __call__(self, parameters: list[float]):
+    def __call__(self, parameters: list[float]) -> float:
         for atoms in self.images:
-            data = update_mtp(atoms.calc.engine.parameters, parameters)
-            atoms.calc.update_parameters(data)
+            self.data.update(parameters)
+            atoms.calc.update_parameters(self.data.data)
         energies, forces, stresses = calc_properties(self.images, self.comm)
         return self.calc_loss_function(energies, forces, stresses)
-
-    def calc_rmses(self, parameters: list[float]) -> None:
-        """Calculate RMSEs."""
-        data = copy.deepcopy(self.images[0].calc.engine.parameters)
-        data = update_mtp(data, parameters)
-        write_mtp(self.setting["potential_final"], data)
-        super().calc_rmses(parameters)
