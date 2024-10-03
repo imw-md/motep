@@ -7,7 +7,7 @@ from pprint import pprint
 
 from mpi4py import MPI
 
-from motep.initializer import Initializer
+from motep.initializer import MTPData
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss_function import LossFunction, update_mtp
@@ -47,7 +47,9 @@ def run(args: argparse.Namespace) -> None:
     images = read_cfg(cfg_file, index=":", species=species)
     species = list(_get_species(images)) if species is None else species
 
-    initializer = Initializer(images, species, setting["seed"])
+    data = read_mtp(untrained_mtp)
+
+    mtp_data = MTPData(data, images, species, setting["seed"])
 
     if setting["engine"] == "mlippy":
         from motep.mlippy_loss_function import MlippyLossFunction
@@ -60,8 +62,6 @@ def run(args: argparse.Namespace) -> None:
     # Create folders for each rank
     folder_name = f"rank_{rank}"
     pathlib.Path(folder_name).mkdir(parents=True, exist_ok=True)
-
-    data = read_mtp(untrained_mtp)
 
     funs = {
         "GA": GeneticAlgorithmOptimizer(data),
@@ -78,7 +78,7 @@ def run(args: argparse.Namespace) -> None:
     # Change working directory to the created folder
     with cd(folder_name):
         for i, step in enumerate(setting["steps"]):
-            parameters, bounds = initializer.initialize(data, step["optimized"])
+            parameters, bounds = mtp_data.initialize(step["optimized"])
             printer.print(parameters)
             optimize = funs[step["method"]]
             kwargs = step.get("kwargs", {})

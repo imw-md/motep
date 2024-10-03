@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from mpi4py import MPI
 
-from motep.initializer import Initializer
+from motep.initializer import MTPData
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss_function import LossFunction
@@ -44,8 +44,8 @@ def test_molecules(
     }
 
     printer = Printer(data)
-    initializer = Initializer(images, species, rng=42)
-    parameters, bounds = initializer.initialize(data, optimized=["moment_coeffs"])
+    mtp_data = MTPData(data, images, species, rng=42)
+    parameters, bounds = mtp_data.initialize(optimized=["moment_coeffs"])
     parameters_ref = np.array(parameters, copy=True)
     printer.print(parameters_ref)
     loss_function = LossFunction(

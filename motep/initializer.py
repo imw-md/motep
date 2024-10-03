@@ -7,11 +7,12 @@ import numpy.typing as npt
 from ase import Atoms
 
 
-class Initializer:
-    """Class to initialize MTP parameters."""
+class MTPData:
+    """Class to handle MTP parameters."""
 
     def __init__(
         self,
+        data: dict[str, Any],
         images: list[Atoms],
         species: list[str],
         rng: np.random.Generator | int | None,
@@ -20,6 +21,8 @@ class Initializer:
 
         Parameters
         ----------
+        data : dict[str, Any]
+            Data in the .mtp file.
         images : list[Atoms]
             List of ASE Atoms objects for the training dataset.
             They are used to determine the initial guess of `species_coeffs`.
@@ -31,23 +34,18 @@ class Initializer:
             default PRNG.
 
         """
+        self.data = data
         self.species_coeffs_lstsq = calc_species_coeffs_lstsq(images, species)
         if isinstance(rng, int | None):
             self.rng = np.random.default_rng(rng)
         else:
             self.rng = rng
 
-    def initialize(
-        self,
-        data: dict[str, Any],
-        optimized: list[str],
-    ) -> tuple[list[float], list[tuple[float, float]]]:
+    def initialize(self, optimized: list[str]) -> tuple[np.ndarray, np.ndarray]:
         """Initialize MTP parameters.
 
         Parameters
         ----------
-        data : dict[str, Any]
-            Data in the .mtp file.
         optimized : list[str]
             Parameters to be optimized.
 
@@ -59,6 +57,7 @@ class Initializer:
             Bounds of the parameters.
 
         """
+        data = self.data
         parameters_scaling, bounds_scaling = _init_scaling(data, optimized)
         parameters_moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
             data,
