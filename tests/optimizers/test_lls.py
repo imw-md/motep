@@ -53,7 +53,7 @@ def test_molecules(
         comm=MPI.COMM_WORLD,
         engine=engine,
     )
-    parameters = LLSOptimizer(data)(loss_function, parameters, bounds)
+    parameters = LLSOptimizer(mtp_data)(loss_function, parameters, bounds)
 
     mtp_data.print(parameters)
     loss_function.calc_rmses(parameters)

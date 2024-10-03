@@ -93,6 +93,28 @@ class MTPData:
         )
         return parameters, bounds
 
+    def update(self, parameters: list[float]) -> None:
+        """Update data in the .mtp file.
+
+        Parameters
+        ----------
+        parameters : list[float]
+            MTP parameters.
+
+        """
+        dict_mtp = self.data
+        species_count = dict_mtp["species_count"]
+        rfc = dict_mtp["radial_funcs_count"]
+        rbs = dict_mtp["radial_basis_size"]
+        asm = dict_mtp["alpha_scalar_moments"]
+
+        dict_mtp["scaling"] = parameters[0]
+        dict_mtp["moment_coeffs"] = parameters[1 : asm + 1]
+        dict_mtp["species_coeffs"] = parameters[asm + 1 : asm + 1 + species_count]
+        total_radial = parameters[asm + 1 + species_count :]
+        shape = species_count, species_count, rfc, rbs
+        dict_mtp["radial_coeffs"] = np.array(total_radial).reshape(shape)
+
     def print(self, parameters: np.ndarray) -> None:
         """Print parameters."""
         species_count = self.data["species_count"]

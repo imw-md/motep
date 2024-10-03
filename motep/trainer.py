@@ -10,7 +10,7 @@ from mpi4py import MPI
 from motep.initializer import MTPData
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
-from motep.loss_function import LossFunction, update_mtp
+from motep.loss_function import LossFunction
 from motep.optimizers.ga import GeneticAlgorithmOptimizer
 from motep.optimizers.lls import LLSOptimizer
 from motep.optimizers.scipy import (
@@ -69,7 +69,7 @@ def run(args: argparse.Namespace) -> None:
         "L-BFGS-B": optimize_bfgs,
         "DA": optimize_da,
         "DE": optimize_de,
-        "LLS": LLSOptimizer(data),
+        "LLS": LLSOptimizer(mtp_data),
     }
 
     # Change working directory to the created folder
@@ -80,11 +80,11 @@ def run(args: argparse.Namespace) -> None:
             optimize = funs[step["method"]]
             kwargs = step.get("kwargs", {})
             parameters = optimize(fitness, parameters, bounds, **kwargs)
-            data = update_mtp(data, parameters)
-            write_mtp(f"intermediate_{i}.mtp", data)
+            mtp_data.update(parameters)
+            write_mtp(f"intermediate_{i}.mtp", mtp_data.data)
         fitness.calc_rmses(parameters)
-        data = update_mtp(data, parameters)
-        write_mtp(setting["potential_final"], data)
+        mtp_data.update(parameters)
+        write_mtp(setting["potential_final"], mtp_data.data)
 
     end_time = time.time()
     print("Total time taken:", end_time - start_time, "seconds")

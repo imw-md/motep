@@ -1,23 +1,22 @@
 """Module for the optimizer based on linear least squares (LLS)."""
 
-from typing import Any
-
 import numpy as np
 from ase import Atoms
 
-from motep.loss_function import LossFunction, update_mtp
+from motep.initializer import MTPData
+from motep.loss_function import LossFunction
 from motep.optimizers.scipy import Callback
 
 
 class LLSOptimizer:
     """Optimizer based on linear least squares (LLS)."""
 
-    def __init__(self, data: dict[str, Any]) -> None:
+    def __init__(self, data: MTPData) -> None:
         """Initialize the optimizer."""
         self.data = data
-        if "species" not in self.data:
-            species = {_: _ for _ in range(self.data["species_count"])}
-            self.data["species"] = species
+        if "species" not in self.data.data:
+            species = {_: _ for _ in range(self.data.data["species_count"])}
+            self.data.data["species"] = species
 
     def __call__(
         self,
@@ -48,7 +47,7 @@ class LLSOptimizer:
         fitness(parameters)
 
         # Update self.data based on the initialized parameters
-        self.data = update_mtp(self.data, parameters)
+        self.data.update(parameters)
 
         energies = self._calc_interaction_energies(fitness)
 
@@ -82,7 +81,8 @@ class LLSOptimizer:
             interactions among atoms, i.e., without site energies.
 
         """
-        species = self.data["species"]
+        dict_mtp = self.data.data
+        species = dict_mtp["species"]
         images = fitness.images
 
         def get_types(atoms: Atoms) -> list[int]:
@@ -90,7 +90,7 @@ class LLSOptimizer:
 
         iterable = (
             fitness.target_energies[i]
-            - np.add.reduce(self.data["species_coeffs"][get_types(atoms)])
+            - np.add.reduce(dict_mtp["species_coeffs"][get_types(atoms)])
             for i, atoms in enumerate(images)
         )
         return np.fromiter(iterable, dtype=float, count=len(images))
