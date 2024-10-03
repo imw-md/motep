@@ -15,6 +15,9 @@ class LLSOptimizer:
     def __init__(self, data: dict[str, Any]) -> None:
         """Initialize the optimizer."""
         self.data = data
+        if "species" not in self.data:
+            species = {_: _ for _ in range(self.data["species_count"])}
+            self.data["species"] = species
 
     def __call__(
         self,
@@ -47,11 +50,7 @@ class LLSOptimizer:
         # Update self.data based on the initialized parameters
         self.data = update_mtp(self.data, parameters)
 
-        if "species" not in self.data:
-            species = {_: _ for _ in range(self.data["species_count"])}
-            self.data["species"] = species
-
-        energies = self._calc_interaction_energies(fitness.images, species)
+        energies = self._calc_interaction_energies(fitness)
 
         basis_values = np.array(
             [atoms.calc.engine.basis_values for atoms in fitness.images],
@@ -68,19 +67,13 @@ class LLSOptimizer:
 
         return parameters
 
-    def _calc_interaction_energies(
-        self,
-        images: list[Atoms],
-        species: list[int],
-    ) -> np.ndarray:
+    def _calc_interaction_energies(self, fitness: LossFunction) -> np.ndarray:
         """Calculate interaction energies of Atoms objects.
 
         Parameters
         ----------
-        images : list[Atoms]
-            List of ASE Atoms objects.
-        species : dict[int, int]
-            Mapping of species to atomic types in the MLIP .mtp file.
+        fitness : :class:`~motep.loss_function.LossFunction`
+            :class:`motep.loss_function.LossFunction` object.
 
         Returns
         -------
@@ -89,13 +82,15 @@ class LLSOptimizer:
             interactions among atoms, i.e., without site energies.
 
         """
+        species = self.data["species"]
+        images = fitness.images
 
         def get_types(atoms: Atoms) -> list[int]:
             return [species[_] for _ in atoms.numbers]
 
         iterable = (
-            atoms.get_potential_energy()
+            fitness.target_energies[i]
             - np.add.reduce(self.data["species_coeffs"][get_types(atoms)])
-            for atoms in images
+            for i, atoms in enumerate(images)
         )
         return np.fromiter(iterable, dtype=float, count=len(images))

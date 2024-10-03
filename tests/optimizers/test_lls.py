@@ -2,6 +2,7 @@
 
 import pathlib
 
+import numpy as np
 import pytest
 from mpi4py import MPI
 
@@ -44,7 +45,8 @@ def test_molecules(
 
     printer = Printer(data)
     initializer = Initializer(images, species, rng=42)
-    parameters_ref, bounds = initializer.initialize(data, optimized=["moment_coeffs"])
+    parameters, bounds = initializer.initialize(data, optimized=["moment_coeffs"])
+    parameters_ref = np.array(parameters, copy=True)
     printer.print(parameters_ref)
     loss_function = LossFunction(
         images,
@@ -53,5 +55,8 @@ def test_molecules(
         comm=MPI.COMM_WORLD,
         engine=engine,
     )
-    parameters = LLSOptimizer(data)(loss_function, parameters_ref, bounds)
+    parameters = LLSOptimizer(data)(loss_function, parameters, bounds)
     printer.print(parameters)
+
+    # Check if `parameters` are updated.
+    assert not np.allclose(parameters, parameters_ref)
