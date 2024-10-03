@@ -60,28 +60,21 @@ class Initializer:
 
         """
         parameters_scaling, bounds_scaling = _init_scaling(data, optimized)
-        print("scaling:", *parameters_scaling)
         parameters_moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
             data,
             optimized,
             self.rng,
         )
-        print("moment_coeffs:")
-        print(parameters_moment_coeffs)
         parameters_species_coeffs, bounds_species_coeffs = _init_species_coeffs(
             data,
             self.species_coeffs_lstsq,
             optimized,
         )
-        print("species_coeffs:")
-        print(parameters_species_coeffs)
         parameters_radial_coeffs, bounds_radial_coeffs = _init_radial_coeffs(
             data,
             optimized,
             self.rng,
         )
-        print("radial_coeffs:")
-        print(parameters_radial_coeffs)
 
         parameters = np.hstack(
             (

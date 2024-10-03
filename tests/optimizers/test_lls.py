@@ -10,6 +10,7 @@ from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss_function import LossFunction
 from motep.optimizers.lls import LLSOptimizer
+from motep.printer import Printer
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
@@ -41,8 +42,10 @@ def test_molecules(
         "stress-weight": 0.0,
     }
 
+    printer = Printer(data)
     initializer = Initializer(images, species, rng=42)
     parameters_ref, bounds = initializer.initialize(data, optimized=["moment_coeffs"])
+    printer.print(parameters_ref)
     loss_function = LossFunction(
         images,
         untrained_mtp=fitting_path / "initial.mtp",
@@ -50,4 +53,5 @@ def test_molecules(
         comm=MPI.COMM_WORLD,
         engine=engine,
     )
-    LLSOptimizer(data)(loss_function, parameters_ref, bounds)
+    parameters = LLSOptimizer(data)(loss_function, parameters_ref, bounds)
+    printer.print(parameters)
