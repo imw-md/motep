@@ -54,14 +54,11 @@ class LLSOptimizer:
         # Update self.data based on the initialized parameters
         self.data.update(parameters)
 
-        energies = self._calc_interaction_energies(fitness)
-
-        basis_values = np.array(
-            [atoms.calc.engine.basis_values for atoms in fitness.images],
-        )
+        matrix = self._calc_matrix(fitness)
+        vector = self._calc_vector(fitness)
 
         # TODO: Consider also forces and stresses
-        moment_coeffs = np.linalg.lstsq(basis_values, energies, rcond=None)[0]
+        moment_coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
 
         # TODO: Redesign optimizers to du such an assignment more semantically
         parameters[1 : len(moment_coeffs) + 1] = moment_coeffs
@@ -70,6 +67,32 @@ class LLSOptimizer:
         callback(parameters)
 
         return parameters
+
+    def _calc_matrix(self, fitness: LossFunction) -> np.ndarray:
+        """Calculate the matrix for linear least squares (LLS)."""
+        dict_mtp = self.data.data
+        images = fitness.images
+        basis_values = np.array([atoms.calc.engine.basis_values for atoms in images])
+        basis_derivs = np.vstack([atoms.calc.engine.basis_derivs.T for atoms in images])
+        basis_derivs = basis_derivs.reshape((-1, dict_mtp["alpha_scalar_moments"]))
+        tmp = (
+            np.sqrt(fitness.setting["energy-weight"]) * basis_values,
+            np.sqrt(fitness.setting["force-weight"]) * basis_derivs,
+        )
+        return np.vstack(tmp)
+
+    def _calc_vector(self, fitness: LossFunction) -> np.ndarray:
+        """Calculate the vector for linear least squares (LLS)."""
+        images = fitness.images
+        energies = self._calc_interaction_energies(fitness)
+        forces = np.hstack(
+            [fitness.target_forces[i].reshape(-1) for i, atoms in enumerate(images)]
+        )
+        tmp = (
+            np.sqrt(fitness.setting["energy-weight"]) * energies,
+            np.sqrt(fitness.setting["force-weight"]) * forces * -1.0,
+        )
+        return np.hstack(tmp)
 
     def _calc_interaction_energies(self, fitness: LossFunction) -> np.ndarray:
         """Calculate interaction energies of Atoms objects.
