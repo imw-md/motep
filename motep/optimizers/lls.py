@@ -46,6 +46,11 @@ class LLSOptimizer:
         # Calculate basis functions of `fitness.images`
         fitness(parameters)
 
+        callback = Callback(fitness)
+
+        # Print the value of the loss function.
+        callback(parameters)
+
         # Update self.data based on the initialized parameters
         self.data.update(parameters)
 
@@ -61,8 +66,8 @@ class LLSOptimizer:
         # TODO: Redesign optimizers to du such an assignment more semantically
         parameters[1 : len(moment_coeffs) + 1] = moment_coeffs
 
-        # Print loss function value
-        Callback(fitness)(parameters)
+        # Print the value of the loss function.
+        callback(parameters)
 
         return parameters
 
