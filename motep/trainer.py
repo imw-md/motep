@@ -20,7 +20,6 @@ from motep.optimizers.scipy import (
     optimize_minimize,
     optimize_nelder,
 )
-from motep.printer import Printer
 from motep.setting import make_default_setting, parse_setting
 from motep.utils import cd
 
@@ -73,13 +72,11 @@ def run(args: argparse.Namespace) -> None:
         "LLS": LLSOptimizer(data),
     }
 
-    printer = Printer(data)
-
     # Change working directory to the created folder
     with cd(folder_name):
         for i, step in enumerate(setting["steps"]):
             parameters, bounds = mtp_data.initialize(step["optimized"])
-            printer.print(parameters)
+            mtp_data.print(parameters)
             optimize = funs[step["method"]]
             kwargs = step.get("kwargs", {})
             parameters = optimize(fitness, parameters, bounds, **kwargs)
