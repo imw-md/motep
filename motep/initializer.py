@@ -123,7 +123,13 @@ def calc_species_coeffs_lstsq(
     energies /= ns
     species_coeffs_lstsq = np.linalg.lstsq(counts, energies, rcond=None)[0]
     rmse = np.sqrt(np.add.reduce((counts @ species_coeffs_lstsq - energies) ** 2))
+    print("#" * 75)
+    print(f"{__name__}.{calc_species_coeffs_lstsq.__name__}")
+    print("species_coeffs_lstsq:")
+    print(species_coeffs_lstsq)
     print("RMSE Energy per atom (eV/atom):", rmse)
+    print("The values are estimated assuming no interatomic forces.")
+    print()
     return species_coeffs_lstsq
 
 
