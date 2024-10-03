@@ -48,7 +48,7 @@ def test_molecules(
     mtp_data.print(parameters_ref)
     loss_function = LossFunction(
         images,
-        untrained_mtp=fitting_path / "initial.mtp",
+        data=mtp_data,
         setting=setting,
         comm=MPI.COMM_WORLD,
         engine=engine,

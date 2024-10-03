@@ -36,17 +36,17 @@ class MTP(Calculator):
 
     def __init__(
         self,
-        mtp_parameters: dict[str, Any],
+        dict_mtp: dict[str, Any],
         *args,
         engine: str = "numpy",
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.engine = make_mtp_engine(engine)
-        self.engine.update(mtp_parameters)
+        self.engine.update(dict_mtp)
 
-    def update_parameters(self, parameters: dict[str, Any]):
-        self.engine.update(parameters)
+    def update_parameters(self, dict_mtp: dict[str, Any]) -> None:
+        self.engine.update(dict_mtp)
         self.results = {}  # trigger new calculation
 
     def calculate(
@@ -54,7 +54,7 @@ class MTP(Calculator):
         atoms: Atoms | None = None,
         properties: list[str] = ["energy"],
         system_changes: list[str] = all_changes,
-    ):
+    ) -> None:
         super().calculate(atoms, properties, system_changes)
 
         energy, forces, stress = self.engine.calculate(self.atoms)

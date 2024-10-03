@@ -53,10 +53,10 @@ def run(args: argparse.Namespace) -> None:
     if setting["engine"] == "mlippy":
         from motep.mlippy_loss_function import MlippyLossFunction
 
-        fitness = MlippyLossFunction(images, untrained_mtp, setting, comm)
+        fitness = MlippyLossFunction(images, mtp_data, setting, comm=comm)
     else:
         engine = setting["engine"]
-        fitness = LossFunction(images, untrained_mtp, setting, comm, engine=engine)
+        fitness = LossFunction(images, mtp_data, setting, comm=comm, engine=engine)
 
     # Create folders for each rank
     folder_name = f"rank_{rank}"
