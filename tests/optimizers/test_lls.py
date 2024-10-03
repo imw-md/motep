@@ -44,8 +44,8 @@ def test_molecules(
 
     mtp_data = MTPData(data, images, species, rng=42)
     parameters, bounds = mtp_data.initialize(optimized=["moment_coeffs"])
-    parameters_ref = np.array(parameters, copy=True)
-    mtp_data.print(parameters_ref)
+    mtp_data.update(parameters)
+
     loss_function = LossFunction(
         images,
         data=mtp_data,
@@ -53,6 +53,11 @@ def test_molecules(
         comm=MPI.COMM_WORLD,
         engine=engine,
     )
+
+    parameters_ref = np.array(parameters, copy=True)
+    mtp_data.print(parameters_ref)
+    loss_function.calc_rmses(parameters_ref)
+
     parameters = LLSOptimizer(mtp_data)(loss_function, parameters, bounds)
 
     mtp_data.print(parameters)
