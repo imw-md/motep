@@ -98,6 +98,7 @@ def calc_rmses(
     print("RMSE Energy per atom (eV/atom):", rmse_energy)
     print("RMSE force per component (eV/Ang):", rmse_forces)
     print("RMSE stress per component (GPa):", rmse_stress * eV * 1e21)
+    print()
 
 
 class LossFunctionBase(ABC):

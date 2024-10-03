@@ -59,6 +59,7 @@ def test_molecules(
     loss_function.calc_rmses(parameters_ref)
 
     parameters = LLSOptimizer(mtp_data)(loss_function, parameters, bounds)
+    print()
 
     mtp_data.print(parameters)
     loss_function.calc_rmses(parameters)

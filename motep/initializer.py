@@ -122,7 +122,6 @@ class MTPData:
         rbs = self.data["radial_basis_size"]
         asm = self.data["alpha_scalar_moments"]
 
-        print("#" * 75)
         print("scaling:", parameters[0])
         print("moment_coeffs:")
         print(parameters[1 : asm + 1])
@@ -156,7 +155,6 @@ def calc_species_coeffs_lstsq(
     energies /= ns
     species_coeffs_lstsq = np.linalg.lstsq(counts, energies, rcond=None)[0]
     rmse = np.sqrt(np.add.reduce((counts @ species_coeffs_lstsq - energies) ** 2))
-    print("#" * 75)
     print(f"{__name__}.{calc_species_coeffs_lstsq.__name__}")
     print("species_coeffs_lstsq:")
     print(species_coeffs_lstsq)

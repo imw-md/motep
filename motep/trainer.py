@@ -36,6 +36,7 @@ def run(args: argparse.Namespace) -> None:
     setting = make_default_setting()
     setting.update(parse_setting(args.setting))
     pprint(setting, sort_dicts=False)
+    print()
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -77,14 +78,17 @@ def run(args: argparse.Namespace) -> None:
         for i, step in enumerate(setting["steps"]):
             parameters, bounds = mtp_data.initialize(step["optimized"])
             mtp_data.print(parameters)
+            print(step["method"])
             optimize = funs[step["method"]]
             kwargs = step.get("kwargs", {})
             parameters = optimize(fitness, parameters, bounds, **kwargs)
             mtp_data.update(parameters)
             write_mtp(f"intermediate_{i}.mtp", mtp_data.data)
-        fitness.calc_rmses(parameters)
-        mtp_data.update(parameters)
-        write_mtp(setting["potential_final"], mtp_data.data)
+            print()
+
+    fitness.calc_rmses(parameters)
+    mtp_data.update(parameters)
+    write_mtp(setting["potential_final"], mtp_data.data)
 
     end_time = time.time()
     print("Total time taken:", end_time - start_time, "seconds")
