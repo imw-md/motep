@@ -94,8 +94,8 @@ class LLSOptimizer:
             return [species[_] for _ in atoms.numbers]
 
         iterable = (
-            np.add.reduce(self.data["species_coeffs"][get_types(atoms)])
-            - atoms.get_potential_energy()
+            atoms.get_potential_energy()
+            - np.add.reduce(self.data["species_coeffs"][get_types(atoms)])
             for atoms in images
         )
         return np.fromiter(iterable, dtype=float, count=len(images))
