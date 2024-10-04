@@ -7,7 +7,6 @@ from pprint import pprint
 
 from mpi4py import MPI
 
-from motep.initializer import MTPData
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss_function import LossFunction
@@ -20,6 +19,7 @@ from motep.optimizers.scipy import (
     optimize_minimize,
     optimize_nelder,
 )
+from motep.potentials import MTPData
 from motep.setting import make_default_setting, parse_setting
 from motep.utils import cd
 

@@ -3,9 +3,9 @@
 import numpy as np
 from ase import Atoms
 
-from motep.initializer import MTPData
 from motep.loss_function import LossFunction
 from motep.optimizers.scipy import Callback
+from motep.potentials import MTPData
 
 
 class LLSOptimizer:

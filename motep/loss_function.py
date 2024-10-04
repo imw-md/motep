@@ -9,8 +9,8 @@ from mpi4py import MPI
 from scipy.constants import eV
 
 from motep.calculator import MTP
-from motep.initializer import MTPData
 from motep.io.mlip.cfg import _get_species
+from motep.potentials import MTPData
 
 
 def calc_properties(

@@ -3,9 +3,9 @@
 import mlippy
 from ase.data import chemical_symbols
 
-from motep.initializer import MTPData
 from motep.io.mlip.mtp import write_mtp
 from motep.loss_function import LossFunctionBase, calc_properties
+from motep.potentials import MTPData
 
 
 def init_mlip(file: str, species: list[str]):

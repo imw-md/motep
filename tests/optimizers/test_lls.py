@@ -6,11 +6,11 @@ import numpy as np
 import pytest
 from mpi4py import MPI
 
-from motep.initializer import MTPData
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss_function import LossFunction
 from motep.optimizers.lls import LLSOptimizer
+from motep.potentials import MTPData
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
