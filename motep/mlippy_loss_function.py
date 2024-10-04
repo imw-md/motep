@@ -39,10 +39,10 @@ class MlippyLossFunction(LossFunctionBase):
         energies, forces, stresses = calc_properties(self.images, self.comm)
         return self.calc_loss_function(energies, forces, stresses)
 
-    def calc_rmses(self, parameters: list[float]) -> dict[str, float]:
+    def print_errors(self, parameters: list[float]) -> dict[str, float]:
         """Calculate RMSEs."""
         file = self.setting["potential_final"]
         calc = init_calc(file, self.data, parameters, self.species)
         for atoms in self.images:
             atoms.calc = calc
-        super().calc_rmses(parameters)
+        super().print_errors(parameters)

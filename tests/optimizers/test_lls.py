@@ -56,13 +56,13 @@ def test_molecules(
 
     parameters_ref = np.array(parameters, copy=True)
     mtp_data.print(parameters_ref)
-    loss_function.calc_rmses(parameters_ref)
+    loss_function.print_errors(parameters_ref)
 
     parameters = LLSOptimizer(mtp_data)(loss_function, parameters, bounds)
     print()
 
     mtp_data.print(parameters)
-    loss_function.calc_rmses(parameters)
+    loss_function.print_errors(parameters)
 
     # Check if `parameters` are updated.
     assert not np.allclose(parameters, parameters_ref)

@@ -67,38 +67,13 @@ def calculate_energy_force_stress(atoms: Atoms):
     return energy, forces, stress
 
 
-def calc_rmses(
-    images: list[Atoms],
-    energies: np.ndarray,
-    target_energies: np.ndarray,
-    forces: np.ndarray,
-    target_forces: np.ndarray,
-    stresses: np.ndarray,
-    target_stresses: np.ndarray,
-) -> None:
-    """Calculate RMSEs."""
-    n = len(images)
-    se_energies = [(energies[i] - target_energies[i]) ** 2 for i in range(n)]
-    se_energies_per_atom = [
-        ((energies[i] - target_energies[i]) / len(atoms)) ** 2
-        for i, atoms in enumerate(images)
-    ]
-    total_number_of_atoms = sum(len(atoms) for atoms in images)
-    se_forces = [np.sum((forces[i] - target_forces[i]) ** 2) / 3.0 for i in range(n)]
-    se_stress = [
-        np.sum((stresses[i] - target_stresses[i]) ** 2) / 9.0 for i in range(n)
-    ]
-
-    rmse_energy = np.sqrt(np.mean(se_energies))
-    rmse_energy_per_atom = np.sqrt(np.mean(se_energies_per_atom))
-    rmse_forces = np.sqrt(np.sum(se_forces) / total_number_of_atoms)
-    rmse_stress = np.sqrt(np.mean(se_stress))  # eV/Ang^3
-
-    print("RMSE Energy (eV):", rmse_energy)
-    print("RMSE Energy per atom (eV/atom):", rmse_energy_per_atom)
-    print("RMSE force per component (eV/Ang):", rmse_forces)
-    print("RMSE stress per component (GPa):", rmse_stress * eV * 1e21)
-    print()
+def _calc_errors_from_diff(diff: np.ndarray) -> dict[str, float]:
+    errors = {}
+    errors["N"] = diff.size
+    errors["MAX"] = np.max(np.abs(diff))
+    errors["ABS"] = np.mean(np.abs(diff))
+    errors["RMS"] = np.sqrt(np.mean(diff**2))
+    return errors
 
 
 class LossFunctionBase(ABC):
@@ -169,18 +144,85 @@ class LossFunctionBase(ABC):
             + self.setting["stress-weight"] * stress_mse
         )
 
-    def calc_rmses(self, parameters: list[float]) -> None:
-        energies, forces, stresses = calc_properties(self.images, self.comm)
-
-        calc_rmses(
-            self.images,
-            energies,
-            self.target_energies,
-            forces,
-            self.target_forces,
-            stresses,
-            self.target_stresses,
+    def _calc_errors_energy(self, energies: np.ndarray) -> dict[str, float]:
+        iterable = (
+            energies[i] - self.target_energies[i] for i in range(len(self.images))
         )
+        return _calc_errors_from_diff(np.fromiter(iterable, dtype=float))
+
+    def _calc_errors_energy_per_atom(self, energies: np.ndarray) -> dict[str, float]:
+        iterable = (
+            ((energies[i] - self.target_energies[i]) / len(atoms))
+            for i, atoms in enumerate(self.images)
+        )
+        return _calc_errors_from_diff(np.fromiter(iterable, dtype=float))
+
+    def _calc_errors_forces(self, forces: np.ndarray) -> dict[str, float]:
+        iterable = (
+            forces[i][j][k] - self.target_forces[i][j][k]
+            for i, atoms in enumerate(self.images)
+            for j in range(len(atoms))
+            for k in range(3)
+        )
+        return _calc_errors_from_diff(np.fromiter(iterable, dtype=float))
+
+    def _calc_errors_stress(self, stresses: np.ndarray) -> dict[str, float]:
+        iterable = (
+            stresses[i][j][k] - self.target_stresses[i][j][k]
+            for i in range(len(self.images))
+            for j in range(3)
+            for k in range(3)
+        )
+        return _calc_errors_from_diff(np.fromiter(iterable, dtype=float))
+
+    def calc_errors(self) -> dict[str, float]:
+        """Calculate errors.
+
+        Returns
+        -------
+        dict[str, float]
+            Errors for the properties.
+
+        """
+        energies, forces, stresses = calc_properties(self.images, self.comm)
+        errors = {}
+        errors["energy"] = self._calc_errors_energy(energies)
+        errors["energy_per_atom"] = self._calc_errors_energy_per_atom(energies)
+        errors["forces"] = self._calc_errors_forces(forces)
+        errors["stress"] = self._calc_errors_stress(stresses)  # eV/Ang^3
+        return errors
+
+    def print_errors(self, parameters: list[float]) -> None:
+        """Print errors."""
+        errors = self.calc_errors()
+
+        key0 = "energy"
+        print("Energy (eV):")
+        print(f"    Errors checked for {errors[key0]['N']} configurations")
+        for key1 in ["MAX", "ABS", "RMS"]:
+            print(f"    {key1} error: {errors[key0][key1]}")
+        print()
+
+        key0 = "energy_per_atom"
+        print("Energy per atom (eV/atom):")
+        print(f"    Errors checked for {errors[key0]['N']} configurations")
+        for key1 in ["MAX", "ABS", "RMS"]:
+            print(f"    {key1} error: {errors[key0][key1]}")
+        print()
+
+        key0 = "forces"
+        print("Forces per component (eV/angstrom):")
+        print(f"    Errors checked for {errors[key0]['N'] // 3} atoms")
+        for key1 in ["MAX", "ABS", "RMS"]:
+            print(f"    {key1} error: {errors[key0][key1]}")
+        print()
+
+        key0 = "stress"
+        print("Stress per component (GPa):")
+        print(f"    Errors checked for {errors[key0]['N'] // 9} configurations")
+        for key1 in ["MAX", "ABS", "RMS"]:
+            print(f"    {key1} error: {errors[key0][key1] * eV * 1e21}")
+        print()
 
 
 class LossFunction(LossFunctionBase):
