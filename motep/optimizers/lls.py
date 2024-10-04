@@ -11,12 +11,12 @@ from motep.potentials import MTPData
 class LLSOptimizer:
     """Optimizer based on linear least squares (LLS)."""
 
-    def __init__(self, data: MTPData) -> None:
+    def __init__(self, mtp_data: MTPData) -> None:
         """Initialize the optimizer."""
-        self.data = data
-        if "species" not in self.data.dict_mtp:
-            species = {_: _ for _ in range(self.data.dict_mtp["species_count"])}
-            self.data.dict_mtp["species"] = species
+        self.mtp_data = mtp_data
+        if "species" not in self.mtp_data.dict_mtp:
+            species = {_: _ for _ in range(self.mtp_data.dict_mtp["species_count"])}
+            self.mtp_data.dict_mtp["species"] = species
 
     def __call__(
         self,
@@ -52,7 +52,7 @@ class LLSOptimizer:
         callback(parameters)
 
         # Update self.data based on the initialized parameters
-        self.data.update(parameters)
+        self.mtp_data.update(parameters)
 
         matrix = self._calc_matrix(fitness)
         vector = self._calc_vector(fitness)
@@ -70,7 +70,7 @@ class LLSOptimizer:
 
     def _calc_matrix(self, fitness: LossFunction) -> np.ndarray:
         """Calculate the matrix for linear least squares (LLS)."""
-        dict_mtp = self.data.dict_mtp
+        dict_mtp = self.mtp_data.dict_mtp
         images = fitness.images
         basis_values = np.array([atoms.calc.engine.basis_values for atoms in images])
         basis_derivs = np.vstack([atoms.calc.engine.basis_derivs.T for atoms in images])
@@ -109,7 +109,7 @@ class LLSOptimizer:
             interactions among atoms, i.e., without site energies.
 
         """
-        dict_mtp = self.data.dict_mtp
+        dict_mtp = self.mtp_data.dict_mtp
         species = dict_mtp["species"]
         images = fitness.images
 

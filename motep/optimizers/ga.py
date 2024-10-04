@@ -7,6 +7,8 @@ from typing import Any
 import numpy as np
 from scipy.optimize import minimize
 
+from motep.potentials import MTPData
+
 
 def _limit_bounds(bounds: np.ndarray) -> np.ndarray:
     """Limit the bounds."""
@@ -258,9 +260,9 @@ def elite_callback(gen: int, elite: float) -> None:
 class GeneticAlgorithmOptimizer:
     """Optimizer based on genetic algorithm (GA)."""
 
-    def __init__(self, data: dict[str, Any]) -> None:
+    def __init__(self, mtp_data: MTPData) -> None:
         """Initialize the optimizer."""
-        self.data = data
+        self.mtp_data = mtp_data
 
     def __call__(
         self,

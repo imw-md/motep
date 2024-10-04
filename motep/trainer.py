@@ -64,7 +64,7 @@ def run(args: argparse.Namespace) -> None:
     pathlib.Path(folder_name).mkdir(parents=True, exist_ok=True)
 
     funs = {
-        "GA": GeneticAlgorithmOptimizer(data),
+        "GA": GeneticAlgorithmOptimizer(mtp_data),
         "minimize": optimize_minimize,
         "Nelder-Mead": optimize_nelder,
         "L-BFGS-B": optimize_bfgs,
