@@ -47,9 +47,9 @@ def run(args: argparse.Namespace) -> None:
     images = read_cfg(cfg_file, index=":", species=species)
     species = list(_get_species(images)) if species is None else species
 
-    data = read_mtp(untrained_mtp)
+    dict_mtp = read_mtp(untrained_mtp)
 
-    mtp_data = MTPData(data, images, species, setting["seed"])
+    mtp_data = MTPData(dict_mtp, images, species, setting["seed"])
 
     if setting["engine"] == "mlippy":
         from motep.mlippy_loss_function import MlippyLossFunction
@@ -83,12 +83,12 @@ def run(args: argparse.Namespace) -> None:
             kwargs = step.get("kwargs", {})
             parameters = optimize(fitness, parameters, bounds, **kwargs)
             mtp_data.update(parameters)
-            write_mtp(f"intermediate_{i}.mtp", mtp_data.data)
+            write_mtp(f"intermediate_{i}.mtp", mtp_data.dict_mtp)
             print()
             fitness.print_errors(parameters)
 
     mtp_data.update(parameters)
-    write_mtp(setting["potential_final"], mtp_data.data)
+    write_mtp(setting["potential_final"], mtp_data.dict_mtp)
 
     end_time = time.time()
     print("Total time taken:", end_time - start_time, "seconds")

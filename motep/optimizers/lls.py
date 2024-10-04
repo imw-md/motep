@@ -14,9 +14,9 @@ class LLSOptimizer:
     def __init__(self, data: MTPData) -> None:
         """Initialize the optimizer."""
         self.data = data
-        if "species" not in self.data.data:
-            species = {_: _ for _ in range(self.data.data["species_count"])}
-            self.data.data["species"] = species
+        if "species" not in self.data.dict_mtp:
+            species = {_: _ for _ in range(self.data.dict_mtp["species_count"])}
+            self.data.dict_mtp["species"] = species
 
     def __call__(
         self,
@@ -70,7 +70,7 @@ class LLSOptimizer:
 
     def _calc_matrix(self, fitness: LossFunction) -> np.ndarray:
         """Calculate the matrix for linear least squares (LLS)."""
-        dict_mtp = self.data.data
+        dict_mtp = self.data.dict_mtp
         images = fitness.images
         basis_values = np.array([atoms.calc.engine.basis_values for atoms in images])
         basis_derivs = np.vstack([atoms.calc.engine.basis_derivs.T for atoms in images])
@@ -109,7 +109,7 @@ class LLSOptimizer:
             interactions among atoms, i.e., without site energies.
 
         """
-        dict_mtp = self.data.data
+        dict_mtp = self.data.dict_mtp
         species = dict_mtp["species"]
         images = fitness.images
 

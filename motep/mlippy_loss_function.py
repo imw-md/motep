@@ -25,7 +25,7 @@ def init_calc(
 ) -> mlippy.MLIP_Calculator:
     """Initialize mlippy ASE calculator."""
     data.update(parameters)
-    write_mtp(file, data.data)
+    write_mtp(file, data.dict_mtp)
     mlip = init_mlip(file, species)
     return mlippy.MLIP_Calculator(mlip, {})
 

@@ -232,13 +232,13 @@ class LossFunction(LossFunctionBase):
         super().__init__(*args, **kwargs)
         self.engine = engine
         for atoms in self.images:
-            atoms.calc = MTP(engine=self.engine, dict_mtp=self.data.data)
+            atoms.calc = MTP(engine=self.engine, dict_mtp=self.data.dict_mtp)
 
         self.configuration_weight = np.ones(len(self.images))
 
     def __call__(self, parameters: list[float]) -> float:
         for atoms in self.images:
             self.data.update(parameters)
-            atoms.calc.update_parameters(self.data.data)
+            atoms.calc.update_parameters(self.data.dict_mtp)
         energies, forces, stresses = calc_properties(self.images, self.comm)
         return self.calc_loss_function(energies, forces, stresses)
