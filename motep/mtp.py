@@ -185,7 +185,6 @@ class NumpyMTPEngine(EngineBase):
             basis_values, basis_derivs = self._calc_basis(atoms, i, js, r_ijs)
 
             self.basis_values += basis_values
-            self.basis_derivs[:, :, i] = basis_derivs.sum(axis=-1)  # sum over neighbors
 
             site_energy = moment_coeffs @ basis_values
             gradient = np.tensordot(moment_coeffs, basis_derivs, axes=(0, 0))
@@ -204,6 +203,8 @@ class NumpyMTPEngine(EngineBase):
             for k, j in enumerate(js):
                 forces[i] += gradient[:, k]
                 forces[j] -= gradient[:, k]
+                self.basis_derivs[:, :, i] -= basis_derivs[:, :, k]
+                self.basis_derivs[:, :, j] += basis_derivs[:, :, k]
             stress += r_ijs @ gradient.T
         self.results["energies"] = energies
         self.results["energy"] = self.results["energies"].sum()
