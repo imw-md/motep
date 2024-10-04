@@ -4,19 +4,12 @@ import numpy as np
 from ase import Atoms
 
 from motep.loss_function import LossFunction
+from motep.optimizers import OptimizerBase
 from motep.optimizers.scipy import Callback
-from motep.potentials import MTPData
 
 
-class LLSOptimizer:
+class LLSOptimizer(OptimizerBase):
     """Optimizer based on linear least squares (LLS)."""
-
-    def __init__(self, mtp_data: MTPData) -> None:
-        """Initialize the optimizer."""
-        self.mtp_data = mtp_data
-        if "species" not in self.mtp_data.dict_mtp:
-            species = {_: _ for _ in range(self.mtp_data.dict_mtp["species_count"])}
-            self.mtp_data.dict_mtp["species"] = species
 
     def __call__(
         self,

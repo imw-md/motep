@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 from scipy.optimize import minimize
 
-from motep.potentials import MTPData
+from motep.optimizers import OptimizerBase
 
 
 def _limit_bounds(bounds: np.ndarray) -> np.ndarray:
@@ -257,12 +257,8 @@ def elite_callback(gen: int, elite: float) -> None:
     print(f"Generation {gen}: Top Elite - {elite}")
 
 
-class GeneticAlgorithmOptimizer:
+class GeneticAlgorithmOptimizer(OptimizerBase):
     """Optimizer based on genetic algorithm (GA)."""
-
-    def __init__(self, mtp_data: MTPData) -> None:
-        """Initialize the optimizer."""
-        self.mtp_data = mtp_data
 
     def __call__(
         self,
