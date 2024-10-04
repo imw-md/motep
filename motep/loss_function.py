@@ -77,25 +77,25 @@ def calc_rmses(
     target_stresses: np.ndarray,
 ) -> None:
     """Calculate RMSEs."""
-    se_energies = [
+    n = len(images)
+    se_energies = [(energies[i] - target_energies[i]) ** 2 for i in range(n)]
+    se_energies_per_atom = [
         ((energies[i] - target_energies[i]) / len(atoms)) ** 2
         for i, atoms in enumerate(images)
     ]
     total_number_of_atoms = sum(len(atoms) for atoms in images)
-    se_forces = [
-        np.sum((forces[i] - target_forces[i]) ** 2) / 3.0
-        for i, atoms in enumerate(images)
-    ]
+    se_forces = [np.sum((forces[i] - target_forces[i]) ** 2) / 3.0 for i in range(n)]
     se_stress = [
-        np.sum((stresses[i] - target_stresses[i]) ** 2) / 9.0
-        for i, atoms in enumerate(images)
+        np.sum((stresses[i] - target_stresses[i]) ** 2) / 9.0 for i in range(n)
     ]
 
     rmse_energy = np.sqrt(np.mean(se_energies))
+    rmse_energy_per_atom = np.sqrt(np.mean(se_energies_per_atom))
     rmse_forces = np.sqrt(np.sum(se_forces) / total_number_of_atoms)
     rmse_stress = np.sqrt(np.mean(se_stress))  # eV/Ang^3
 
-    print("RMSE Energy per atom (eV/atom):", rmse_energy)
+    print("RMSE Energy (eV):", rmse_energy)
+    print("RMSE Energy per atom (eV/atom):", rmse_energy_per_atom)
     print("RMSE force per component (eV/Ang):", rmse_forces)
     print("RMSE stress per component (GPa):", rmse_stress * eV * 1e21)
     print()
