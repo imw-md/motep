@@ -155,7 +155,7 @@ class NumpyMTPEngine(EngineBase):
     ) -> tuple[np.ndarray, np.ndarray]:
         itype = self.dict_mtp["species"][atoms.numbers[i]]
         jtypes = [self.dict_mtp["species"][atoms.numbers[j]] for j in js]
-        r_abs = np.linalg.norm(r_ijs, axis=0)
+        r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
         rb_values, rb_derivs = self._calc_radial_basis(r_abs, itype, jtypes)
         return calc_moment_basis(
             r_ijs,
