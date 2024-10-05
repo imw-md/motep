@@ -1,5 +1,7 @@
 """Module for the optimizer based on linear least squares (LLS)."""
 
+from typing import Any
+
 import numpy as np
 from ase import Atoms
 
@@ -8,7 +10,26 @@ from motep.optimizers.scipy import Callback
 
 
 class LLSOptimizer(OptimizerBase):
-    """Optimizer based on linear least squares (LLS)."""
+    """Optimizer based on linear least squares (LLS).
+
+    Attributes
+    ----------
+    minimized : list[str]
+        Properties whose errors are minimized by optimizing `moment_coeffs`.
+        The elements must be some of `energy`, `forces`, and `stress`.
+
+    """
+
+    def __init__(
+        self,
+        *args: list[Any],
+        minimized: list[str] | None = None,
+        **kwargs: dict[str, Any],
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        if minimized is None:
+            minimized = ["energy", "forces"]
+        self.minimized = minimized
 
     def optimize(
         self,
@@ -66,28 +87,25 @@ class LLSOptimizer(OptimizerBase):
         basis_values = np.array([atoms.calc.engine.basis_values for atoms in images])
         basis_derivs = np.vstack([atoms.calc.engine.basis_derivs.T for atoms in images])
         basis_derivs = basis_derivs.reshape((-1, dict_mtp["alpha_scalar_moments"]))
-        tmp = (
-            np.sqrt(setting["energy-weight"]) * basis_values,
-            np.sqrt(setting["force-weight"]) * basis_derivs,
-        )
+        tmp = []
+        if "energy" in self.minimized:
+            tmp.append(np.sqrt(setting["energy-weight"]) * basis_values)
+        if "forces" in self.minimized:
+            tmp.append(np.sqrt(setting["force-weight"]) * basis_derivs)
         return np.vstack(tmp)
 
     def _calc_vector(self) -> np.ndarray:
         """Calculate the vector for linear least squares (LLS)."""
         loss_function = self.loss_function
-        images = loss_function.images
         setting = loss_function.setting
+        n = len(loss_function.images)
         energies = self._calc_interaction_energies()
-        forces = np.hstack(
-            [
-                loss_function.target_forces[i].reshape(-1)
-                for i, atoms in enumerate(images)
-            ],
-        )
-        tmp = (
-            np.sqrt(setting["energy-weight"]) * energies,
-            np.sqrt(setting["force-weight"]) * forces * -1.0,
-        )
+        forces = np.hstack([loss_function.target_forces[i].flatten() for i in range(n)])
+        tmp = []
+        if "energy" in self.minimized:
+            tmp.append(np.sqrt(setting["energy-weight"]) * energies)
+        if "forces" in self.minimized:
+            tmp.append(np.sqrt(setting["force-weight"]) * forces * -1.0)
         return np.hstack(tmp)
 
     def _calc_interaction_energies(self) -> np.ndarray:
