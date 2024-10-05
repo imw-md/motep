@@ -3,9 +3,9 @@
 import mlippy
 from ase.data import chemical_symbols
 
-from motep.initializer import MTPData
 from motep.io.mlip.mtp import write_mtp
 from motep.loss_function import LossFunctionBase, calc_properties
+from motep.potentials import MTPData
 
 
 def init_mlip(file: str, species: list[str]):
@@ -25,7 +25,7 @@ def init_calc(
 ) -> mlippy.MLIP_Calculator:
     """Initialize mlippy ASE calculator."""
     data.update(parameters)
-    write_mtp(file, data.data)
+    write_mtp(file, data.dict_mtp)
     mlip = init_mlip(file, species)
     return mlippy.MLIP_Calculator(mlip, {})
 
@@ -33,16 +33,16 @@ def init_calc(
 class MlippyLossFunction(LossFunctionBase):
     def __call__(self, parameters: list[float]) -> float:
         file = self.setting["potential_final"]
-        calc = init_calc(file, self.data, parameters, self.species)
+        calc = init_calc(file, self.mtp_data, parameters, self.species)
         for atoms in self.images:
             atoms.calc = calc
         energies, forces, stresses = calc_properties(self.images, self.comm)
         return self.calc_loss_function(energies, forces, stresses)
 
-    def calc_rmses(self, parameters: list[float]) -> dict[str, float]:
+    def print_errors(self, parameters: list[float]) -> dict[str, float]:
         """Calculate RMSEs."""
         file = self.setting["potential_final"]
-        calc = init_calc(file, self.data, parameters, self.species)
+        calc = init_calc(file, self.mtp_data, parameters, self.species)
         for atoms in self.images:
             atoms.calc = calc
-        super().calc_rmses(parameters)
+        super().print_errors(parameters)

@@ -12,7 +12,7 @@ class MTPData:
 
     def __init__(
         self,
-        data: dict[str, Any],
+        dict_mtp: dict[str, Any],
         images: list[Atoms],
         species: list[str],
         rng: np.random.Generator | int | None,
@@ -21,7 +21,7 @@ class MTPData:
 
         Parameters
         ----------
-        data : dict[str, Any]
+        dict_mtp : dict[str, Any]
             Data in the .mtp file.
         images : list[Atoms]
             List of ASE Atoms objects for the training dataset.
@@ -34,7 +34,7 @@ class MTPData:
             default PRNG.
 
         """
-        self.data = data
+        self.dict_mtp = dict_mtp
         self.species_coeffs_lstsq = calc_species_coeffs_lstsq(images, species)
         if isinstance(rng, int | None):
             self.rng = np.random.default_rng(rng)
@@ -57,7 +57,7 @@ class MTPData:
             Bounds of the parameters.
 
         """
-        data = self.data
+        data = self.dict_mtp
         parameters_scaling, bounds_scaling = _init_scaling(data, optimized)
         parameters_moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
             data,
@@ -102,7 +102,7 @@ class MTPData:
             MTP parameters.
 
         """
-        dict_mtp = self.data
+        dict_mtp = self.dict_mtp
         species_count = dict_mtp["species_count"]
         rfc = dict_mtp["radial_funcs_count"]
         rbs = dict_mtp["radial_basis_size"]
@@ -117,12 +117,11 @@ class MTPData:
 
     def print(self, parameters: np.ndarray) -> None:
         """Print parameters."""
-        species_count = self.data["species_count"]
-        rfc = self.data["radial_funcs_count"]
-        rbs = self.data["radial_basis_size"]
-        asm = self.data["alpha_scalar_moments"]
+        species_count = self.dict_mtp["species_count"]
+        rfc = self.dict_mtp["radial_funcs_count"]
+        rbs = self.dict_mtp["radial_basis_size"]
+        asm = self.dict_mtp["alpha_scalar_moments"]
 
-        print("#" * 75)
         print("scaling:", parameters[0])
         print("moment_coeffs:")
         print(parameters[1 : asm + 1])
@@ -156,7 +155,6 @@ def calc_species_coeffs_lstsq(
     energies /= ns
     species_coeffs_lstsq = np.linalg.lstsq(counts, energies, rcond=None)[0]
     rmse = np.sqrt(np.add.reduce((counts @ species_coeffs_lstsq - energies) ** 2))
-    print("#" * 75)
     print(f"{__name__}.{calc_species_coeffs_lstsq.__name__}")
     print("species_coeffs_lstsq:")
     print(species_coeffs_lstsq)

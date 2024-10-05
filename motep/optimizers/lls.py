@@ -1,26 +1,38 @@
 """Module for the optimizer based on linear least squares (LLS)."""
 
+from typing import Any
+
 import numpy as np
 from ase import Atoms
 
-from motep.initializer import MTPData
-from motep.loss_function import LossFunction
+from motep.optimizers import OptimizerBase
 from motep.optimizers.scipy import Callback
 
 
-class LLSOptimizer:
-    """Optimizer based on linear least squares (LLS)."""
+class LLSOptimizer(OptimizerBase):
+    """Optimizer based on linear least squares (LLS).
 
-    def __init__(self, data: MTPData) -> None:
-        """Initialize the optimizer."""
-        self.data = data
-        if "species" not in self.data.data:
-            species = {_: _ for _ in range(self.data.data["species_count"])}
-            self.data.data["species"] = species
+    Attributes
+    ----------
+    minimized : list[str]
+        Properties whose errors are minimized by optimizing `moment_coeffs`.
+        The elements must be some of `energy`, `forces`, and `stress`.
 
-    def __call__(
+    """
+
+    def __init__(
         self,
-        fitness: LossFunction,
+        *args: list[Any],
+        minimized: list[str] | None = None,
+        **kwargs: dict[str, Any],
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        if minimized is None:
+            minimized = ["energy", "forces"]
+        self.minimized = minimized
+
+    def optimize(
+        self,
         parameters: np.ndarray,
         bounds: np.ndarray,
         **kwargs,
@@ -29,8 +41,6 @@ class LLSOptimizer:
 
         Parameters
         ----------
-        fitness : :class:`~motep.loss_function.LossFunction`
-            :class:`motep.loss_function.LossFunction` object.
         parameters : np.ndarray
             Initial parameters.
         bounds : np.ndarray
@@ -44,35 +54,62 @@ class LLSOptimizer:
 
         """
         # Calculate basis functions of `fitness.images`
-        fitness(parameters)
+        self.loss_function(parameters)
+
+        callback = Callback(self.loss_function)
+
+        # Print the value of the loss function.
+        callback(parameters)
 
         # Update self.data based on the initialized parameters
-        self.data.update(parameters)
+        self.loss_function.mtp_data.update(parameters)
 
-        energies = self._calc_interaction_energies(fitness)
-
-        basis_values = np.array(
-            [atoms.calc.engine.basis_values for atoms in fitness.images],
-        )
+        matrix = self._calc_matrix()
+        vector = self._calc_vector()
 
         # TODO: Consider also forces and stresses
-        moment_coeffs = np.linalg.lstsq(basis_values, energies, rcond=None)[0]
+        moment_coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
 
         # TODO: Redesign optimizers to du such an assignment more semantically
         parameters[1 : len(moment_coeffs) + 1] = moment_coeffs
 
-        # Print loss function value
-        Callback(fitness)(parameters)
+        # Print the value of the loss function.
+        callback(parameters)
 
         return parameters
 
-    def _calc_interaction_energies(self, fitness: LossFunction) -> np.ndarray:
-        """Calculate interaction energies of Atoms objects.
+    def _calc_matrix(self) -> np.ndarray:
+        """Calculate the matrix for linear least squares (LLS)."""
+        loss_function = self.loss_function
+        dict_mtp = loss_function.mtp_data.dict_mtp
+        images = loss_function.images
+        setting = loss_function.setting
+        basis_values = np.array([atoms.calc.engine.basis_values for atoms in images])
+        basis_derivs = np.vstack([atoms.calc.engine.basis_derivs.T for atoms in images])
+        basis_derivs = basis_derivs.reshape((-1, dict_mtp["alpha_scalar_moments"]))
+        tmp = []
+        if "energy" in self.minimized:
+            tmp.append(np.sqrt(setting["energy-weight"]) * basis_values)
+        if "forces" in self.minimized:
+            tmp.append(np.sqrt(setting["force-weight"]) * basis_derivs)
+        return np.vstack(tmp)
 
-        Parameters
-        ----------
-        fitness : :class:`~motep.loss_function.LossFunction`
-            :class:`motep.loss_function.LossFunction` object.
+    def _calc_vector(self) -> np.ndarray:
+        """Calculate the vector for linear least squares (LLS)."""
+        loss_function = self.loss_function
+        setting = loss_function.setting
+        n = len(loss_function.images)
+        energies = self._calc_interaction_energies()
+        forces = np.hstack([loss_function.target_forces[i].flatten() for i in range(n)])
+        tmp = []
+        if "energy" in self.minimized:
+            tmp.append(np.sqrt(setting["energy-weight"]) * energies)
+        if "forces" in self.minimized:
+            tmp.append(np.sqrt(setting["force-weight"]) * forces * -1.0)
+        return np.hstack(tmp)
+
+    def _calc_interaction_energies(self) -> np.ndarray:
+        """Calculate interaction energies of Atoms objects.
 
         Returns
         -------
@@ -81,15 +118,16 @@ class LLSOptimizer:
             interactions among atoms, i.e., without site energies.
 
         """
-        dict_mtp = self.data.data
+        loss_function = self.loss_function
+        dict_mtp = loss_function.mtp_data.dict_mtp
+        images = loss_function.images
         species = dict_mtp["species"]
-        images = fitness.images
 
         def get_types(atoms: Atoms) -> list[int]:
             return [species[_] for _ in atoms.numbers]
 
         iterable = (
-            fitness.target_energies[i]
+            loss_function.target_energies[i]
             - np.add.reduce(dict_mtp["species_coeffs"][get_types(atoms)])
             for i, atoms in enumerate(images)
         )

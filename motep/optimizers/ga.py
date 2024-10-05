@@ -7,6 +7,8 @@ from typing import Any
 import numpy as np
 from scipy.optimize import minimize
 
+from motep.optimizers import OptimizerBase
+
 
 def _limit_bounds(bounds: np.ndarray) -> np.ndarray:
     """Limit the bounds."""
@@ -255,16 +257,11 @@ def elite_callback(gen: int, elite: float) -> None:
     print(f"Generation {gen}: Top Elite - {elite}")
 
 
-class GeneticAlgorithmOptimizer:
+class GeneticAlgorithmOptimizer(OptimizerBase):
     """Optimizer based on genetic algorithm (GA)."""
 
-    def __init__(self, data: dict[str, Any]) -> None:
-        """Initialize the optimizer."""
-        self.data = data
-
-    def __call__(
+    def optimize(
         self,
-        fun: Callable,
         initial_guess: np.ndarray,
         bounds: np.ndarray,
         **kwargs: dict[str, Any],
@@ -272,7 +269,7 @@ class GeneticAlgorithmOptimizer:
         """Optimize parameters."""
         bounds = _limit_bounds(bounds)
         ga = GeneticAlgorithm(
-            fun,
+            self.loss_function,
             initial_guess,
             lower_bound=bounds[:, 0],
             upper_bound=bounds[:, 1],
@@ -284,7 +281,7 @@ class GeneticAlgorithmOptimizer:
         )
         ga.initialize_population()
         return ga.evolve_with_mix(
-            fun,
+            self.loss_function,
             generations=30,
             elite_callback=elite_callback,
         )

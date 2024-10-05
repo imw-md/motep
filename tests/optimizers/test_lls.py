@@ -6,11 +6,11 @@ import numpy as np
 import pytest
 from mpi4py import MPI
 
-from motep.initializer import MTPData
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss_function import LossFunction
 from motep.optimizers.lls import LLSOptimizer
+from motep.potentials import MTPData
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
@@ -48,7 +48,7 @@ def test_molecules(
 
     loss_function = LossFunction(
         images,
-        data=mtp_data,
+        mtp_data=mtp_data,
         setting=setting,
         comm=MPI.COMM_WORLD,
         engine=engine,
@@ -56,12 +56,36 @@ def test_molecules(
 
     parameters_ref = np.array(parameters, copy=True)
     mtp_data.print(parameters_ref)
-    loss_function.calc_rmses(parameters_ref)
+    loss_function.print_errors(parameters_ref)
 
-    parameters = LLSOptimizer(mtp_data)(loss_function, parameters, bounds)
+    optimizer = LLSOptimizer(loss_function, minimized=["energy"])
+    parameters = optimizer.optimize(parameters, bounds)
+    print()
 
     mtp_data.print(parameters)
-    loss_function.calc_rmses(parameters)
+    loss_function.print_errors(parameters)
+    f0 = loss_function(parameters)
+    errors0 = loss_function.calc_errors()
 
     # Check if `parameters` are updated.
     assert not np.allclose(parameters, parameters_ref)
+
+    optimizer = LLSOptimizer(loss_function, minimized=["energy", "forces"])
+    parameters = optimizer.optimize(parameters, bounds)
+    print()
+
+    mtp_data.print(parameters)
+    loss_function.print_errors(parameters)
+    f1 = loss_function(parameters)
+    errors1 = loss_function.calc_errors()
+
+    # Check loss functions
+    # The value should be smaller when considering both energies and forces than
+    # when considering only energies.
+    assert f0 > f1
+
+    # Check RMSEs
+    # When only the RMSE of the energies is minimized, it should be smaller than
+    # the value when minimizing the errors of both the energies and the forces.
+    assert errors0["energy"]["RMS"] < errors1["energy"]["RMS"]
+    assert errors0["forces"]["RMS"] > errors1["forces"]["RMS"]
