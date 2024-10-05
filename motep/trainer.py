@@ -13,11 +13,11 @@ from motep.loss_function import LossFunction
 from motep.optimizers.ga import GeneticAlgorithmOptimizer
 from motep.optimizers.lls import LLSOptimizer
 from motep.optimizers.scipy import (
-    optimize_bfgs,
-    optimize_da,
-    optimize_de,
-    optimize_minimize,
-    optimize_nelder,
+    ScipyBFGSOptimizer,
+    ScipyDifferentialEvolutionOptimizer,
+    ScipyDualAnnealingOptimizer,
+    ScipyMinimizeOptimizer,
+    ScipyNelderMeadOptimizer,
 )
 from motep.potentials import MTPData
 from motep.setting import make_default_setting, parse_setting
@@ -65,11 +65,11 @@ def run(args: argparse.Namespace) -> None:
 
     funs = {
         "GA": GeneticAlgorithmOptimizer(mtp_data),
-        "minimize": optimize_minimize,
-        "Nelder-Mead": optimize_nelder,
-        "L-BFGS-B": optimize_bfgs,
-        "DA": optimize_da,
-        "DE": optimize_de,
+        "minimize": ScipyMinimizeOptimizer(mtp_data),
+        "Nelder-Mead": ScipyNelderMeadOptimizer(mtp_data),
+        "L-BFGS-B": ScipyBFGSOptimizer(mtp_data),
+        "DA": ScipyDualAnnealingOptimizer(mtp_data),
+        "DE": ScipyDifferentialEvolutionOptimizer(mtp_data),
         "LLS": LLSOptimizer(mtp_data),
     }
 
