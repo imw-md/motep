@@ -72,6 +72,10 @@ class EngineBase:
         self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
         self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
 
+        self.energies = np.full(len(atoms), np.nan)
+        self.forces = np.full((len(atoms), 3), np.nan)
+        self.stress = np.full((3, 3), np.nan)
+
         shape = self.dict_mtp["alpha_scalar_moments"]
         self.basis_values = np.full(shape, np.nan)
 
@@ -171,16 +175,15 @@ class NumpyMTPEngine(EngineBase):
     def calculate(self, atoms: Atoms) -> tuple:
         """Calculate properties of the given system."""
         self.update_neighbor_list(atoms)
-        number_of_atoms = len(atoms)
-        energies = np.zeros(number_of_atoms)
-        forces = np.zeros((number_of_atoms, 3))
-        stress = np.zeros((3, 3))
+        self.energies[:] = 0.0
+        self.forces[:, :] = 0.0
+        self.stress[:, :] = 0.0
         self.basis_values[:] = 0.0
         self.basis_derivs[:, :, :] = 0.0
 
         moment_coeffs = self.dict_mtp["moment_coeffs"]
 
-        for i in range(number_of_atoms):
+        for i in range(len(atoms)):
             js, r_ijs = self._get_distances(atoms, i)
             basis_values, basis_derivs = self._calc_basis(atoms, i, js, r_ijs)
 
@@ -190,7 +193,7 @@ class NumpyMTPEngine(EngineBase):
             gradient = np.tensordot(moment_coeffs, basis_derivs, axes=(0, 0))
 
             itype = self.dict_mtp["species"][atoms.numbers[i]]
-            energies[i] = site_energy + self.dict_mtp["species_coeffs"][itype]
+            self.energies[i] = site_energy + self.dict_mtp["species_coeffs"][itype]
             # Calculate forces
             # Be careful that the derivative of the site energy of the j-th atom also
             # contributes to the forces on the i-th atom.
@@ -201,21 +204,21 @@ class NumpyMTPEngine(EngineBase):
             #    with respect to the i-th atom.
             # Thus, the negative signs of the two contributions are cancelled out below.
             for k, j in enumerate(js):
-                forces[i] += gradient[:, k]
-                forces[j] -= gradient[:, k]
+                self.forces[i] += gradient[:, k]
+                self.forces[j] -= gradient[:, k]
                 self.basis_derivs[:, :, i] -= basis_derivs[:, :, k]
                 self.basis_derivs[:, :, j] += basis_derivs[:, :, k]
-            stress += r_ijs @ gradient.T
-        self.results["energies"] = energies
+            self.stress += r_ijs @ gradient.T
+        self.results["energies"] = self.energies
         self.results["energy"] = self.results["energies"].sum()
-        self.results["forces"] = forces
+        self.results["forces"] = self.forces
 
         if atoms.cell.rank == 3:
-            stress = (stress + stress.T) * 0.5  # symmetrize
-            stress /= atoms.get_volume()
+            self.stress = (self.stress + self.stress.T) * 0.5  # symmetrize
+            self.stress /= atoms.get_volume()
         else:
-            stress[:, :] = np.nan
-        self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
+            self.stress[:, :] = np.nan
+        self.results["stress"] = self.stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return self.results["energy"], self.results["forces"], self.results["stress"]
 
