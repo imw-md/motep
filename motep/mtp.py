@@ -97,22 +97,22 @@ def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
 
 
 class NumpyMTPEngine(EngineBase):
-    def __init__(self, mtp_parameters: dict[str, Any] | None = None):
+    def __init__(self, dict_mtp: dict[str, Any] | None = None):
         """MLIP-2 MTP.
 
         Parameters
         ----------
-        mtp_parameters : dict[str, Any]
+        dict_mtp : dict[str, Any]
             Parameters in the MLIP .mtp file.
 
         """
         self.radial_basis_funcs = None
         self.radial_basis_dfdrs = None
-        super().__init__(mtp_parameters)
+        super().__init__(dict_mtp)
 
-    def update(self, parameters: dict[str, Any]) -> None:
+    def update(self, dict_mtp: dict[str, Any]) -> None:
         """Update MTP parameters."""
-        super().update(parameters)
+        super().update(dict_mtp)
         if "radial_coeffs" in self.dict_mtp:
             if self.radial_basis_funcs is None:
                 self.radial_basis_funcs, self.radial_basis_dfdrs = (
