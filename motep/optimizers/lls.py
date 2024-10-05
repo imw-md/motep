@@ -11,7 +11,7 @@ from motep.optimizers.scipy import Callback
 class LLSOptimizer(OptimizerBase):
     """Optimizer based on linear least squares (LLS)."""
 
-    def __call__(
+    def optimize(
         self,
         fitness: LossFunction,
         parameters: np.ndarray,

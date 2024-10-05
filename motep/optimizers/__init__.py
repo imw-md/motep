@@ -27,7 +27,7 @@ class OptimizerBase(ABC):
             self.mtp_data.dict_mtp["species"] = species
 
     @abstractmethod
-    def __call__(
+    def optimize(
         self,
         fun: Callable,
         parameters: np.ndarray,

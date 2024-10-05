@@ -10,6 +10,7 @@ from mpi4py import MPI
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss_function import LossFunction
+from motep.optimizers import OptimizerBase
 from motep.optimizers.ga import GeneticAlgorithmOptimizer
 from motep.optimizers.lls import LLSOptimizer
 from motep.optimizers.scipy import (
@@ -22,6 +23,19 @@ from motep.optimizers.scipy import (
 from motep.potentials import MTPData
 from motep.setting import make_default_setting, parse_setting
 from motep.utils import cd
+
+
+def make_optimizer(optimizer: str) -> OptimizerBase:
+    """Make an `Optimizer` class."""
+    return {
+        "GA": GeneticAlgorithmOptimizer,
+        "minimize": ScipyMinimizeOptimizer,
+        "Nelder-Mead": ScipyNelderMeadOptimizer,
+        "L-BFGS-B": ScipyBFGSOptimizer,
+        "DA": ScipyDualAnnealingOptimizer,
+        "DE": ScipyDifferentialEvolutionOptimizer,
+        "LLS": LLSOptimizer,
+    }[optimizer]
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -63,25 +77,18 @@ def run(args: argparse.Namespace) -> None:
     folder_name = f"rank_{rank}"
     pathlib.Path(folder_name).mkdir(parents=True, exist_ok=True)
 
-    funs = {
-        "GA": GeneticAlgorithmOptimizer(mtp_data),
-        "minimize": ScipyMinimizeOptimizer(mtp_data),
-        "Nelder-Mead": ScipyNelderMeadOptimizer(mtp_data),
-        "L-BFGS-B": ScipyBFGSOptimizer(mtp_data),
-        "DA": ScipyDualAnnealingOptimizer(mtp_data),
-        "DE": ScipyDifferentialEvolutionOptimizer(mtp_data),
-        "LLS": LLSOptimizer(mtp_data),
-    }
-
     # Change working directory to the created folder
     with cd(folder_name):
         for i, step in enumerate(setting["steps"]):
             parameters, bounds = mtp_data.initialize(step["optimized"])
             mtp_data.print(parameters)
             print(step["method"])
-            optimize = funs[step["method"]]
+
+            # Instantiate an `Optimizer` class
+            optimizer: OptimizerBase = make_optimizer(step["method"])(mtp_data)
+
             kwargs = step.get("kwargs", {})
-            parameters = optimize(fitness, parameters, bounds, **kwargs)
+            parameters = optimizer.optimize(fitness, parameters, bounds, **kwargs)
             mtp_data.update(parameters)
             write_mtp(f"intermediate_{i}.mtp", mtp_data.dict_mtp)
             print()

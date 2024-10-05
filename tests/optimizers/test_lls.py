@@ -58,7 +58,8 @@ def test_molecules(
     mtp_data.print(parameters_ref)
     loss_function.print_errors(parameters_ref)
 
-    parameters = LLSOptimizer(mtp_data)(loss_function, parameters, bounds)
+    optimizer = LLSOptimizer(mtp_data)
+    parameters = optimizer.optimize(loss_function, parameters, bounds)
     print()
 
     mtp_data.print(parameters)

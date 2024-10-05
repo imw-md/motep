@@ -42,7 +42,7 @@ def print_result(result: OptimizeResult) -> None:
 
 
 class ScipyDualAnnealingOptimizer(OptimizerBase):
-    def __call__(
+    def optimize(
         self,
         fun: Callable,
         initial_guess: np.ndarray,
@@ -62,7 +62,7 @@ class ScipyDualAnnealingOptimizer(OptimizerBase):
 
 
 class ScipyDifferentialEvolutionOptimizer(OptimizerBase):
-    def __call__(
+    def optimize(
         self,
         fun: Callable,
         initial_guess: np.ndarray,
@@ -83,7 +83,7 @@ class ScipyDifferentialEvolutionOptimizer(OptimizerBase):
 class ScipyMinimizeOptimizer(OptimizerBase):
     """`Optimizer` class using `scipy.minimize`."""
 
-    def __call__(
+    def optimize(
         self,
         fun: Callable,
         initial_guess: np.ndarray,
@@ -104,14 +104,14 @@ class ScipyMinimizeOptimizer(OptimizerBase):
 
 
 class ScipyNelderMeadOptimizer(ScipyMinimizeOptimizer):
-    def __call__(
+    def optimize(
         self,
         fun: Callable,
         initial_guess: np.ndarray,
         bounds: np.ndarray,
         **kwargs: dict[str, Any],
     ) -> np.ndarray:
-        return super().__call__(
+        return super().optimize(
             fun,
             initial_guess,
             bounds,
@@ -121,14 +121,14 @@ class ScipyNelderMeadOptimizer(ScipyMinimizeOptimizer):
 
 
 class ScipyBFGSOptimizer(ScipyMinimizeOptimizer):
-    def __call__(
+    def optimize(
         self,
         fun: Callable,
         initial_guess: np.ndarray,
         bounds: np.ndarray,
         **kwargs: dict[str, Any],
     ) -> np.ndarray:
-        return super().__call__(
+        return super().optimize(
             fun,
             initial_guess,
             bounds,

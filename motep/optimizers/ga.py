@@ -260,7 +260,7 @@ def elite_callback(gen: int, elite: float) -> None:
 class GeneticAlgorithmOptimizer(OptimizerBase):
     """Optimizer based on genetic algorithm (GA)."""
 
-    def __call__(
+    def optimize(
         self,
         fun: Callable,
         initial_guess: np.ndarray,
