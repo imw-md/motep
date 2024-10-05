@@ -1,12 +1,11 @@
 """Base class of the `Optimizer` classes."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 
-from motep.potentials import MTPData
+from motep.loss_function import LossFunctionBase
 
 
 class OptimizerBase(ABC):
@@ -19,17 +18,17 @@ class OptimizerBase(ABC):
 
     """
 
-    def __init__(self, mtp_data: MTPData) -> None:
+    def __init__(self, loss_function: LossFunctionBase) -> None:
         """Initialize the `Optimizer` class."""
-        self.mtp_data = mtp_data
-        if "species" not in self.mtp_data.dict_mtp:
-            species = {_: _ for _ in range(self.mtp_data.dict_mtp["species_count"])}
-            self.mtp_data.dict_mtp["species"] = species
+        self.loss_function = loss_function
+        mtp_data = self.loss_function.mtp_data
+        if "species" not in mtp_data.dict_mtp:
+            species = {_: _ for _ in range(mtp_data.dict_mtp["species_count"])}
+            mtp_data.dict_mtp["species"] = species
 
     @abstractmethod
     def optimize(
         self,
-        fun: Callable,
         parameters: np.ndarray,
         bounds: np.ndarray,
         **kwargs: dict[str, Any],
@@ -38,8 +37,6 @@ class OptimizerBase(ABC):
 
         Parameters
         ----------
-        fun : Callable
-            Callable returing the value of the loss function.
         parameters : np.ndarray
             Initial parameters.
         bounds : np.ndarray

@@ -33,7 +33,7 @@ def init_calc(
 class MlippyLossFunction(LossFunctionBase):
     def __call__(self, parameters: list[float]) -> float:
         file = self.setting["potential_final"]
-        calc = init_calc(file, self.data, parameters, self.species)
+        calc = init_calc(file, self.mtp_data, parameters, self.species)
         for atoms in self.images:
             atoms.calc = calc
         energies, forces, stresses = calc_properties(self.images, self.comm)
@@ -42,7 +42,7 @@ class MlippyLossFunction(LossFunctionBase):
     def print_errors(self, parameters: list[float]) -> dict[str, float]:
         """Calculate RMSEs."""
         file = self.setting["potential_final"]
-        calc = init_calc(file, self.data, parameters, self.species)
+        calc = init_calc(file, self.mtp_data, parameters, self.species)
         for atoms in self.images:
             atoms.calc = calc
         super().print_errors(parameters)

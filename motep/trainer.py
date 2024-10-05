@@ -85,10 +85,10 @@ def run(args: argparse.Namespace) -> None:
             print(step["method"])
 
             # Instantiate an `Optimizer` class
-            optimizer: OptimizerBase = make_optimizer(step["method"])(mtp_data)
+            optimizer: OptimizerBase = make_optimizer(step["method"])(fitness)
 
             kwargs = step.get("kwargs", {})
-            parameters = optimizer.optimize(fitness, parameters, bounds, **kwargs)
+            parameters = optimizer.optimize(parameters, bounds, **kwargs)
             mtp_data.update(parameters)
             write_mtp(f"intermediate_{i}.mtp", mtp_data.dict_mtp)
             print()

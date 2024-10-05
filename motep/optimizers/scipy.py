@@ -44,14 +44,13 @@ def print_result(result: OptimizeResult) -> None:
 class ScipyDualAnnealingOptimizer(OptimizerBase):
     def optimize(
         self,
-        fun: Callable,
         initial_guess: np.ndarray,
         bounds: np.ndarray,
         **kwargs: dict[str, Any],
     ) -> np.ndarray:
-        callback = Callback(fun)
+        callback = Callback(self.loss_function)
         result = dual_annealing(
-            fun,
+            self.loss_function,
             bounds=bounds,
             callback=callback,
             seed=40,
@@ -64,14 +63,13 @@ class ScipyDualAnnealingOptimizer(OptimizerBase):
 class ScipyDifferentialEvolutionOptimizer(OptimizerBase):
     def optimize(
         self,
-        fun: Callable,
         initial_guess: np.ndarray,
         bounds: np.ndarray,
         **kwargs: dict[str, Any],
     ) -> np.ndarray:
-        callback = Callback(fun)
+        callback = Callback(self.loss_function)
         result = differential_evolution(
-            fun,
+            self.loss_function,
             bounds,
             popsize=30,
             callback=callback,
@@ -85,15 +83,14 @@ class ScipyMinimizeOptimizer(OptimizerBase):
 
     def optimize(
         self,
-        fun: Callable,
         initial_guess: np.ndarray,
         bounds: np.ndarray,
         **kwargs: dict[str, Any],
     ) -> np.ndarray:
         """Optimizer using `scipy.optimize.minimize`."""
-        callback = Callback(fun)
+        callback = Callback(self.loss_function)
         result = minimize(
-            fun,
+            self.loss_function,
             initial_guess,
             bounds=bounds,
             callback=callback,
@@ -106,13 +103,11 @@ class ScipyMinimizeOptimizer(OptimizerBase):
 class ScipyNelderMeadOptimizer(ScipyMinimizeOptimizer):
     def optimize(
         self,
-        fun: Callable,
         initial_guess: np.ndarray,
         bounds: np.ndarray,
         **kwargs: dict[str, Any],
     ) -> np.ndarray:
         return super().optimize(
-            fun,
             initial_guess,
             bounds,
             method="Nelder-Mead",
@@ -123,13 +118,11 @@ class ScipyNelderMeadOptimizer(ScipyMinimizeOptimizer):
 class ScipyBFGSOptimizer(ScipyMinimizeOptimizer):
     def optimize(
         self,
-        fun: Callable,
         initial_guess: np.ndarray,
         bounds: np.ndarray,
         **kwargs: dict[str, Any],
     ) -> np.ndarray:
         return super().optimize(
-            fun,
             initial_guess,
             bounds,
             method="L-BFGS-B",

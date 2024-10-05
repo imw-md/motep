@@ -262,7 +262,6 @@ class GeneticAlgorithmOptimizer(OptimizerBase):
 
     def optimize(
         self,
-        fun: Callable,
         initial_guess: np.ndarray,
         bounds: np.ndarray,
         **kwargs: dict[str, Any],
@@ -270,7 +269,7 @@ class GeneticAlgorithmOptimizer(OptimizerBase):
         """Optimize parameters."""
         bounds = _limit_bounds(bounds)
         ga = GeneticAlgorithm(
-            fun,
+            self.loss_function,
             initial_guess,
             lower_bound=bounds[:, 0],
             upper_bound=bounds[:, 1],
@@ -282,7 +281,7 @@ class GeneticAlgorithmOptimizer(OptimizerBase):
         )
         ga.initialize_population()
         return ga.evolve_with_mix(
-            fun,
+            self.loss_function,
             generations=30,
             elite_callback=elite_callback,
         )

@@ -48,7 +48,7 @@ def test_molecules(
 
     loss_function = LossFunction(
         images,
-        data=mtp_data,
+        mtp_data=mtp_data,
         setting=setting,
         comm=MPI.COMM_WORLD,
         engine=engine,
@@ -58,8 +58,8 @@ def test_molecules(
     mtp_data.print(parameters_ref)
     loss_function.print_errors(parameters_ref)
 
-    optimizer = LLSOptimizer(mtp_data)
-    parameters = optimizer.optimize(loss_function, parameters, bounds)
+    optimizer = LLSOptimizer(loss_function)
+    parameters = optimizer.optimize(parameters, bounds)
     print()
 
     mtp_data.print(parameters)

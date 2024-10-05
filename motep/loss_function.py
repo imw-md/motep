@@ -82,7 +82,7 @@ class LossFunctionBase(ABC):
     def __init__(
         self,
         images: list[Atoms],
-        data: MTPData,
+        mtp_data: MTPData,
         setting: dict[str, Any],
         *,
         comm: MPI.Comm,
@@ -91,10 +91,10 @@ class LossFunctionBase(ABC):
 
         Parameters
         ----------
-        data : :class:`motep.initializer.MTPData`
-            :class:`motep.initializer.MTPData` object.
         images : list[Atoms]
             List of ASE Atoms objects for the training dataset.
+        mtp_data : :class:`motep.initializer.MTPData`
+            :class:`motep.initializer.MTPData` object.
         setting : dict[str, Any]
             Setting for the training.
         comm : MPI.Comm
@@ -102,7 +102,7 @@ class LossFunctionBase(ABC):
 
         """
         self.images = images
-        self.data = data
+        self.mtp_data = mtp_data
         self.setting = setting
         self.comm = comm
 
@@ -232,13 +232,13 @@ class LossFunction(LossFunctionBase):
         super().__init__(*args, **kwargs)
         self.engine = engine
         for atoms in self.images:
-            atoms.calc = MTP(engine=self.engine, dict_mtp=self.data.dict_mtp)
+            atoms.calc = MTP(engine=self.engine, dict_mtp=self.mtp_data.dict_mtp)
 
         self.configuration_weight = np.ones(len(self.images))
 
     def __call__(self, parameters: list[float]) -> float:
         for atoms in self.images:
-            self.data.update(parameters)
-            atoms.calc.update_parameters(self.data.dict_mtp)
+            self.mtp_data.update(parameters)
+            atoms.calc.update_parameters(self.mtp_data.dict_mtp)
         energies, forces, stresses = calc_properties(self.images, self.comm)
         return self.calc_loss_function(energies, forces, stresses)

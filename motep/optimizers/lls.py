@@ -13,7 +13,6 @@ class LLSOptimizer(OptimizerBase):
 
     def optimize(
         self,
-        fitness: LossFunction,
         parameters: np.ndarray,
         bounds: np.ndarray,
         **kwargs,
@@ -22,8 +21,6 @@ class LLSOptimizer(OptimizerBase):
 
         Parameters
         ----------
-        fitness : :class:`~motep.loss_function.LossFunction`
-            :class:`motep.loss_function.LossFunction` object.
         parameters : np.ndarray
             Initial parameters.
         bounds : np.ndarray
@@ -37,18 +34,18 @@ class LLSOptimizer(OptimizerBase):
 
         """
         # Calculate basis functions of `fitness.images`
-        fitness(parameters)
+        self.loss_function(parameters)
 
-        callback = Callback(fitness)
+        callback = Callback(self.loss_function)
 
         # Print the value of the loss function.
         callback(parameters)
 
         # Update self.data based on the initialized parameters
-        self.mtp_data.update(parameters)
+        self.loss_function.mtp_data.update(parameters)
 
-        matrix = self._calc_matrix(fitness)
-        vector = self._calc_vector(fitness)
+        matrix = self._calc_matrix(self.loss_function)
+        vector = self._calc_vector(self.loss_function)
 
         # TODO: Consider also forces and stresses
         moment_coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
@@ -63,7 +60,7 @@ class LLSOptimizer(OptimizerBase):
 
     def _calc_matrix(self, fitness: LossFunction) -> np.ndarray:
         """Calculate the matrix for linear least squares (LLS)."""
-        dict_mtp = self.mtp_data.dict_mtp
+        dict_mtp = self.loss_function.mtp_data.dict_mtp
         images = fitness.images
         basis_values = np.array([atoms.calc.engine.basis_values for atoms in images])
         basis_derivs = np.vstack([atoms.calc.engine.basis_derivs.T for atoms in images])
@@ -102,7 +99,7 @@ class LLSOptimizer(OptimizerBase):
             interactions among atoms, i.e., without site energies.
 
         """
-        dict_mtp = self.mtp_data.dict_mtp
+        dict_mtp = self.loss_function.mtp_data.dict_mtp
         species = dict_mtp["species"]
         images = fitness.images
 
