@@ -80,18 +80,25 @@ def run(args: argparse.Namespace) -> None:
     # Change working directory to the created folder
     with cd(folder_name):
         for i, step in enumerate(setting["steps"]):
+            print(step["method"])
+            print()
+
+            # Print parameters before optimization.
             parameters, bounds = mtp_data.initialize(step["optimized"])
             mtp_data.print(parameters)
-            print(step["method"])
 
             # Instantiate an `Optimizer` class
-            optimizer: OptimizerBase = make_optimizer(step["method"])(fitness)
+            optimizer: OptimizerBase = make_optimizer(step["method"])(fitness, **step)
 
             kwargs = step.get("kwargs", {})
             parameters = optimizer.optimize(parameters, bounds, **kwargs)
-            mtp_data.update(parameters)
-            write_mtp(f"intermediate_{i}.mtp", mtp_data.dict_mtp)
             print()
+
+            # Print parameters after optimization.
+            mtp_data.update(parameters)
+            mtp_data.print(parameters)
+
+            write_mtp(f"intermediate_{i}.mtp", mtp_data.dict_mtp)
             fitness.print_errors(parameters)
 
     mtp_data.update(parameters)

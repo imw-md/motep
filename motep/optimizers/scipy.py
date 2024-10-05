@@ -37,8 +37,8 @@ def print_result(result: OptimizeResult) -> None:
     print("  Status code:", result.status)
     print("  Number of function evaluations:", result.nfev)
     print("  Number of iterations:", result.nit)
-    print("  Final parameters:", result.x)
-    print("  Final function value:", result.fun)
+    # print("  Final parameters:", result.x)
+    # print("  Final function value:", result.fun)
 
 
 class ScipyDualAnnealingOptimizer(OptimizerBase):
