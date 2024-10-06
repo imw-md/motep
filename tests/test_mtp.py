@@ -8,12 +8,7 @@ import pytest
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.mtp import (
-    NumbaMTPEngine,
-    NumpyMTPEngine,
-    calc_radial_basis,
-    init_radial_basis_functions,
-)
+from motep.mtp import NumbaMTPEngine, NumpyMTPEngine
 
 
 def get_scale(component: str, dx: float) -> np.ndarray:
@@ -212,91 +207,3 @@ def test_stress(
     print(stress_ref[sindex], s, stress_ref[sindex] / s)
 
     assert stress_ref[sindex] == pytest.approx(s, abs=1e-4)
-
-
-params = [
-    (
-        np.array(
-            [
-                [
-                    [[0.0, 1.0, 2.0], [1.0, 2.0, 3.0]],
-                ],
-            ]
-        ),
-        np.array([[2.0, 2.0, 1.0]]),
-        [0],
-    ),
-    (
-        np.array(
-            [
-                [
-                    [[0.0, 1.0, 2.0], [1.0, 2.0, 3.0]],
-                    [[2.0, 3.0, 4.0], [3.0, 4.0, 5.0]],
-                ],
-                [
-                    [[4.0, 5.0, 6.0], [5.0, 6.0, 7.0]],
-                    [[6.0, 7.0, 8.0], [7.0, 8.0, 9.0]],
-                ],
-            ]
-        ),
-        np.array([[2.0, 2.0, 1.0], [1.0, 1.0, 2.0]]),
-        [0, 1],
-    ),
-]
-
-
-@pytest.mark.parametrize(("radial_coeffs", "r_ijs", "jtypes"), params)
-def test_radial_funcs(
-    radial_coeffs: np.ndarray,
-    r_ijs: np.ndarray,
-    jtypes: list[int],
-):
-    radial_funcs_count = radial_coeffs.shape[2]
-    radial_basis_funcs, radial_basis_dfdrs = init_radial_basis_functions(
-        radial_coeffs,
-        min_dist=2.0,
-        max_dist=5.0,
-    )
-    r_abs = np.linalg.norm(r_ijs, axis=1)
-    _, radial_basis_derivs = calc_radial_basis(
-        radial_basis_funcs,
-        radial_basis_dfdrs,
-        r_abs,
-        0,
-        jtypes=jtypes,
-        scaling=1.0,
-        max_dist=5.0,
-        radial_funcs_count=radial_funcs_count,
-    )
-    radial_basis_derivs = radial_basis_derivs[:, :, None] * r_ijs / r_abs[:, None]
-    dx = 1e-6
-    r_ijs_p = r_ijs + [[dx, 0.0, 0.0]]
-    r_abs_p = np.linalg.norm(r_ijs_p, axis=1)
-    radial_basis_values_p, _ = calc_radial_basis(
-        radial_basis_funcs,
-        radial_basis_dfdrs,
-        r_abs_p,
-        0,
-        jtypes=jtypes,
-        scaling=1.0,
-        max_dist=5.0,
-        radial_funcs_count=radial_funcs_count,
-    )
-    r_ijs_m = r_ijs - [[dx, 0.0, 0.0]]
-    r_abs_m = np.linalg.norm(r_ijs_m, axis=1)
-    radial_basis_values_m, _ = calc_radial_basis(
-        radial_basis_funcs,
-        radial_basis_dfdrs,
-        r_abs_m,
-        0,
-        jtypes=jtypes,
-        scaling=1.0,
-        max_dist=5.0,
-        radial_funcs_count=radial_funcs_count,
-    )
-    radial_basis_derivs_fd = radial_basis_values_p - radial_basis_values_m
-    radial_basis_derivs_fd /= 2.0 * dx
-    np.testing.assert_allclose(
-        radial_basis_derivs[0, 0, 0],
-        radial_basis_derivs_fd[0, 0],
-    )

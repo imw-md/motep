@@ -10,7 +10,6 @@ import numpy as np
 import numpy.typing as npt
 from ase import Atoms
 from ase.neighborlist import PrimitiveNeighborList
-from numpy.polynomial import Chebyshev
 
 
 class EngineBase:
@@ -111,45 +110,19 @@ class NumpyMTPEngine(EngineBase):
             Parameters in the MLIP .mtp file.
 
         """
-        self.radial_basis_funcs = None
-        self.radial_basis_dfdrs = None
+        from motep.radial import ChebyshevPolynomialRadialBasis
+
+        self.rb = ChebyshevPolynomialRadialBasis(dict_mtp)
         super().__init__(dict_mtp)
 
     def update(self, dict_mtp: dict[str, Any]) -> None:
         """Update MTP parameters."""
         super().update(dict_mtp)
         if "radial_coeffs" in self.dict_mtp:
-            if self.radial_basis_funcs is None:
-                self.radial_basis_funcs, self.radial_basis_dfdrs = (
-                    init_radial_basis_functions(
-                        self.dict_mtp["radial_coeffs"],
-                        self.dict_mtp["min_dist"],
-                        self.dict_mtp["max_dist"],
-                    )
-                )
+            if self.rb.funcs is None:
+                self.rb.init_funcs(self.dict_mtp["radial_coeffs"])
             else:
-                update_radial_basis_coefficients(
-                    self.dict_mtp["radial_coeffs"],
-                    self.radial_basis_funcs,
-                    self.radial_basis_dfdrs,
-                )
-
-    def _calc_radial_basis(
-        self,
-        r_abs: np.ndarray,
-        itype: int,
-        jtypes: list[int],
-    ) -> tuple[np.ndarray, np.ndarray]:
-        return calc_radial_basis(
-            self.radial_basis_funcs,
-            self.radial_basis_dfdrs,
-            r_abs,
-            itype,
-            jtypes,
-            self.dict_mtp["scaling"],
-            self.dict_mtp["max_dist"],
-            self.dict_mtp["radial_funcs_count"],
-        )
+                self.rb.update_coeffs(self.dict_mtp["radial_coeffs"])
 
     def _calc_basis(
         self,
@@ -161,7 +134,7 @@ class NumpyMTPEngine(EngineBase):
         itype = self.dict_mtp["species"][atoms.numbers[i]]
         jtypes = [self.dict_mtp["species"][atoms.numbers[j]] for j in js]
         r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
-        rb_values, rb_derivs = self._calc_radial_basis(r_abs, itype, jtypes)
+        rb_values, rb_derivs = self.rb.calculate(r_abs, itype, jtypes)
         return calc_moment_basis(
             r_ijs,
             r_abs,
@@ -222,76 +195,6 @@ class NumpyMTPEngine(EngineBase):
         self.results["stress"] = self.stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return self.results["energy"], self.results["forces"], self.results["stress"]
-
-
-#
-# Numpy implemented functions for radial basis and moment basis evaluation:
-#
-def init_radial_basis_functions(
-    radial_coeffs: np.ndarray,
-    min_dist: float,
-    max_dist: float,
-) -> tuple[np.ndarray, np.ndarray]:  # array of Chebyshev objects
-    """Initialize radial basis functions."""
-    radial_basis_funcs = []
-    radial_basis_dfdrs = []  # derivatives
-    domain = [min_dist, max_dist]
-    nspecies, _, nmu, _ = radial_coeffs.shape
-    for i0 in range(nspecies):
-        for i1 in range(nspecies):
-            for i2 in range(nmu):
-                p = Chebyshev(radial_coeffs[i0, i1, i2], domain=domain)
-                radial_basis_funcs.append(p)
-                radial_basis_dfdrs.append(p.deriv())
-    shape = nspecies, nspecies, nmu
-    return (
-        np.array(radial_basis_funcs).reshape(shape),
-        np.array(radial_basis_dfdrs).reshape(shape),
-    )
-
-
-def update_radial_basis_coefficients(
-    radial_coeffs: np.ndarray,
-    radial_basis_funcs: np.ndarray,  # array of Chebyshev objects
-    radial_basis_dfdrs: np.ndarray,  # array of Chebyshev objects
-) -> None:
-    """Update radial basis coefficients."""
-    nspecies, _, nmu, _ = radial_coeffs.shape
-    for i0 in range(nspecies):
-        for i1 in range(nspecies):
-            for i2 in range(nmu):
-                p = radial_basis_funcs[i0, i1, i2]
-                p.coef = radial_coeffs[i0, i1, i2]
-                radial_basis_dfdrs[i0, i1, i2] = p.deriv()
-
-
-def calc_radial_basis(
-    radial_basis_funcs: np.ndarray,  # array of Chebyshev objects
-    radial_basis_dfdrs: np.ndarray,  # array of Chebyshev objects
-    r_abs: np.ndarray,
-    itype: int,
-    jtypes: list[int],
-    scaling: float,
-    max_dist: float,
-    radial_funcs_count: int,
-) -> tuple[np.ndarray, np.ndarray]:
-    is_within_cutoff = r_abs < max_dist
-    smooth_values = scaling * (max_dist - r_abs) ** 2
-    smooth_derivs = -2.0 * scaling * (max_dist - r_abs)
-    rb_values = np.zeros((radial_funcs_count, r_abs.size))
-    rb_derivs = np.zeros((radial_funcs_count, r_abs.size))
-    for mu in range(radial_funcs_count):
-        for j, jtype in enumerate(jtypes):
-            if is_within_cutoff[j]:
-                rb_func = radial_basis_funcs[itype, jtype, mu]
-                rb_dfdr = radial_basis_dfdrs[itype, jtype, mu]
-                v = rb_func(r_abs[j]) * smooth_values[j]
-                rb_values[mu, j] = v
-                d0 = rb_dfdr(r_abs[j]) * smooth_values[j]
-                d1 = rb_func(r_abs[j]) * smooth_derivs[j]
-                d = d0 + d1
-                rb_derivs[mu, j] = d
-    return rb_values, rb_derivs
 
 
 def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:

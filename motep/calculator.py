@@ -10,15 +10,15 @@ from ase.calculators.calculator import (
 )
 
 
-def make_mtp_engine(engine: str = "numpy"):
+def make_mtp_engine(engine: str = "numpy") -> type:
     if engine == "numpy":
         from .mtp import NumpyMTPEngine
 
-        return NumpyMTPEngine()
+        return NumpyMTPEngine
     elif engine == "numba":
         from .mtp import NumbaMTPEngine
 
-        return NumbaMTPEngine()
+        return NumbaMTPEngine
     else:
         raise ValueError(engine)
 
@@ -42,7 +42,7 @@ class MTP(Calculator):
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.engine = make_mtp_engine(engine)
+        self.engine = make_mtp_engine(engine)(dict_mtp)
         self.engine.update(dict_mtp)
 
     def update_parameters(self, dict_mtp: dict[str, Any]) -> None:
