@@ -7,6 +7,7 @@ Modified version: Yuji Ikeda
 from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 from ase import Atoms
 from ase.neighborlist import PrimitiveNeighborList
 from numpy.polynomial import Chebyshev
@@ -294,15 +295,15 @@ def calc_radial_basis(
 
 
 def calc_moment_basis(
-    r_ijs: np.ndarray,  # (3, neighbors)
-    r_abs: np.ndarray,  # (neighbors)
-    rb_values: np.ndarray,  # (mu, neighbors)
-    rb_derivs: np.ndarray,  # (mu, neighbors)
+    r_ijs: npt.NDArray[np.float64],  # (3, neighbors)
+    r_abs: npt.NDArray[np.float64],  # (neighbors)
+    rb_values: npt.NDArray[np.float64],  # (mu, neighbors)
+    rb_derivs: npt.NDArray[np.float64],  # (mu, neighbors)
     alpha_moments_count: int,
-    alpha_index_basic: int,
-    alpha_index_times: int,
-    alpha_moment_mapping: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
+    alpha_index_basic: npt.NDArray[np.int64],
+    alpha_index_times: npt.NDArray[np.int64],
+    alpha_moment_mapping: npt.NDArray[np.int64],
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     r"""Calculate basis functions and their derivatives.
 
     Parameters
