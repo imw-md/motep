@@ -294,6 +294,14 @@ def calc_radial_basis(
     return rb_values, rb_derivs
 
 
+def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
+    r_unit_pows = np.empty((max_pow, *r_unit.shape))
+    r_unit_pows[0] = 1.0
+    r_unit_pows[1:] = r_unit
+    np.multiply.accumulate(r_unit_pows[1:], out=r_unit_pows[1:])
+    return r_unit_pows
+
+
 def calc_moment_basis(
     r_ijs: npt.NDArray[np.float64],  # (3, neighbors)
     r_abs: npt.NDArray[np.float64],  # (neighbors)
@@ -325,37 +333,35 @@ def calc_moment_basis(
     moment_jacobian = np.zeros((alpha_moments_count, *r_ijs.shape))  # dEi/dxj
     # Precompute powers
     max_pow = np.max(alpha_index_basic)
-    val_pows = np.ones((max_pow + 1, *r_ijs.shape))
-    for pow in range(1, max_pow + 1):
-        val_pows[pow] = val_pows[pow - 1] * r_ijs_unit
+    r_unit_pows = _calc_r_unit_pows(r_ijs_unit, max_pow + 1)
     # Compute basic moments
     for i, aib in enumerate(alpha_index_basic):
         mu, xpow, ypow, zpow = aib
         k = xpow + ypow + zpow
-        mult0 = val_pows[xpow, 0] * val_pows[ypow, 1] * val_pows[zpow, 2]
+        mult0 = r_unit_pows[xpow, 0] * r_unit_pows[ypow, 1] * r_unit_pows[zpow, 2]
         val = rb_values[mu] * mult0
         der = rb_derivs[mu] * mult0 * r_ijs_unit
         der -= val * k * r_ijs_unit / r_abs
         if xpow != 0:
             der[0] += (
                 rb_values[mu]
-                * (xpow * val_pows[xpow - 1, 0])
-                * val_pows[ypow, 1]
-                * val_pows[zpow, 2]
+                * (xpow * r_unit_pows[xpow - 1, 0])
+                * r_unit_pows[ypow, 1]
+                * r_unit_pows[zpow, 2]
             ) / r_abs
         if ypow != 0:
             der[1] += (
                 rb_values[mu]
-                * val_pows[xpow, 0]
-                * (ypow * val_pows[ypow - 1, 1])
-                * val_pows[zpow, 2]
+                * r_unit_pows[xpow, 0]
+                * (ypow * r_unit_pows[ypow - 1, 1])
+                * r_unit_pows[zpow, 2]
             ) / r_abs
         if zpow != 0:
             der[2] += (
                 rb_values[mu]
-                * val_pows[xpow, 0]
-                * val_pows[ypow, 1]
-                * (zpow * val_pows[zpow - 1, 2])
+                * r_unit_pows[xpow, 0]
+                * r_unit_pows[ypow, 1]
+                * (zpow * r_unit_pows[zpow - 1, 2])
             ) / r_abs
         moment_components[i] = val.sum()
         moment_jacobian[i] = der
