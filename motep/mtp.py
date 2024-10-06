@@ -334,37 +334,35 @@ def calc_moment_basis(
     # Precompute powers
     max_pow = np.max(alpha_index_basic)
     r_unit_pows = _calc_r_unit_pows(r_ijs_unit, max_pow + 1)
+
     # Compute basic moments
-    for i, aib in enumerate(alpha_index_basic):
-        mu, xpow, ypow, zpow = aib
-        k = xpow + ypow + zpow
-        mult0 = r_unit_pows[xpow, 0] * r_unit_pows[ypow, 1] * r_unit_pows[zpow, 2]
-        val = rb_values[mu] * mult0
-        der = rb_derivs[mu] * mult0 * r_ijs_unit
-        der -= val * k * r_ijs_unit / r_abs
-        if xpow != 0:
-            der[0] += (
-                rb_values[mu]
-                * (xpow * r_unit_pows[xpow - 1, 0])
-                * r_unit_pows[ypow, 1]
-                * r_unit_pows[zpow, 2]
-            ) / r_abs
-        if ypow != 0:
-            der[1] += (
-                rb_values[mu]
-                * r_unit_pows[xpow, 0]
-                * (ypow * r_unit_pows[ypow - 1, 1])
-                * r_unit_pows[zpow, 2]
-            ) / r_abs
-        if zpow != 0:
-            der[2] += (
-                rb_values[mu]
-                * r_unit_pows[xpow, 0]
-                * r_unit_pows[ypow, 1]
-                * (zpow * r_unit_pows[zpow - 1, 2])
-            ) / r_abs
-        moment_components[i] = val.sum()
-        moment_jacobian[i] = der
+    mu, xpow, ypow, zpow = alpha_index_basic.T
+    k = xpow + ypow + zpow
+    mult0 = r_unit_pows[xpow, 0] * r_unit_pows[ypow, 1] * r_unit_pows[zpow, 2]
+    val = rb_values[mu] * mult0
+    der = (rb_derivs[mu] * mult0)[:, None, :] * r_ijs_unit
+    der -= (val * k[:, None])[:, None, :] * r_ijs_unit / r_abs
+    der[:, 0] += (
+        rb_values[mu]
+        * (xpow[:, None] * r_unit_pows[xpow - 1, 0])
+        * r_unit_pows[ypow, 1]
+        * r_unit_pows[zpow, 2]
+    ) / r_abs
+    der[:, 1] += (
+        rb_values[mu]
+        * r_unit_pows[xpow, 0]
+        * (ypow[:, None] * r_unit_pows[ypow - 1, 1])
+        * r_unit_pows[zpow, 2]
+    ) / r_abs
+    der[:, 2] += (
+        rb_values[mu]
+        * r_unit_pows[xpow, 0]
+        * r_unit_pows[ypow, 1]
+        * (zpow[:, None] * r_unit_pows[zpow - 1, 2])
+    ) / r_abs
+    moment_components[: mu.size] = val.sum(axis=-1)
+    moment_jacobian[: mu.size] = der
+
     # Compute contractions
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
