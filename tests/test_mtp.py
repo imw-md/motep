@@ -11,17 +11,21 @@ from motep.io.mlip.mtp import read_mtp
 from motep.mtp import NumbaMTPEngine, NumpyMTPEngine
 
 
-def get_scale(component: str, dx: float) -> np.ndarray:
+def get_scale(component: str, d: float) -> np.ndarray:
     """Get the scaling matrix for the corresponding stress component."""
+    voigt_index = ["xx", "yy", "zz", "yz", "zx", "xy"].index(component)
     if component == "xx":
-        voigt_index = 0
-        scale = np.diag((1.0 + dx, 1.0, 1.0))
+        scale = np.diag((1.0 + d, 1.0, 1.0))
     elif component == "yy":
-        voigt_index = 1
-        scale = np.diag((1.0, 1.0 + dx, 1.0))
+        scale = np.diag((1.0, 1.0 + d, 1.0))
     elif component == "zz":
-        voigt_index = 2
-        scale = np.diag((1.0, 1.0, 1.0 + dx))
+        scale = np.diag((1.0, 1.0, 1.0 + d))
+    elif component == "yz":
+        scale = np.array(((1.0, 0.0, 0.0), (0.0, 1.0, 0.5 * d), (0.0, 0.5 * d, 1.0)))
+    elif component == "zx":
+        scale = np.array(((1.0, 0.0, 0.5 * d), (0.0, 1.0, 0.0), (0.5 * d, 0.0, 1.0)))
+    elif component == "xy":
+        scale = np.array(((1.0, 0.5 * d, 0.0), (0.5 * d, 1.0, 0.0), (0.0, 0.0, 1.0)))
     else:
         raise ValueError(component)
     return voigt_index, scale
@@ -152,7 +156,7 @@ def test_forces(
     assert forces_ref[0, 0] == pytest.approx(f, abs=1e-4)
 
 
-@pytest.mark.parametrize("component", ["xx", "yy", "zz"])
+@pytest.mark.parametrize("component", ["xx", "yy", "zz", "yz", "zx", "xy"])
 @pytest.mark.parametrize("index", [0, -1])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize(
@@ -194,16 +198,16 @@ def test_stress(
 
     atoms = atoms_ref.copy()
     sindex, scale = get_scale(component, +1.0 * dx)
-    atoms.set_cell(scale @ atoms.get_cell(), scale_atoms=True)
+    atoms.set_cell(atoms.get_cell() @ scale, scale_atoms=True)
     ep = mtp.calculate(atoms)[0]
 
     atoms = atoms_ref.copy()
     sindex, scale = get_scale(component, -1.0 * dx)
-    atoms.set_cell(scale @ atoms.get_cell(), scale_atoms=True)
+    atoms.set_cell(atoms.get_cell() @ scale, scale_atoms=True)
     em = mtp.calculate(atoms)[0]
 
     s = (ep - em) / (2.0 * dx) / atoms_ref.get_volume()
 
-    print(stress_ref[sindex], s, stress_ref[sindex] / s)
+    print(stress_ref[sindex], s)
 
     assert stress_ref[sindex] == pytest.approx(s, abs=1e-4)
