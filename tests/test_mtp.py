@@ -194,12 +194,12 @@ def test_stress(
 
     atoms = atoms_ref.copy()
     sindex, scale = get_scale(component, +1.0 * dx)
-    atoms.set_cell(scale @ atoms.get_cell(), scale_atoms=True)
+    atoms.set_cell(atoms.get_cell() @ scale, scale_atoms=True)
     ep = mtp.calculate(atoms)[0]
 
     atoms = atoms_ref.copy()
     sindex, scale = get_scale(component, -1.0 * dx)
-    atoms.set_cell(scale @ atoms.get_cell(), scale_atoms=True)
+    atoms.set_cell(atoms.get_cell() @ scale, scale_atoms=True)
     em = mtp.calculate(atoms)[0]
 
     s = (ep - em) / (2.0 * dx) / atoms_ref.get_volume()
