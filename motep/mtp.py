@@ -110,19 +110,16 @@ class NumpyMTPEngine(EngineBase):
             Parameters in the MLIP .mtp file.
 
         """
-        from motep.radial import ChebyshevPolynomialRadialBasis
+        from motep.radial import ChebyshevArrayRadialBasis
 
-        self.rb = ChebyshevPolynomialRadialBasis(dict_mtp)
+        self.rb = ChebyshevArrayRadialBasis(dict_mtp)
         super().__init__(dict_mtp)
 
     def update(self, dict_mtp: dict[str, Any]) -> None:
         """Update MTP parameters."""
         super().update(dict_mtp)
         if "radial_coeffs" in self.dict_mtp:
-            if self.rb.funcs is None:
-                self.rb.init_funcs(self.dict_mtp["radial_coeffs"])
-            else:
-                self.rb.update_coeffs(self.dict_mtp["radial_coeffs"])
+            self.rb.update_coeffs(self.dict_mtp["radial_coeffs"])
 
     def _calc_basis(
         self,

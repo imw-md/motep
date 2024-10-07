@@ -1,12 +1,102 @@
 """Radial basis functions based on Chebyshev polynomials."""
 
+from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
 import numpy.typing as npt
 
 
-class ChebyshevPolynomialRadialBasis:
+class RadialBasisBase(ABC):
+    """Base class of `RadialBasis`."""
+
+    def __init__(self, dict_mtp: dict[str, Any]) -> None:
+        """Initialize `ChebyshevRadialBasis`."""
+        self.dict_mtp = dict_mtp
+
+    @abstractmethod
+    def update_coeffs(self, radial_basis_coeffs: npt.NDArray[np.float64]) -> None:
+        """Update radial basis coefficients."""
+
+    @abstractmethod
+    def calculate(
+        self,
+        r_abs: npt.NDArray[np.float64],
+        itype: int,
+        jtypes: list[int],
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        """Calculate values of radial basis functions."""
+
+
+class ChebyshevArrayRadialBasis(RadialBasisBase):
+    """Radial basis functions based on Chebyshev polynomials."""
+
+    def __init__(self, dict_mtp: dict[str, Any]) -> None:
+        """Initialize `ChebyshevRadialBasis`."""
+        super().__init__(dict_mtp)
+        self.radial_basis_coeffs = None
+
+    def vander(
+        self,
+        r_abs: npt.NDArray[np.float64],
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        """Calculate (pseudo) Vandermonde matrices."""
+        min_dist = self.dict_mtp["min_dist"]
+        max_dist = self.dict_mtp["max_dist"]
+        radial_basis_size = self.dict_mtp["radial_basis_size"]
+
+        values = np.zeros((radial_basis_size, r_abs.size))
+        derivs = np.zeros((radial_basis_size, r_abs.size))
+        s = (2.0 * r_abs - (min_dist + max_dist)) / (max_dist - min_dist)
+        d = 2.0 / (max_dist - min_dist)
+        values[0] = 1.0
+        values[1] = s
+        derivs[0] = 0.0
+        derivs[1] = 2.0 / (max_dist - min_dist)
+        for i in range(2, radial_basis_size):
+            values[i] = 2.0 * s * values[i - 1] - values[i - 2]
+            derivs[i] = 2.0 * (d * values[i - 1] + s * derivs[i - 1]) - derivs[i - 2]
+
+        return values, derivs
+
+    def update_coeffs(self, radial_basis_coeffs: npt.NDArray[np.float64]) -> None:
+        """Update radial basis coefficients."""
+        self.radial_basis_coeffs = radial_basis_coeffs
+
+    def calculate(
+        self,
+        r_abs: npt.NDArray[np.float64],
+        itype: int,
+        jtypes: list[int],
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        """Calculate rabial basis values.
+
+        Returns
+        -------
+        rb_values : npt.NDArray[np.float64]
+            Values of radial basis functions (radial_funcs_count, neighbors).
+        rb_derivs : npt.NDArray[np.float64]
+            Derivatives of radial basis functions (radial_funcs_count, neighbors).
+
+        """
+        scaling = self.dict_mtp["scaling"]
+        max_dist = self.dict_mtp["max_dist"]
+
+        in_cutoff = r_abs < max_dist
+        smooth_values = np.where(in_cutoff, scaling * (max_dist - r_abs) ** 2, 0.0)
+        smooth_derivs = np.where(in_cutoff, -2.0 * scaling * (max_dist - r_abs), 0.0)
+        values0, derivs0 = self.vander(r_abs)
+        values0 = values0.T[:, None, :]
+        derivs0 = derivs0.T[:, None, :]
+        tmp0 = np.sum(values0 * self.radial_basis_coeffs[itype, jtypes], axis=-1).T
+        tmp1 = np.sum(derivs0 * self.radial_basis_coeffs[itype, jtypes], axis=-1).T
+        rb_values = tmp0 * smooth_values
+        rb_derivs = tmp1 * smooth_values + tmp0 * smooth_derivs
+
+        return rb_values, rb_derivs
+
+
+class ChebyshevPolynomialRadialBasis(RadialBasisBase):
     """Radial basis functions based on Chebyshev polynomials.
 
     Attributes
@@ -20,14 +110,11 @@ class ChebyshevPolynomialRadialBasis:
 
     def __init__(self, dict_mtp: dict[str, Any]) -> None:
         """Initialize `ChebyshevRadialBasis`."""
-        self.dict_mtp = dict_mtp
+        super().__init__(dict_mtp)
         self.funcs = None
         self.dfdrs = None
 
-    def init_funcs(
-        self,
-        radial_coeffs: npt.NDArray[np.float64],
-    ) -> None:
+    def init_funcs(self, radial_basis_coeffs: npt.NDArray[np.float64]) -> None:
         """Initialize radial basis functions."""
         from numpy.polynomial import Chebyshev
 
@@ -37,25 +124,28 @@ class ChebyshevPolynomialRadialBasis:
         radial_basis_funcs = []
         radial_basis_dfdrs = []  # derivatives
         domain = [min_dist, max_dist]
-        nspecies, _, nmu, _ = radial_coeffs.shape
+        nspecies, _, nmu, _ = radial_basis_coeffs.shape
         for i0 in range(nspecies):
             for i1 in range(nspecies):
                 for i2 in range(nmu):
-                    p = Chebyshev(radial_coeffs[i0, i1, i2], domain=domain)
+                    p = Chebyshev(radial_basis_coeffs[i0, i1, i2], domain=domain)
                     radial_basis_funcs.append(p)
                     radial_basis_dfdrs.append(p.deriv())
         shape = nspecies, nspecies, nmu
         self.funcs = np.array(radial_basis_funcs).reshape(shape)
         self.dfdrs = np.array(radial_basis_dfdrs).reshape(shape)
 
-    def update_coeffs(self, radial_coeffs: npt.NDArray[np.float64]) -> None:
+    def update_coeffs(self, radial_basis_coeffs: npt.NDArray[np.float64]) -> None:
         """Update radial basis coefficients."""
-        nspecies, _, nmu, _ = radial_coeffs.shape
+        if self.funcs is None:
+            self.init_funcs(radial_basis_coeffs)
+            return
+        nspecies, _, nmu, _ = radial_basis_coeffs.shape
         for i0 in range(nspecies):
             for i1 in range(nspecies):
                 for i2 in range(nmu):
                     p = self.funcs[i0, i1, i2]
-                    p.coef = radial_coeffs[i0, i1, i2]
+                    p.coef = radial_basis_coeffs[i0, i1, i2]
                     self.dfdrs[i0, i1, i2] = p.deriv()
 
     def calculate(
