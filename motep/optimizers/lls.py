@@ -67,7 +67,7 @@ class LLSOptimizer(OptimizerBase):
         matrix = self._calc_matrix()
         vector = self._calc_vector()
 
-        # TODO: Consider also forces and stresses
+        # TODO: Consider also `species_coeffs`
         moment_coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
 
         # TODO: Redesign optimizers to du such an assignment more semantically
@@ -80,32 +80,39 @@ class LLSOptimizer(OptimizerBase):
 
     def _calc_matrix(self) -> np.ndarray:
         """Calculate the matrix for linear least squares (LLS)."""
-        loss_function = self.loss_function
-        dict_mtp = loss_function.mtp_data.dict_mtp
-        images = loss_function.images
-        setting = loss_function.setting
+        loss = self.loss_function
+        dict_mtp = loss.mtp_data.dict_mtp
+        images = loss.images
+        setting = loss.setting
         basis_values = np.array([atoms.calc.engine.basis_values for atoms in images])
-        basis_derivs = np.vstack([atoms.calc.engine.basis_derivs.T for atoms in images])
-        basis_derivs = basis_derivs.reshape((-1, dict_mtp["alpha_scalar_moments"]))
+        basis_dbdris = np.vstack([atoms.calc.engine.basis_dbdris.T for atoms in images])
+        basis_dbdeps = np.vstack([atoms.calc.engine.basis_dbdeps.T for atoms in images])
+        basis_dbdris = basis_dbdris.reshape((-1, dict_mtp["alpha_scalar_moments"]))
+        basis_dbdeps = basis_dbdeps.reshape((-1, dict_mtp["alpha_scalar_moments"]))
         tmp = []
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting["energy-weight"]) * basis_values)
         if "forces" in self.minimized:
-            tmp.append(np.sqrt(setting["force-weight"]) * basis_derivs)
+            tmp.append(np.sqrt(setting["force-weight"]) * basis_dbdris)
+        if "stress" in self.minimized:
+            tmp.append(np.sqrt(setting["stress-weight"]) * basis_dbdeps)
         return np.vstack(tmp)
 
     def _calc_vector(self) -> np.ndarray:
         """Calculate the vector for linear least squares (LLS)."""
-        loss_function = self.loss_function
-        setting = loss_function.setting
-        n = len(loss_function.images)
+        loss = self.loss_function
+        setting = loss.setting
+        n = len(loss.images)
         energies = self._calc_interaction_energies()
-        forces = np.hstack([loss_function.target_forces[i].flatten() for i in range(n)])
+        forces = np.hstack([loss.target_forces[i].flatten() for i in range(n)])
+        stresses = np.hstack([loss.target_stresses[i].flatten() for i in range(n)])
         tmp = []
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting["energy-weight"]) * energies)
         if "forces" in self.minimized:
             tmp.append(np.sqrt(setting["force-weight"]) * forces * -1.0)
+        if "stress" in self.minimized:
+            tmp.append(np.sqrt(setting["stress-weight"]) * stresses)
         return np.hstack(tmp)
 
     def _calc_interaction_energies(self) -> np.ndarray:
@@ -118,16 +125,16 @@ class LLSOptimizer(OptimizerBase):
             interactions among atoms, i.e., without site energies.
 
         """
-        loss_function = self.loss_function
-        dict_mtp = loss_function.mtp_data.dict_mtp
-        images = loss_function.images
+        loss = self.loss_function
+        dict_mtp = loss.mtp_data.dict_mtp
+        images = loss.images
         species = dict_mtp["species"]
 
         def get_types(atoms: Atoms) -> list[int]:
             return [species[_] for _ in atoms.numbers]
 
         iterable = (
-            loss_function.target_energies[i]
+            loss.target_energies[i]
             - np.add.reduce(dict_mtp["species_coeffs"][get_types(atoms)])
             for i, atoms in enumerate(images)
         )

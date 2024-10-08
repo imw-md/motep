@@ -20,10 +20,12 @@ class EngineBase:
     basis_values : np.ndarray (alpha_moments_count)
         Basis values summed over atoms.
         This corresponds to b_j in Eq. (5) in [Podryabinkin_CMS_2017_Active]_.
-    basis_derivs : np.ndarray (alpha_moments_count, 3, number_of_atoms)
+    basis_dbdris : np.ndarray (alpha_moments_count, 3, number_of_atoms)
         Derivatives of basis functions with respect to Cartesian coordinates of atoms
         summed over atoms.
         This corresponds to nabla b_j in Eq. (7a) in [Podryabinkin_CMS_2017_Active]_.
+    basis_dbdeps : np.ndarray (alpha_moments_count, 3, 3)
+        Derivatives of cumulated basis functions with respect to the strain tensor.
 
     .. [Podryabinkin_CMS_2017_Active]
        E. V. Podryabinkin and A. V. Shapeev, Comput. Mater. Sci. 140, 171 (2017).
@@ -45,7 +47,8 @@ class EngineBase:
         self.results = {}
         self._neighbor_list = None
         self.basis_values = None
-        self.basis_derivs = None
+        self.basis_dbdris = None
+        self.basis_dbdeps = None
 
     def update(self, dict_mtp: dict[str, Any]) -> None:
         """Update MTP parameters."""
@@ -72,16 +75,20 @@ class EngineBase:
         self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
         self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
 
-        self.energies = np.full(len(atoms), np.nan)
-        self.forces = np.full((len(atoms), 3), np.nan)
+        number_of_atoms = len(atoms)
+
+        self.energies = np.full(number_of_atoms, np.nan)
+        self.forces = np.full((number_of_atoms, 3), np.nan)
         self.stress = np.full((3, 3), np.nan)
 
         shape = self.dict_mtp["alpha_scalar_moments"]
         self.basis_values = np.full(shape, np.nan)
 
-        number_of_atoms = len(atoms)
         shape = self.dict_mtp["alpha_scalar_moments"], 3, number_of_atoms
-        self.basis_derivs = np.full(shape, np.nan)
+        self.basis_dbdris = np.full(shape, np.nan)
+
+        shape = self.dict_mtp["alpha_scalar_moments"], 3, 3
+        self.basis_dbdeps = np.full(shape, np.nan)
 
     def _get_distances(
         self,
@@ -150,7 +157,8 @@ class NumpyMTPEngine(EngineBase):
         self.forces[:, :] = 0.0
         self.stress[:, :] = 0.0
         self.basis_values[:] = 0.0
-        self.basis_derivs[:, :, :] = 0.0
+        self.basis_dbdris[:, :, :] = 0.0
+        self.basis_dbdeps[:, :, :] = 0.0
 
         moment_coeffs = self.dict_mtp["moment_coeffs"]
 
@@ -177,9 +185,10 @@ class NumpyMTPEngine(EngineBase):
             for k, j in enumerate(js):
                 self.forces[i] += gradient[:, k]
                 self.forces[j] -= gradient[:, k]
-                self.basis_derivs[:, :, i] -= basis_derivs[:, :, k]
-                self.basis_derivs[:, :, j] += basis_derivs[:, :, k]
-            self.stress += r_ijs @ gradient.T
+                self.basis_dbdris[:, :, i] -= basis_derivs[:, :, k]
+                self.basis_dbdris[:, :, j] += basis_derivs[:, :, k]
+            self.stress += gradient @ r_ijs.T
+            self.basis_dbdeps += basis_derivs @ r_ijs.T
         self.results["energies"] = self.energies
         self.results["energy"] = self.results["energies"].sum()
         self.results["forces"] = self.forces
@@ -187,8 +196,11 @@ class NumpyMTPEngine(EngineBase):
         if atoms.cell.rank == 3:
             self.stress = (self.stress + self.stress.T) * 0.5  # symmetrize
             self.stress /= atoms.get_volume()
+            self.basis_dbdeps += self.basis_dbdeps.transpose(0, 2, 1)
+            self.basis_dbdeps *= 0.5 / atoms.get_volume()
         else:
             self.stress[:, :] = np.nan
+            self.basis_dbdeps[:, :, :] = np.nan
         self.results["stress"] = self.stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return self.results["energy"], self.results["forces"], self.results["stress"]
