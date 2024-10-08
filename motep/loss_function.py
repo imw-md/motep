@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 from ase import Atoms
+from ase.data import chemical_symbols
 from mpi4py import MPI
 from scipy.constants import eV
 
@@ -77,7 +78,14 @@ def _calc_errors_from_diff(diff: np.ndarray) -> dict[str, float]:
 
 
 class LossFunctionBase(ABC):
-    """Loss function."""
+    """Loss function.
+
+    Attributes
+    ----------
+    species : list[int]
+        List of atomic numbers in the order of atomic types in the .mtp file.
+
+    """
 
     def __init__(
         self,
@@ -107,7 +115,8 @@ class LossFunctionBase(ABC):
         self.comm = comm
 
         species = setting.get("species")
-        self.species = list(_get_species(self.images)) if species is None else species
+        species = _get_species(self.images) if species is None else species
+        self.species = [chemical_symbols.index(_) for _ in species]
 
         self.target_energies, self.target_forces, self.target_stresses = (
             calc_properties(self.images, self.comm)

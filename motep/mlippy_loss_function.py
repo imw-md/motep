@@ -1,7 +1,6 @@
 """Loss function."""
 
 import mlippy
-from ase.data import chemical_symbols
 
 from motep.io.mlip.mtp import write_mtp
 from motep.loss_function import LossFunctionBase
@@ -13,7 +12,7 @@ def init_mlip(file: str, species: list[str]):
     mlip = mlippy.mtp()
     mlip.load_potential(file)
     for _ in species:
-        mlip.add_atomic_type(chemical_symbols.index(_))
+        mlip.add_atomic_type(_)
     return mlip
 
 
@@ -21,7 +20,7 @@ def init_calc(
     file: str,
     data: MTPData,
     parameters: list[float],
-    species: list[str],
+    species: list[int],
 ) -> mlippy.MLIP_Calculator:
     """Initialize mlippy ASE calculator."""
     data.update(parameters)
