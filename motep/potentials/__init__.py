@@ -57,41 +57,48 @@ class MTPData:
             Bounds of the parameters.
 
         """
-        data = self.dict_mtp
-        parameters_scaling, bounds_scaling = _init_scaling(data, optimized)
-        parameters_moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
-            data,
+        dict_mtp = self.dict_mtp
+        scaling, bound_scaling = _init_scaling(dict_mtp, optimized)
+        moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
+            dict_mtp,
             optimized,
             self.rng,
         )
-        parameters_species_coeffs, bounds_species_coeffs = _init_species_coeffs(
-            data,
+        species_coeffs, bounds_species_coeffs = _init_species_coeffs(
+            dict_mtp,
             self.species_coeffs_lstsq,
             optimized,
         )
-        parameters_radial_coeffs, bounds_radial_coeffs = _init_radial_coeffs(
-            data,
+        radial_coeffs, bounds_radial_coeffs = _init_radial_coeffs(
+            dict_mtp,
             optimized,
             self.rng,
         )
-
-        parameters = np.hstack(
-            (
-                parameters_scaling,
-                parameters_moment_coeffs,
-                parameters_species_coeffs,
-                parameters_radial_coeffs.reshape(-1),
-            ),
-        )
+        dict_mtp["scaling"] = scaling
+        dict_mtp["moment_coeffs"] = moment_coeffs
+        dict_mtp["species_coeffs"] = species_coeffs
+        dict_mtp["radial_coeffs"] = radial_coeffs
         bounds = np.vstack(
             (
-                bounds_scaling,
+                np.atleast_1d(bound_scaling),
                 bounds_moment_coeffs,
                 bounds_species_coeffs,
                 bounds_radial_coeffs.reshape(-1, 2),
             ),
         )
-        return parameters, bounds
+        return self.parameters, bounds
+
+    @property
+    def parameters(self) -> np.ndarray:
+        """Serialized parameters."""
+        return np.hstack(
+            (
+                np.atleast_1d(self.dict_mtp["scaling"]),
+                self.dict_mtp["moment_coeffs"],
+                self.dict_mtp["species_coeffs"],
+                self.dict_mtp["radial_coeffs"].reshape(-1),
+            ),
+        )
 
     def update(self, parameters: list[float]) -> None:
         """Update data in the .mtp file.
@@ -160,11 +167,11 @@ def calc_species_coeffs_lstsq(
 def _init_scaling(
     data: dict[str, Any],
     optimized: list[str],
-) -> tuple[list[float], list[tuple[float, float]]]:
+) -> tuple[float, tuple[float, float]]:
     key = "scaling"
     v = data.get(key, 1.0)
-    parameters_scaling = np.array([v])
-    bounds_scaling = np.array([(0.0, np.inf)] if key in optimized else [(v, v)])
+    parameters_scaling = v
+    bounds_scaling = (0.0, np.inf) if key in optimized else (v, v)
     return parameters_scaling, bounds_scaling
 
 
