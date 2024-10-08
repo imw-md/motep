@@ -46,6 +46,9 @@ class EngineBase:
             self.update(dict_mtp)
         self.results = {}
         self._neighbor_list = None
+
+        self.energies = None
+
         self.basis_values = None
         self.basis_dbdris = None
         self.basis_dbdeps = None
@@ -153,7 +156,8 @@ class NumpyMTPEngine(EngineBase):
     def calculate(self, atoms: Atoms) -> tuple:
         """Calculate properties of the given system."""
         self.update_neighbor_list(atoms)
-        self.energies[:] = 0.0
+        itypes = [self.dict_mtp["species"][_] for _ in atoms.numbers]
+        self.energies = self.dict_mtp["species_coeffs"][itypes]
         self.forces[:, :] = 0.0
         self.stress[:, :] = 0.0
         self.basis_values[:] = 0.0
@@ -171,8 +175,7 @@ class NumpyMTPEngine(EngineBase):
             site_energy = moment_coeffs @ basis_values
             gradient = np.tensordot(moment_coeffs, basis_derivs, axes=(0, 0))
 
-            itype = self.dict_mtp["species"][atoms.numbers[i]]
-            self.energies[i] = site_energy + self.dict_mtp["species_coeffs"][itype]
+            self.energies[i] += site_energy
             # Calculate forces
             # Be careful that the derivative of the site energy of the j-th atom also
             # contributes to the forces on the i-th atom.
