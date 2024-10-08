@@ -56,7 +56,7 @@ def calc_properties(
     return np.array(current_energies), current_forces, current_stress
 
 
-def calculate_energy_force_stress(atoms: Atoms):
+def calculate_energy_force_stress(atoms: Atoms) -> tuple:
     energy = atoms.get_potential_energy()
     forces = atoms.get_forces()
     stress = (
@@ -119,7 +119,9 @@ class LossFunctionBase(ABC):
     def __call__(self, parameters: list[float]) -> float:
         """Evaluate the loss function."""
 
-    def calc_loss_function(self, energies, forces, stresses) -> float:
+    def calc_loss_function(self) -> float:
+        """Calculate the value of the loss function."""
+        energies, forces, stresses = calc_properties(self.images, self.comm)
         # Calculate the energy difference
         energy_ses = (energies - self.target_energies) ** 2
         energy_mse = self.configuration_weight @ energy_ses
@@ -242,5 +244,4 @@ class LossFunction(LossFunctionBase):
         for atoms in self.images:
             self.mtp_data.update(parameters)
             atoms.calc.update_parameters(self.mtp_data.dict_mtp)
-        energies, forces, stresses = calc_properties(self.images, self.comm)
-        return self.calc_loss_function(energies, forces, stresses)
+        return self.calc_loss_function()
