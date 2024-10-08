@@ -48,6 +48,8 @@ class EngineBase:
         self._neighbor_list = None
 
         self.energies = None
+        self.forces = None
+        self.stress = None
 
         self.basis_values = None
         self.basis_dbdris = None
@@ -79,10 +81,6 @@ class EngineBase:
         self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
 
         number_of_atoms = len(atoms)
-
-        self.energies = np.full(number_of_atoms, np.nan)
-        self.forces = np.full((number_of_atoms, 3), np.nan)
-        self.stress = np.full((3, 3), np.nan)
 
         shape = self.dict_mtp["alpha_scalar_moments"]
         self.basis_values = np.full(shape, np.nan)
@@ -158,8 +156,7 @@ class NumpyMTPEngine(EngineBase):
         self.update_neighbor_list(atoms)
         itypes = [self.dict_mtp["species"][_] for _ in atoms.numbers]
         self.energies = self.dict_mtp["species_coeffs"][itypes]
-        self.forces[:, :] = 0.0
-        self.stress[:, :] = 0.0
+
         self.basis_values[:] = 0.0
         self.basis_dbdris[:, :, :] = 0.0
         self.basis_dbdeps[:, :, :] = 0.0
@@ -172,10 +169,7 @@ class NumpyMTPEngine(EngineBase):
 
             self.basis_values += basis_values
 
-            site_energy = moment_coeffs @ basis_values
-            gradient = np.tensordot(moment_coeffs, basis_derivs, axes=(0, 0))
-
-            self.energies[i] += site_energy
+            self.energies[i] += moment_coeffs @ basis_values
             # Calculate forces
             # Be careful that the derivative of the site energy of the j-th atom also
             # contributes to the forces on the i-th atom.
@@ -186,12 +180,13 @@ class NumpyMTPEngine(EngineBase):
             #    with respect to the i-th atom.
             # Thus, the negative signs of the two contributions are cancelled out below.
             for k, j in enumerate(js):
-                self.forces[i] += gradient[:, k]
-                self.forces[j] -= gradient[:, k]
                 self.basis_dbdris[:, :, i] -= basis_derivs[:, :, k]
                 self.basis_dbdris[:, :, j] += basis_derivs[:, :, k]
-            self.stress += gradient @ r_ijs.T
             self.basis_dbdeps += basis_derivs @ r_ijs.T
+
+        self.forces = np.sum(moment_coeffs * self.basis_dbdris.T, axis=-1) * -1.0
+        self.stress = np.sum(moment_coeffs * self.basis_dbdeps.T, axis=-1).T
+
         self.results["energies"] = self.energies
         self.results["energy"] = self.results["energies"].sum()
         self.results["forces"] = self.forces
