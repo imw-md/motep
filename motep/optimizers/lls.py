@@ -70,8 +70,9 @@ class LLSOptimizer(OptimizerBase):
         # TODO: Consider also `species_coeffs`
         moment_coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
 
-        # TODO: Redesign optimizers to du such an assignment more semantically
-        parameters[1 : len(moment_coeffs) + 1] = moment_coeffs
+        # Update `dict_mtp` and `parameters`.
+        self.loss_function.mtp_data.dict_mtp["moment_coeffs"] = moment_coeffs
+        parameters = self.loss_function.mtp_data.parameters
 
         # Print the value of the loss function.
         callback(parameters)
