@@ -45,4 +45,4 @@ class MlippyLossFunction(LossFunctionBase):
         calc = init_calc(file, self.mtp_data, parameters, self.species)
         for atoms in self.images:
             atoms.calc = calc
-        super().print_errors(parameters)
+        return super().print_errors(parameters)
