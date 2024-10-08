@@ -85,7 +85,8 @@ def run(args: argparse.Namespace) -> None:
 
             # Print parameters before optimization.
             parameters, bounds = mtp_data.initialize(step["optimized"])
-            mtp_data.print(parameters)
+            mtp_data.update(parameters)
+            mtp_data.print()
 
             # Instantiate an `Optimizer` class
             optimizer: OptimizerBase = make_optimizer(step["method"])(fitness, **step)
@@ -96,7 +97,7 @@ def run(args: argparse.Namespace) -> None:
 
             # Print parameters after optimization.
             mtp_data.update(parameters)
-            mtp_data.print(parameters)
+            mtp_data.print()
 
             write_mtp(f"intermediate_{i}.mtp", mtp_data.dict_mtp)
             fitness.print_errors()

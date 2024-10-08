@@ -45,6 +45,7 @@ def test_molecules(
     mtp_data = MTPData(data, images, species, rng=42)
     parameters, bounds = mtp_data.initialize(optimized=["moment_coeffs"])
     mtp_data.update(parameters)
+    mtp_data.print()
 
     loss_function = LossFunction(
         images,
@@ -55,7 +56,6 @@ def test_molecules(
     )
 
     parameters_ref = np.array(parameters, copy=True)
-    mtp_data.print(parameters_ref)
     loss_function(parameters_ref)  # update paramters
     loss_function.print_errors()
 
@@ -63,7 +63,8 @@ def test_molecules(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.print(parameters)
+    mtp_data.update(parameters)
+    mtp_data.print()
     f0 = loss_function(parameters)  # update paramters
     errors0 = loss_function.print_errors()
 
@@ -74,7 +75,8 @@ def test_molecules(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.print(parameters)
+    mtp_data.update(parameters)
+    mtp_data.print()
     f1 = loss_function(parameters)  # update parameters
     errors1 = loss_function.print_errors()
 
@@ -132,7 +134,8 @@ def test_crystals(
     )
 
     parameters_ref = np.array(parameters, copy=True)
-    mtp_data.print(parameters_ref)
+    mtp_data.update(parameters_ref)
+    mtp_data.print()
     loss_function(parameters_ref)  # update parameters
     loss_function.print_errors()
 
@@ -140,7 +143,8 @@ def test_crystals(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.print(parameters)
+    mtp_data.update(parameters)
+    mtp_data.print()
     f0 = loss_function(parameters)  # update parameters
     errors0 = loss_function.print_errors()
 
@@ -151,7 +155,8 @@ def test_crystals(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.print(parameters)
+    mtp_data.update(parameters)
+    mtp_data.print()
     f1 = loss_function(parameters)  # update parameters
     errors1 = loss_function.print_errors()
 
@@ -170,7 +175,8 @@ def test_crystals(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.print(parameters)
+    mtp_data.update(parameters)
+    mtp_data.print()
     f2 = loss_function(parameters)  # update parameters
     errors2 = loss_function.print_errors()
 

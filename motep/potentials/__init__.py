@@ -115,22 +115,15 @@ class MTPData:
         shape = species_count, species_count, rfc, rbs
         dict_mtp["radial_coeffs"] = np.array(total_radial).reshape(shape)
 
-    def print(self, parameters: np.ndarray) -> None:
+    def print(self) -> None:
         """Print parameters."""
-        species_count = self.dict_mtp["species_count"]
-        rfc = self.dict_mtp["radial_funcs_count"]
-        rbs = self.dict_mtp["radial_basis_size"]
-        asm = self.dict_mtp["alpha_scalar_moments"]
-
-        print("scaling:", parameters[0])
+        print("scaling:", self.dict_mtp["scaling"])
         print("moment_coeffs:")
-        print(parameters[1 : asm + 1])
+        print(self.dict_mtp["moment_coeffs"])
         print("species_coeffs:")
-        print(parameters[asm + 1 : asm + 1 + species_count])
-        shape = species_count, species_count, rfc, rbs
-        radial_coeffs = np.array(parameters[asm + 1 + species_count :]).reshape(shape)
+        print(self.dict_mtp["species_coeffs"])
         print("radial_coeffs:")
-        print(radial_coeffs)
+        print(self.dict_mtp["radial_coeffs"])
         print()
 
 
