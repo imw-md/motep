@@ -192,7 +192,7 @@ class LossFunctionBase(ABC):
         errors["stress"] = self._calc_errors_stress(stresses)  # eV/Ang^3
         return errors
 
-    def print_errors(self, parameters: list[float]) -> None:
+    def print_errors(self, parameters: list[float]) -> dict[str, float]:
         """Print errors."""
         errors = self.calc_errors()
 
@@ -223,6 +223,8 @@ class LossFunctionBase(ABC):
         for key1 in ["MAX", "ABS", "RMS"]:
             print(f"    {key1} error: {errors[key0][key1] * eV * 1e21}")
         print()
+
+        return errors
 
 
 class LossFunction(LossFunctionBase):

@@ -63,9 +63,8 @@ def test_molecules(
     print()
 
     mtp_data.print(parameters)
-    loss_function.print_errors(parameters)
+    errors0 = loss_function.print_errors(parameters)
     f0 = loss_function(parameters)
-    errors0 = loss_function.calc_errors()
 
     # Check if `parameters` are updated.
     assert not np.allclose(parameters, parameters_ref)
@@ -75,9 +74,8 @@ def test_molecules(
     print()
 
     mtp_data.print(parameters)
-    loss_function.print_errors(parameters)
+    errors1 = loss_function.print_errors(parameters)
     f1 = loss_function(parameters)
-    errors1 = loss_function.calc_errors()
 
     # Check loss functions
     # The value should be smaller when considering both energies and forces than
@@ -141,9 +139,8 @@ def test_crystals(
     print()
 
     mtp_data.print(parameters)
-    loss_function.print_errors(parameters)
+    errors0 = loss_function.print_errors(parameters)
     f0 = loss_function(parameters)
-    errors0 = loss_function.calc_errors()
 
     # Check if `parameters` are updated.
     assert not np.allclose(parameters, parameters_ref)
@@ -153,9 +150,8 @@ def test_crystals(
     print()
 
     mtp_data.print(parameters)
-    loss_function.print_errors(parameters)
+    errors1 = loss_function.print_errors(parameters)
     f1 = loss_function(parameters)
-    errors1 = loss_function.calc_errors()
 
     # Check loss functions
     # The value should be smaller when considering both energies and forces than
@@ -173,9 +169,8 @@ def test_crystals(
     print()
 
     mtp_data.print(parameters)
-    loss_function.print_errors(parameters)
+    errors2 = loss_function.print_errors(parameters)
     f2 = loss_function(parameters)
-    errors2 = loss_function.calc_errors()
 
     # Check loss functions
     assert f1 > f2
