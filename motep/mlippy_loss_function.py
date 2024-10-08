@@ -37,11 +37,3 @@ class MlippyLossFunction(LossFunctionBase):
         for atoms in self.images:
             atoms.calc = calc
         return self.calc_loss_function()
-
-    def print_errors(self, parameters: list[float]) -> dict[str, float]:
-        """Calculate RMSEs."""
-        file = self.setting["potential_final"]
-        calc = init_calc(file, self.mtp_data, parameters, self.species)
-        for atoms in self.images:
-            atoms.calc = calc
-        return super().print_errors(parameters)
