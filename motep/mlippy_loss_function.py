@@ -4,7 +4,7 @@ import mlippy
 from ase.data import chemical_symbols
 
 from motep.io.mlip.mtp import write_mtp
-from motep.loss_function import LossFunctionBase, calc_properties
+from motep.loss_function import LossFunctionBase
 from motep.potentials import MTPData
 
 
@@ -36,8 +36,7 @@ class MlippyLossFunction(LossFunctionBase):
         calc = init_calc(file, self.mtp_data, parameters, self.species)
         for atoms in self.images:
             atoms.calc = calc
-        energies, forces, stresses = calc_properties(self.images, self.comm)
-        return self.calc_loss_function(energies, forces, stresses)
+        return self.calc_loss_function()
 
     def print_errors(self, parameters: list[float]) -> dict[str, float]:
         """Calculate RMSEs."""
