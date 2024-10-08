@@ -99,7 +99,7 @@ def run(args: argparse.Namespace) -> None:
             mtp_data.print(parameters)
 
             write_mtp(f"intermediate_{i}.mtp", mtp_data.dict_mtp)
-            fitness.print_errors(parameters)
+            fitness.print_errors()
 
     mtp_data.update(parameters)
     write_mtp(setting["potential_final"], mtp_data.dict_mtp)

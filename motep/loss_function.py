@@ -194,7 +194,7 @@ class LossFunctionBase(ABC):
         errors["stress"] = self._calc_errors_stress(stresses)  # eV/Ang^3
         return errors
 
-    def print_errors(self, parameters: list[float]) -> dict[str, float]:
+    def print_errors(self) -> dict[str, float]:
         """Print errors."""
         errors = self.calc_errors()
 
