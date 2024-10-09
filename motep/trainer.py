@@ -10,32 +10,10 @@ from mpi4py import MPI
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss_function import LossFunction
-from motep.optimizers.base import OptimizerBase
-from motep.optimizers.ga import GeneticAlgorithmOptimizer
-from motep.optimizers.lls import LLSOptimizer
-from motep.optimizers.scipy import (
-    ScipyBFGSOptimizer,
-    ScipyDifferentialEvolutionOptimizer,
-    ScipyDualAnnealingOptimizer,
-    ScipyMinimizeOptimizer,
-    ScipyNelderMeadOptimizer,
-)
+from motep.optimizers import OptimizerBase, make_optimizer
 from motep.potentials import MTPData
 from motep.setting import make_default_setting, parse_setting
 from motep.utils import cd
-
-
-def make_optimizer(optimizer: str) -> OptimizerBase:
-    """Make an `Optimizer` class."""
-    return {
-        "GA": GeneticAlgorithmOptimizer,
-        "minimize": ScipyMinimizeOptimizer,
-        "Nelder-Mead": ScipyNelderMeadOptimizer,
-        "L-BFGS-B": ScipyBFGSOptimizer,
-        "DA": ScipyDualAnnealingOptimizer,
-        "DE": ScipyDifferentialEvolutionOptimizer,
-        "LLS": LLSOptimizer,
-    }[optimizer]
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
