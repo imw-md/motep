@@ -99,10 +99,10 @@ class LLSOptimizerBase(OptimizerBase):
         loss = self.loss_function
         dict_mtp = loss.mtp_data.dict_mtp
         images = loss.images
-        species = dict_mtp["species"]
+        species: list[int] = dict_mtp["species"]
 
         def get_types(atoms: Atoms) -> list[int]:
-            return [species[_] for _ in atoms.numbers]
+            return [species.index(_) for _ in atoms.numbers]
 
         energies = self._calc_target_energies()
         if "species_coeffs" not in self.optimized:

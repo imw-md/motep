@@ -62,8 +62,7 @@ class EngineBase:
         """Update MTP parameters."""
         self.dict_mtp = dict_mtp
         if "species" not in self.dict_mtp:
-            species = {_: _ for _ in range(self.dict_mtp["species_count"])}
-            self.dict_mtp["species"] = species
+            self.dict_mtp["species"] = list(range(self.dict_mtp["species_count"]))
 
     def update_neighbor_list(self, atoms: Atoms) -> None:
         """Update the ASE `PrimitiveNeighborList` object."""
@@ -142,8 +141,8 @@ class NumpyMTPEngine(EngineBase):
         js: list[int],
         r_ijs: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
-        itype = self.dict_mtp["species"][atoms.numbers[i]]
-        jtypes = [self.dict_mtp["species"][atoms.numbers[j]] for j in js]
+        itype = self.dict_mtp["species"].index(atoms.numbers[i])
+        jtypes = [self.dict_mtp["species"].index(atoms.numbers[j]) for j in js]
         r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
 
         rb_values, rb_derivs = self.rb.calculate(r_abs, itype, jtypes)
@@ -167,7 +166,7 @@ class NumpyMTPEngine(EngineBase):
     def calculate(self, atoms: Atoms) -> tuple:
         """Calculate properties of the given system."""
         self.update_neighbor_list(atoms)
-        itypes = [self.dict_mtp["species"][_] for _ in atoms.numbers]
+        itypes = [self.dict_mtp["species"].index(_) for _ in atoms.numbers]
         self.energies = self.dict_mtp["species_coeffs"][itypes]
 
         self.basis_values[:] = 0.0
