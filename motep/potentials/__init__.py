@@ -4,7 +4,6 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
-from ase import Atoms
 
 
 class MTPData:
@@ -13,8 +12,6 @@ class MTPData:
     def __init__(
         self,
         dict_mtp: dict[str, Any],
-        images: list[Atoms],
-        species: list[int],
         rng: np.random.Generator | int | None,
     ) -> None:
         """Initialize Initializer.
@@ -23,11 +20,6 @@ class MTPData:
         ----------
         dict_mtp : dict[str, Any]
             Data in the .mtp file.
-        images : list[Atoms]
-            List of ASE Atoms objects for the training dataset.
-            They are used to determine the initial guess of `species_coeffs`.
-        species : list[int]
-            List of species in the order of `type` in the MLIP cfg file.
         rng : np.random.Generator | int | None, default = None
             Pseudo-random-number generator (PRNG) with the NumPy API.
             If ``int`` or ``None``, they are treated as the seed of the NumPy
@@ -35,7 +27,6 @@ class MTPData:
 
         """
         self.dict_mtp = dict_mtp
-        self.species_coeffs_lstsq = calc_species_coeffs_lstsq(images, species)
         if isinstance(rng, int | None):
             self.rng = np.random.default_rng(rng)
         else:
@@ -66,8 +57,8 @@ class MTPData:
         )
         species_coeffs, bounds_species_coeffs = _init_species_coeffs(
             dict_mtp,
-            self.species_coeffs_lstsq,
             optimized,
+            self.rng,
         )
         radial_coeffs, bounds_radial_coeffs = _init_radial_coeffs(
             dict_mtp,
@@ -134,36 +125,6 @@ class MTPData:
         print()
 
 
-def calc_species_coeffs_lstsq(
-    images: list[Atoms],
-    species: list[str],
-) -> npt.NDArray[np.float64]:
-    """Calculate `species_coeffs` assuming no interatomic forces.
-
-    The values are determined using the least-square method.
-    Note that, if there are no composition varieties in the training set,
-    the values are physically less meaningful.
-    """
-    counts = np.full((len(images), len(species)), np.nan)
-    energies = np.full(len(images), np.nan)
-    for i, atoms in enumerate(images):
-        for j, s in enumerate(species):
-            counts[i, j] = list(atoms.numbers).count(s)
-        energies[i] = atoms.get_potential_energy(force_consistent=True)
-    ns = counts.sum(axis=1)
-    counts /= ns[:, None]
-    energies /= ns
-    species_coeffs_lstsq = np.linalg.lstsq(counts, energies, rcond=None)[0]
-    rmse = np.sqrt(np.add.reduce((counts @ species_coeffs_lstsq - energies) ** 2))
-    print(f"{__name__}.{calc_species_coeffs_lstsq.__name__}")
-    print("species_coeffs_lstsq:")
-    print(species_coeffs_lstsq)
-    print("RMSE Energy per atom (eV/atom):", rmse)
-    print("The values are estimated assuming no interatomic forces.")
-    print()
-    return species_coeffs_lstsq
-
-
 def _init_scaling(
     data: dict[str, Any],
     optimized: list[str],
@@ -196,12 +157,16 @@ def _init_moment_coeffs(
 
 def _init_species_coeffs(
     data: dict[str, Any],
-    species_coeffs_lstsq: npt.NDArray[np.float64],
     optimized: list[str],
-) -> tuple[list[float], list[tuple[float, float]]]:
+    rng: np.random.Generator,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     species_count = data["species_count"]
     key = "species_coeffs"
-    parameters = np.asarray(data[key]) if key in data else species_coeffs_lstsq
+    if key in data:
+        parameters = np.asarray(data[key])
+    else:
+        lb, ub = -5.0, +5.0
+        parameters = rng.uniform(lb, ub, species_count)
     if key in optimized:
         bounds = np.array([(-np.inf, +np.inf)] * species_count)
     else:

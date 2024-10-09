@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from mpi4py import MPI
 
-from motep.io.mlip.cfg import _get_species, read_cfg
+from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss_function import LossFunction
 from motep.optimizers.lls import LLSOptimizer
@@ -16,7 +16,7 @@ from motep.potentials import MTPData
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize(
     ("molecule", "species"),
-    [(762, {1: 0}), (291, {6: 0, 1: 1}), (14214, {9: 0, 1: 1}), (23208, {8: 0})],
+    [(762, [1]), (291, [6, 1]), (14214, [9, 1]), (23208, [8])],
 )
 @pytest.mark.parametrize("engine", ["numpy"])
 def test_molecules(
@@ -34,15 +34,13 @@ def test_molecules(
     data = read_mtp(fitting_path / "initial.mtp")
     images = read_cfg(original_path / "training.cfg", index=":")
 
-    species = list(_get_species(images))
-
     setting = {
         "energy-weight": 1.0,
         "force-weight": 0.01,
         "stress-weight": 0.0,
     }
 
-    mtp_data = MTPData(data, images, species, rng=42)
+    mtp_data = MTPData(data, rng=42)
     parameters, bounds = mtp_data.initialize(optimized=["moment_coeffs"])
     mtp_data.update(parameters)
     mtp_data.print()
@@ -95,7 +93,7 @@ def test_molecules(
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize(
     ("crystal", "species"),
-    [("cubic", {29: 0}), ("noncubic", {29: 0})],
+    [("cubic", [29]), ("noncubic", [29])],
 )
 @pytest.mark.parametrize("engine", ["numpy"])
 def test_crystals(
@@ -113,15 +111,13 @@ def test_crystals(
     dict_mtp = read_mtp(fitting_path / "initial.mtp")
     images = read_cfg(original_path / "training.cfg", index=":")[::100]
 
-    species = list(_get_species(images))
-
     setting = {
         "energy-weight": 1.0,
         "force-weight": 0.01,
         "stress-weight": 0.001,
     }
 
-    mtp_data = MTPData(dict_mtp, images, species, rng=42)
+    mtp_data = MTPData(dict_mtp, rng=42)
     parameters, bounds = mtp_data.initialize(optimized=["moment_coeffs"])
     mtp_data.update(parameters)
 

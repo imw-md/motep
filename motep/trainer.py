@@ -50,7 +50,7 @@ def run(args: argparse.Namespace) -> None:
 
     dict_mtp = read_mtp(untrained_mtp)
 
-    mtp_data = MTPData(dict_mtp, images, setting["species"], setting["seed"])
+    mtp_data = MTPData(dict_mtp, setting["seed"])
 
     if setting["engine"] == "mlippy":
         from motep.mlippy_loss_function import MlippyLossFunction
