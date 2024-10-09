@@ -10,7 +10,7 @@ from mpi4py import MPI
 from motep.io.mlip.cfg import _get_species, read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss_function import LossFunction
-from motep.optimizers import OptimizerBase
+from motep.optimizers.base import OptimizerBase
 from motep.optimizers.ga import GeneticAlgorithmOptimizer
 from motep.optimizers.lls import LLSOptimizer
 from motep.optimizers.scipy import (

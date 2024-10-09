@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 from ase import Atoms
 
-from motep.optimizers import OptimizerBase
+from motep.optimizers.base import OptimizerBase
 from motep.optimizers.scipy import Callback
 
 
