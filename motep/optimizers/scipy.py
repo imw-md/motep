@@ -11,7 +11,7 @@ from scipy.optimize import (
     minimize,
 )
 
-from motep.optimizers import OptimizerBase
+from motep.optimizers.base import OptimizerBase
 
 
 class Callback:

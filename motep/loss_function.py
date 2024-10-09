@@ -9,7 +9,6 @@ from mpi4py import MPI
 from scipy.constants import eV
 
 from motep.calculator import MTP
-from motep.io.mlip.cfg import _get_species
 from motep.potentials import MTPData
 
 
@@ -106,9 +105,6 @@ class LossFunctionBase(ABC):
         self.setting = setting
         self.comm = comm
 
-        species = setting.get("species")
-        self.species = list(_get_species(self.images)) if species is None else species
-
         self.target_energies, self.target_forces, self.target_stresses = (
             calc_properties(self.images, self.comm)
         )
@@ -194,7 +190,7 @@ class LossFunctionBase(ABC):
         errors["stress"] = self._calc_errors_stress(stresses)  # eV/Ang^3
         return errors
 
-    def print_errors(self, parameters: list[float]) -> dict[str, float]:
+    def print_errors(self) -> dict[str, float]:
         """Print errors."""
         errors = self.calc_errors()
 
@@ -241,7 +237,7 @@ class LossFunction(LossFunctionBase):
         self.configuration_weight = np.ones(len(self.images))
 
     def __call__(self, parameters: list[float]) -> float:
+        self.mtp_data.update(parameters)
         for atoms in self.images:
-            self.mtp_data.update(parameters)
             atoms.calc.update_parameters(self.mtp_data.dict_mtp)
         return self.calc_loss_function()

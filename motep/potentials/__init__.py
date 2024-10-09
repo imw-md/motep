@@ -4,7 +4,6 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
-from ase import Atoms
 
 
 class MTPData:
@@ -13,8 +12,6 @@ class MTPData:
     def __init__(
         self,
         dict_mtp: dict[str, Any],
-        images: list[Atoms],
-        species: list[str],
         rng: np.random.Generator | int | None,
     ) -> None:
         """Initialize Initializer.
@@ -23,11 +20,6 @@ class MTPData:
         ----------
         dict_mtp : dict[str, Any]
             Data in the .mtp file.
-        images : list[Atoms]
-            List of ASE Atoms objects for the training dataset.
-            They are used to determine the initial guess of `species_coeffs`.
-        species : list[str]
-            List of species in the order of `type` in the MLIP cfg file.
         rng : np.random.Generator | int | None, default = None
             Pseudo-random-number generator (PRNG) with the NumPy API.
             If ``int`` or ``None``, they are treated as the seed of the NumPy
@@ -35,7 +27,6 @@ class MTPData:
 
         """
         self.dict_mtp = dict_mtp
-        self.species_coeffs_lstsq = calc_species_coeffs_lstsq(images, species)
         if isinstance(rng, int | None):
             self.rng = np.random.default_rng(rng)
         else:
@@ -57,41 +48,48 @@ class MTPData:
             Bounds of the parameters.
 
         """
-        data = self.dict_mtp
-        parameters_scaling, bounds_scaling = _init_scaling(data, optimized)
-        parameters_moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
-            data,
+        dict_mtp = self.dict_mtp
+        scaling, bound_scaling = _init_scaling(dict_mtp, optimized)
+        moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
+            dict_mtp,
             optimized,
             self.rng,
         )
-        parameters_species_coeffs, bounds_species_coeffs = _init_species_coeffs(
-            data,
-            self.species_coeffs_lstsq,
-            optimized,
-        )
-        parameters_radial_coeffs, bounds_radial_coeffs = _init_radial_coeffs(
-            data,
+        species_coeffs, bounds_species_coeffs = _init_species_coeffs(
+            dict_mtp,
             optimized,
             self.rng,
         )
-
-        parameters = np.hstack(
-            (
-                parameters_scaling,
-                parameters_moment_coeffs,
-                parameters_species_coeffs,
-                parameters_radial_coeffs.reshape(-1),
-            ),
+        radial_coeffs, bounds_radial_coeffs = _init_radial_coeffs(
+            dict_mtp,
+            optimized,
+            self.rng,
         )
+        dict_mtp["scaling"] = scaling
+        dict_mtp["moment_coeffs"] = moment_coeffs
+        dict_mtp["species_coeffs"] = species_coeffs
+        dict_mtp["radial_coeffs"] = radial_coeffs
         bounds = np.vstack(
             (
-                bounds_scaling,
+                np.atleast_1d(bound_scaling),
                 bounds_moment_coeffs,
                 bounds_species_coeffs,
                 bounds_radial_coeffs.reshape(-1, 2),
             ),
         )
-        return parameters, bounds
+        return self.parameters, bounds
+
+    @property
+    def parameters(self) -> np.ndarray:
+        """Serialized parameters."""
+        return np.hstack(
+            (
+                np.atleast_1d(self.dict_mtp["scaling"]),
+                self.dict_mtp["moment_coeffs"],
+                self.dict_mtp["species_coeffs"],
+                self.dict_mtp["radial_coeffs"].reshape(-1),
+            ),
+        )
 
     def update(self, parameters: list[float]) -> None:
         """Update data in the .mtp file.
@@ -115,63 +113,26 @@ class MTPData:
         shape = species_count, species_count, rfc, rbs
         dict_mtp["radial_coeffs"] = np.array(total_radial).reshape(shape)
 
-    def print(self, parameters: np.ndarray) -> None:
+    def print(self) -> None:
         """Print parameters."""
-        species_count = self.dict_mtp["species_count"]
-        rfc = self.dict_mtp["radial_funcs_count"]
-        rbs = self.dict_mtp["radial_basis_size"]
-        asm = self.dict_mtp["alpha_scalar_moments"]
-
-        print("scaling:", parameters[0])
+        print("scaling:", self.dict_mtp["scaling"])
         print("moment_coeffs:")
-        print(parameters[1 : asm + 1])
+        print(self.dict_mtp["moment_coeffs"])
         print("species_coeffs:")
-        print(parameters[asm + 1 : asm + 1 + species_count])
-        shape = species_count, species_count, rfc, rbs
-        radial_coeffs = np.array(parameters[asm + 1 + species_count :]).reshape(shape)
+        print(self.dict_mtp["species_coeffs"])
         print("radial_coeffs:")
-        print(radial_coeffs)
+        print(self.dict_mtp["radial_coeffs"])
         print()
-
-
-def calc_species_coeffs_lstsq(
-    images: list[Atoms],
-    species: list[str],
-) -> npt.NDArray[np.float64]:
-    """Calculate `species_coeffs` assuming no interatomic forces.
-
-    The values are determined using the least-square method.
-    Note that, if there are no composition varieties in the training set,
-    the values are physically less meaningful.
-    """
-    counts = np.full((len(images), len(species)), np.nan)
-    energies = np.full(len(images), np.nan)
-    for i, atoms in enumerate(images):
-        for j, s in enumerate(species):
-            counts[i, j] = atoms.symbols.count(s)
-        energies[i] = atoms.get_potential_energy(force_consistent=True)
-    ns = counts.sum(axis=1)
-    counts /= ns[:, None]
-    energies /= ns
-    species_coeffs_lstsq = np.linalg.lstsq(counts, energies, rcond=None)[0]
-    rmse = np.sqrt(np.add.reduce((counts @ species_coeffs_lstsq - energies) ** 2))
-    print(f"{__name__}.{calc_species_coeffs_lstsq.__name__}")
-    print("species_coeffs_lstsq:")
-    print(species_coeffs_lstsq)
-    print("RMSE Energy per atom (eV/atom):", rmse)
-    print("The values are estimated assuming no interatomic forces.")
-    print()
-    return species_coeffs_lstsq
 
 
 def _init_scaling(
     data: dict[str, Any],
     optimized: list[str],
-) -> tuple[list[float], list[tuple[float, float]]]:
+) -> tuple[float, tuple[float, float]]:
     key = "scaling"
     v = data.get(key, 1.0)
-    parameters_scaling = np.array([v])
-    bounds_scaling = np.array([(0.0, np.inf)] if key in optimized else [(v, v)])
+    parameters_scaling = v
+    bounds_scaling = (0.0, np.inf) if key in optimized else (v, v)
     return parameters_scaling, bounds_scaling
 
 
@@ -179,7 +140,7 @@ def _init_moment_coeffs(
     data: dict[str, Any],
     optimized: list[str],
     rng: np.random.Generator,
-) -> tuple[list[float], list[tuple[float, float]]]:
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     asm = data["alpha_scalar_moments"]
     key = "moment_coeffs"
     if key in data:
@@ -188,7 +149,7 @@ def _init_moment_coeffs(
         lb, ub = -5.0, +5.0
         parameters = rng.uniform(lb, ub, asm)
     if key in optimized:
-        bounds = [(-np.inf, +np.inf)] * asm
+        bounds = np.array([(-np.inf, +np.inf)] * asm)
     else:
         bounds = np.repeat(parameters[:, None], 2, axis=1)
     return parameters, bounds
@@ -196,12 +157,16 @@ def _init_moment_coeffs(
 
 def _init_species_coeffs(
     data: dict[str, Any],
-    species_coeffs_lstsq: npt.NDArray[np.float64],
     optimized: list[str],
-) -> tuple[list[float], list[tuple[float, float]]]:
+    rng: np.random.Generator,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     species_count = data["species_count"]
     key = "species_coeffs"
-    parameters = np.asarray(data[key]) if key in data else species_coeffs_lstsq
+    if key in data:
+        parameters = np.asarray(data[key])
+    else:
+        lb, ub = -5.0, +5.0
+        parameters = rng.uniform(lb, ub, species_count)
     if key in optimized:
         bounds = np.array([(-np.inf, +np.inf)] * species_count)
     else:
@@ -213,7 +178,7 @@ def _init_radial_coeffs(
     data: dict[str, Any],
     optimized: list[str],
     rng: np.random.Generator,
-) -> tuple[list[float], list[tuple[float, float]]]:
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     species_count = data["species_count"]
     rfc = data["radial_funcs_count"]
     rbs = data["radial_basis_size"]

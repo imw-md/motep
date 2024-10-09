@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 from scipy.optimize import minimize
 
-from motep.optimizers import OptimizerBase
+from motep.optimizers.base import OptimizerBase
 
 
 def _limit_bounds(bounds: np.ndarray) -> np.ndarray:
