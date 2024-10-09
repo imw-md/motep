@@ -57,6 +57,7 @@ class EngineBase:
 
         # used for `Level2MTPOptimizer`
         self.radial_basis_values = None
+        self.radial_basis_derivs = None
 
     def update(self, dict_mtp: dict[str, Any]) -> None:
         """Update MTP parameters."""
@@ -82,17 +83,18 @@ class EngineBase:
         self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
         self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
 
-        number_of_atoms = len(atoms)
+        natoms = len(atoms)
         spc = self.dict_mtp["species_count"]
         rfc = self.dict_mtp["radial_funcs_count"]
         rbs = self.dict_mtp["radial_basis_size"]
         asm = self.dict_mtp["alpha_scalar_moments"]
 
         self.basis_values = np.full((asm), np.nan)
-        self.basis_dbdris = np.full((asm, 3, number_of_atoms), np.nan)
+        self.basis_dbdris = np.full((asm, 3, natoms), np.nan)
         self.basis_dbdeps = np.full((asm, 3, 3), np.nan)
 
         self.radial_basis_values = np.full((spc, spc, rfc, rbs), np.nan)
+        self.radial_basis_derivs = np.full((spc, spc, rfc, rbs, 3, natoms), np.nan)
 
     def _get_distances(
         self,
@@ -151,6 +153,13 @@ class NumpyMTPEngine(EngineBase):
             jtypes,
             self.rb.values0[:, None, :],
         )
+        for k, (j, jtype) in enumerate(zip(js, jtypes, strict=True)):
+            self.radial_basis_derivs[itype, jtype, :, :, :, i] -= (
+                self.rb.derivs0[k, :, None] * r_ijs[:, k] / r_abs[k],
+            )
+            self.radial_basis_derivs[itype, jtype, :, :, :, j] += (
+                self.rb.derivs0[k, :, None] * r_ijs[:, k] / r_abs[k],
+            )
 
         return calc_moment_basis(
             r_ijs,
@@ -174,6 +183,7 @@ class NumpyMTPEngine(EngineBase):
         self.basis_dbdeps[:, :, :] = 0.0
 
         self.radial_basis_values[...] = 0.0
+        self.radial_basis_derivs[...] = 0.0
 
         moment_coeffs = self.dict_mtp["moment_coeffs"]
 

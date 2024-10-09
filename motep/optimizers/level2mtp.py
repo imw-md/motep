@@ -68,7 +68,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         vector = self._calc_vector()
 
         # TODO: Consider also forces and stresses
-        coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
+        coeffs, *_ = np.linalg.lstsq(matrix, vector, rcond=None)
 
         # Update `dict_mtp` and `parameters`.
         parameters = self._update_parameters(coeffs)
@@ -115,13 +115,18 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         def get_radial_basis_values(atoms: Atoms) -> np.ndarray:
             return atoms.calc.engine.radial_basis_values[:, :, 0, :]
 
+        def get_radial_basis_derivs(atoms: Atoms) -> np.ndarray:
+            return atoms.calc.engine.radial_basis_derivs[:, :, 0, :, :, :].T
+
         values = np.stack([get_radial_basis_values(atoms) for atoms in images])
+        derivs = np.stack([get_radial_basis_derivs(atoms) for atoms in images])
         values = values.reshape(-1, size)
+        derivs = derivs.reshape(-1, size)
         tmp = []
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting["energy-weight"]) * values)
-        # if "forces" in self.minimized:
-        #     tmp.append(np.sqrt(setting["force-weight"]) * dbdris)
+        if "forces" in self.minimized:
+            tmp.append(np.sqrt(setting["force-weight"]) * derivs)
         # if "stress" in self.minimized:
         #     tmp.append(np.sqrt(setting["stress-weight"]) * dbdeps)
         return np.vstack(tmp)

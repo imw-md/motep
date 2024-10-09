@@ -43,7 +43,7 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
     ----------
     values0 : npt.NDArray[np.float64]
         Values of the (pseudo) Vandermonde matrix multiplied with the smoothing
-        funciton with the shape of (radial_funcs_count, radial_basis_size).
+        funciton with the shape of (neighbors, radial_basis_size).
 
     """
 

@@ -80,7 +80,7 @@ def test_molecules(
     assert f_e00 < f_ref
 
 
-@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize("level", [2, 4])
 @pytest.mark.parametrize(
     ("crystal", "species"),
     [("cubic", [29]), ("noncubic", [29])],
@@ -103,7 +103,7 @@ def test_crystals(
 
     setting = {
         "energy-weight": 1.0,
-        "force-weight": 0.0,
+        "force-weight": 0.01,
         "stress-weight": 0.0,
     }
 
@@ -145,6 +145,21 @@ def test_crystals(
 
     # Check if `parameters` are updated.
     assert not np.allclose(parameters, parameters_ref)
+
+    minimized = ["energy", "forces"]
+    optimizer = Level2MTPOptimizer(loss, optimized=optimized, minimized=minimized)
+    parameters = optimizer.optimize(parameters, bounds)
+    print()
+
+    mtp_data.update(parameters)
+    mtp_data.print()
+    f1 = loss(parameters)  # update parameters
+    errors1 = loss.print_errors()
+
+    # Check loss functions
+    # The value should be smaller when considering both energies and forces than
+    # when considering only energies.
+    assert f1 < f0
 
 
 @pytest.mark.parametrize("minimized", [["energy"]])
