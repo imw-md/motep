@@ -145,7 +145,7 @@ class LLSOptimizer(OptimizerBase):
         loss = self.loss_function
         setting = loss.setting
         n = len(loss.images)
-        energies = self._calc_interaction_energies()
+        energies = self._calc_energies()
         forces = np.hstack([loss.target_forces[i].flatten() for i in range(n)])
         stresses = np.hstack([loss.target_stresses[i].flatten() for i in range(n)])
         tmp = []
@@ -157,14 +157,16 @@ class LLSOptimizer(OptimizerBase):
             tmp.append(np.sqrt(setting["stress-weight"]) * stresses)
         return np.hstack(tmp)
 
-    def _calc_interaction_energies(self) -> np.ndarray:
-        """Calculate interaction energies of Atoms objects.
+    def _calc_energies(self) -> np.ndarray:
+        """Calculate energies of Atoms objects.
 
         Returns
         -------
-        np.ndarray
-            Array of interaction energies of the Atoms objects caused by
-            interactions among atoms, i.e., without site energies.
+        energies : np.ndarray
+            Array of interaction energies of the Atoms objects.
+            If the key `species_coeffs` is not in `optimized`, this is the
+            energies due to interactions among atoms without site energies.
+            Otherwise, this is the raw energies including site energies.
 
         """
         loss = self.loss_function
