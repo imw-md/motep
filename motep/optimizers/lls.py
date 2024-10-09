@@ -1,5 +1,6 @@
 """Module for the optimizer based on linear least squares (LLS)."""
 
+from abc import abstractmethod
 from typing import Any
 
 import numpy as np
@@ -10,13 +11,13 @@ from motep.optimizers.base import OptimizerBase
 from motep.optimizers.scipy import Callback
 
 
-class LLSOptimizer(OptimizerBase):
-    """Optimizer based on linear least squares (LLS).
+class LLSOptimizerBase(OptimizerBase):
+    """Abstract base class for `LLSOptimizer` and `Level2MTPOptimizer`.
 
     Attributes
     ----------
     minimized : list[str]
-        Properties whose errors are minimized by optimizing `moment_coeffs`.
+        Properties whose errors are minimized by optimizing `radial_coeffs`.
         The elements must be some of `energy`, `forces`, and `stress`.
 
     """
@@ -29,13 +30,114 @@ class LLSOptimizer(OptimizerBase):
         minimized: list[str] | None = None,
         **kwargs: dict[str, Any],
     ) -> None:
+        """Initialize the optimizer."""
         super().__init__(loss_function, **kwargs)
-        if optimized is None:
-            optimized = ["species_coeffs", "moment_coeffs"]
-        self.optimized = optimized
         if minimized is None:
             minimized = ["energy", "forces"]
         self.minimized = minimized
+        self.optimized = optimized
+
+    @abstractmethod
+    def _calc_matrix(self) -> np.ndarray:
+        """Calculate the matrix for linear least squares (LLS)."""
+
+    def _calc_matrix_species_coeffs(self) -> np.ndarray:
+        loss = self.loss_function
+        species = loss.mtp_data.dict_mtp["species"]
+        setting = loss.setting
+        tmp = []
+        if "energy" in self.minimized:
+            v = self._calc_matrix_energies_species_coeffs()
+            tmp.append(np.sqrt(setting["energy-weight"]) * v)
+        if "forces" in self.minimized:
+            shape = sum(_.size for _ in loss.target_forces), len(species)
+            tmp.append(np.zeros(shape))
+        if "stress" in self.minimized:
+            shape = sum(_.size for _ in loss.target_stresses), len(species)
+            tmp.append(np.zeros(shape))
+        return np.vstack(tmp)
+
+    def _calc_matrix_energies_species_coeffs(self) -> np.ndarray:
+        loss = self.loss_function
+        species = loss.mtp_data.dict_mtp["species"]
+        images = loss.images
+        counts = np.full((len(images), len(species)), np.nan)
+        for i, atoms in enumerate(images):
+            for j, s in enumerate(species):
+                counts[i, j] = list(atoms.numbers).count(s)
+        return counts
+
+    def _calc_vector(self) -> np.ndarray:
+        """Calculate the vector for linear least squares (LLS)."""
+        loss = self.loss_function
+        setting = loss.setting
+        n = len(loss.images)
+        energies = self._calc_energies()
+        forces = np.hstack([loss.target_forces[i].flatten() for i in range(n)])
+        stresses = np.hstack([loss.target_stresses[i].flatten() for i in range(n)])
+        tmp = []
+        if "energy" in self.minimized:
+            tmp.append(np.sqrt(setting["energy-weight"]) * energies)
+        if "forces" in self.minimized:
+            tmp.append(np.sqrt(setting["force-weight"]) * forces * -1.0)
+        if "stress" in self.minimized:
+            tmp.append(np.sqrt(setting["stress-weight"]) * stresses)
+        return np.hstack(tmp)
+
+    def _calc_energies(self) -> np.ndarray:
+        """Calculate energies of Atoms objects.
+
+        Returns
+        -------
+        energies : np.ndarray
+            Array of interaction energies of the Atoms objects.
+            If the key `species_coeffs` is not in `optimized`, this is the
+            energies due to interactions among atoms without site energies.
+            Otherwise, this is the raw energies including site energies.
+
+        """
+        loss = self.loss_function
+        dict_mtp = loss.mtp_data.dict_mtp
+        images = loss.images
+        species = dict_mtp["species"]
+
+        def get_types(atoms: Atoms) -> list[int]:
+            return [species[_] for _ in atoms.numbers]
+
+        energies = self._calc_target_energies()
+        if "species_coeffs" not in self.optimized:
+            iterable = (
+                np.add.reduce(dict_mtp["species_coeffs"][get_types(atoms)])
+                for atoms in images
+            )
+            energies -= np.fromiter(iterable, dtype=float, count=len(images))
+        return energies
+
+    def _calc_target_energies(self) -> np.ndarray:
+        """Calculate the target energies."""
+        return self.loss_function.target_energies.copy()
+
+
+class LLSOptimizer(LLSOptimizerBase):
+    """Optimizer based on linear least squares (LLS).
+
+    Attributes
+    ----------
+    optimized : list[str]
+        Coefficients to be optimized.
+        The elements must be some of `species_coeffs` and `moment_coeffs`.
+
+    """
+
+    def __init__(
+        self,
+        loss_function: LossFunctionBase,
+        **kwargs: dict[str, Any],
+    ) -> None:
+        """Initialize the optimizer."""
+        super().__init__(loss_function, **kwargs)
+        if self.optimized is None:
+            self.optimized = ["species_coeffs", "moment_coeffs"]
 
     def optimize(
         self,
@@ -113,79 +215,3 @@ class LLSOptimizer(OptimizerBase):
         if "stress" in self.minimized:
             tmp.append(np.sqrt(setting["stress-weight"]) * basis_dbdeps)
         return np.vstack(tmp)
-
-    def _calc_matrix_species_coeffs(self) -> np.ndarray:
-        loss = self.loss_function
-        species = loss.mtp_data.dict_mtp["species"]
-        setting = loss.setting
-        tmp = []
-        if "energy" in self.minimized:
-            v = self._calc_matrix_energies_species_coeffs()
-            tmp.append(np.sqrt(setting["energy-weight"]) * v)
-        if "forces" in self.minimized:
-            shape = sum(_.size for _ in loss.target_forces), len(species)
-            tmp.append(np.zeros(shape))
-        if "stress" in self.minimized:
-            shape = sum(_.size for _ in loss.target_stresses), len(species)
-            tmp.append(np.zeros(shape))
-        return np.vstack(tmp)
-
-    def _calc_matrix_energies_species_coeffs(self) -> np.ndarray:
-        loss = self.loss_function
-        species = loss.mtp_data.dict_mtp["species"]
-        images = loss.images
-        counts = np.full((len(images), len(species)), np.nan)
-        for i, atoms in enumerate(images):
-            for j, s in enumerate(species):
-                counts[i, j] = list(atoms.numbers).count(s)
-        return counts
-
-    def _calc_vector(self) -> np.ndarray:
-        """Calculate the vector for linear least squares (LLS)."""
-        loss = self.loss_function
-        setting = loss.setting
-        n = len(loss.images)
-        energies = self._calc_energies()
-        forces = np.hstack([loss.target_forces[i].flatten() for i in range(n)])
-        stresses = np.hstack([loss.target_stresses[i].flatten() for i in range(n)])
-        tmp = []
-        if "energy" in self.minimized:
-            tmp.append(np.sqrt(setting["energy-weight"]) * energies)
-        if "forces" in self.minimized:
-            tmp.append(np.sqrt(setting["force-weight"]) * forces * -1.0)
-        if "stress" in self.minimized:
-            tmp.append(np.sqrt(setting["stress-weight"]) * stresses)
-        return np.hstack(tmp)
-
-    def _calc_energies(self) -> np.ndarray:
-        """Calculate energies of Atoms objects.
-
-        Returns
-        -------
-        energies : np.ndarray
-            Array of interaction energies of the Atoms objects.
-            If the key `species_coeffs` is not in `optimized`, this is the
-            energies due to interactions among atoms without site energies.
-            Otherwise, this is the raw energies including site energies.
-
-        """
-        loss = self.loss_function
-        dict_mtp = loss.mtp_data.dict_mtp
-        images = loss.images
-        species = dict_mtp["species"]
-
-        def get_types(atoms: Atoms) -> list[int]:
-            return [species[_] for _ in atoms.numbers]
-
-        energies = self._calc_target_energies()
-        if "species_coeffs" not in self.optimized:
-            iterable = (
-                np.add.reduce(dict_mtp["species_coeffs"][get_types(atoms)])
-                for atoms in images
-            )
-            energies -= np.fromiter(iterable, dtype=float, count=len(images))
-        return energies
-
-    def _calc_target_energies(self) -> np.ndarray:
-        """Calculate the target energies."""
-        return self.loss_function.target_energies.copy()
