@@ -104,7 +104,7 @@ def test_crystals(
     setting = {
         "energy-weight": 1.0,
         "force-weight": 0.01,
-        "stress-weight": 0.0,
+        "stress-weight": 0.001,
     }
 
     optimized = ["radial_coeffs"]
@@ -160,6 +160,28 @@ def test_crystals(
     # The value should be smaller when considering both energies and forces than
     # when considering only energies.
     assert f1 < f0
+
+    # Check RMSEs
+    # When only the RMSE of the energies is minimized, it should be smaller than
+    # the value when minimizing the errors of both the energies and the forces.
+    assert errors0["energy"]["RMS"] < errors1["energy"]["RMS"]
+    assert errors0["forces"]["RMS"] > errors1["forces"]["RMS"]
+
+    minimized = ["energy", "forces", "stress"]
+    optimizer = Level2MTPOptimizer(loss, optimized=optimized, minimized=minimized)
+    parameters = optimizer.optimize(parameters, bounds)
+    print()
+
+    mtp_data.update(parameters)
+    mtp_data.print()
+    f2 = loss(parameters)  # update parameters
+    errors2 = loss.print_errors()
+
+    # Check loss functions
+    assert f2 < f1
+
+    # Check RMSEs
+    assert errors1["stress"]["RMS"] > errors2["stress"]["RMS"]
 
 
 @pytest.mark.parametrize("minimized", [["energy"]])

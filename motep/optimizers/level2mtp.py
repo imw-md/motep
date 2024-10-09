@@ -3,7 +3,6 @@
 from typing import Any
 
 import numpy as np
-from ase import Atoms
 
 from motep.loss_function import LossFunctionBase
 from motep.optimizers.lls import LLSOptimizerBase
@@ -67,7 +66,6 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         matrix = self._calc_matrix()
         vector = self._calc_vector()
 
-        # TODO: Consider also forces and stresses
         coeffs, *_ = np.linalg.lstsq(matrix, vector, rcond=None)
 
         # Update `dict_mtp` and `parameters`.
@@ -112,21 +110,17 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         radial_basis_size = dict_mtp["radial_basis_size"]
         size = species_count * species_count * radial_basis_size
 
-        def get_radial_basis_values(atoms: Atoms) -> np.ndarray:
-            return atoms.calc.engine.radial_basis_values[:, :, :]
-
-        def get_radial_basis_derivs(atoms: Atoms) -> np.ndarray:
-            return atoms.calc.engine.radial_basis_derivs[:, :, :, :, :].T
-
-        values = np.stack([get_radial_basis_values(atoms) for atoms in images])
-        derivs = np.stack([get_radial_basis_derivs(atoms) for atoms in images])
+        values = np.stack([atoms.calc.engine.radial_basis_values for atoms in images])
+        dqdris = np.stack([atoms.calc.engine.radial_basis_dqdris.T for atoms in images])
+        dqdeps = np.stack([atoms.calc.engine.radial_basis_dqdeps.T for atoms in images])
         values = values.reshape(-1, size)
-        derivs = derivs.reshape(-1, size)
+        dqdris = dqdris.reshape(-1, size)
+        dqdeps = dqdeps.reshape(-1, size)
         tmp = []
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting["energy-weight"]) * values)
         if "forces" in self.minimized:
-            tmp.append(np.sqrt(setting["force-weight"]) * derivs)
-        # if "stress" in self.minimized:
-        #     tmp.append(np.sqrt(setting["stress-weight"]) * dbdeps)
+            tmp.append(np.sqrt(setting["force-weight"]) * dqdris)
+        if "stress" in self.minimized:
+            tmp.append(np.sqrt(setting["stress-weight"]) * dqdeps)
         return np.vstack(tmp)
