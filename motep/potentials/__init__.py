@@ -14,7 +14,7 @@ class MTPData:
         self,
         dict_mtp: dict[str, Any],
         images: list[Atoms],
-        species: list[str],
+        species: list[int],
         rng: np.random.Generator | int | None,
     ) -> None:
         """Initialize Initializer.
@@ -26,7 +26,7 @@ class MTPData:
         images : list[Atoms]
             List of ASE Atoms objects for the training dataset.
             They are used to determine the initial guess of `species_coeffs`.
-        species : list[str]
+        species : list[int]
             List of species in the order of `type` in the MLIP cfg file.
         rng : np.random.Generator | int | None, default = None
             Pseudo-random-number generator (PRNG) with the NumPy API.
@@ -148,7 +148,7 @@ def calc_species_coeffs_lstsq(
     energies = np.full(len(images), np.nan)
     for i, atoms in enumerate(images):
         for j, s in enumerate(species):
-            counts[i, j] = atoms.symbols.count(s)
+            counts[i, j] = list(atoms.numbers).count(s)
         energies[i] = atoms.get_potential_energy(force_consistent=True)
     ns = counts.sum(axis=1)
     counts /= ns[:, None]

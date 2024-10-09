@@ -5,12 +5,10 @@ from typing import Any
 
 import numpy as np
 from ase import Atoms
-from ase.data import chemical_symbols
 from mpi4py import MPI
 from scipy.constants import eV
 
 from motep.calculator import MTP
-from motep.io.mlip.cfg import _get_species
 from motep.potentials import MTPData
 
 
@@ -78,14 +76,7 @@ def _calc_errors_from_diff(diff: np.ndarray) -> dict[str, float]:
 
 
 class LossFunctionBase(ABC):
-    """Loss function.
-
-    Attributes
-    ----------
-    species : list[int]
-        List of atomic numbers in the order of atomic types in the .mtp file.
-
-    """
+    """Loss function."""
 
     def __init__(
         self,
@@ -113,10 +104,6 @@ class LossFunctionBase(ABC):
         self.mtp_data = mtp_data
         self.setting = setting
         self.comm = comm
-
-        species = setting.get("species")
-        species = _get_species(self.images) if species is None else species
-        self.species = [chemical_symbols.index(_) for _ in species]
 
         self.target_energies, self.target_forces, self.target_stresses = (
             calc_properties(self.images, self.comm)

@@ -5,15 +5,23 @@ import pathlib
 import time
 from pprint import pprint
 
+from ase import Atoms
 from mpi4py import MPI
 
-from motep.io.mlip.cfg import _get_species, read_cfg
+from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss_function import LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
 from motep.potentials import MTPData
 from motep.setting import make_default_setting, parse_setting
 from motep.utils import cd
+
+
+def _get_dummy_species(images: list[Atoms]) -> list[int]:
+    m = 0
+    for atoms in images:
+        m = max(m, atoms.numbers.max())
+    return list(range(m + 1))
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -37,11 +45,12 @@ def run(args: argparse.Namespace) -> None:
 
     species = setting.get("species")
     images = read_cfg(cfg_file, index=":", species=species)
-    species = list(_get_species(images)) if species is None else species
+    if "species" not in setting:
+        setting["species"] = _get_dummy_species(images)
 
     dict_mtp = read_mtp(untrained_mtp)
 
-    mtp_data = MTPData(dict_mtp, images, species, setting["seed"])
+    mtp_data = MTPData(dict_mtp, images, setting["species"], setting["seed"])
 
     if setting["engine"] == "mlippy":
         from motep.mlippy_loss_function import MlippyLossFunction

@@ -7,7 +7,7 @@ from motep.loss_function import LossFunctionBase
 from motep.potentials import MTPData
 
 
-def init_mlip(file: str, species: list[str]):
+def init_mlip(file: str, species: list[int]):
     mlip = mlippy.initialize()
     mlip = mlippy.mtp()
     mlip.load_potential(file)
@@ -32,7 +32,7 @@ def init_calc(
 class MlippyLossFunction(LossFunctionBase):
     def __call__(self, parameters: list[float]) -> float:
         file = self.setting["potential_final"]
-        calc = init_calc(file, self.mtp_data, parameters, self.species)
+        calc = init_calc(file, self.mtp_data, parameters, self.setting["species"])
         for atoms in self.images:
             atoms.calc = calc
         return self.calc_loss_function()
