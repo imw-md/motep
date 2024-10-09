@@ -55,6 +55,9 @@ class EngineBase:
         self.basis_dbdris = None
         self.basis_dbdeps = None
 
+        # used for `Level2MTPOptimizer`
+        self.radial_basis_values = None
+
     def update(self, dict_mtp: dict[str, Any]) -> None:
         """Update MTP parameters."""
         self.dict_mtp = dict_mtp
@@ -81,15 +84,16 @@ class EngineBase:
         self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
 
         number_of_atoms = len(atoms)
+        spc = self.dict_mtp["species_count"]
+        rfc = self.dict_mtp["radial_funcs_count"]
+        rbs = self.dict_mtp["radial_basis_size"]
+        asm = self.dict_mtp["alpha_scalar_moments"]
 
-        shape = self.dict_mtp["alpha_scalar_moments"]
-        self.basis_values = np.full(shape, np.nan)
+        self.basis_values = np.full((asm), np.nan)
+        self.basis_dbdris = np.full((asm, 3, number_of_atoms), np.nan)
+        self.basis_dbdeps = np.full((asm, 3, 3), np.nan)
 
-        shape = self.dict_mtp["alpha_scalar_moments"], 3, number_of_atoms
-        self.basis_dbdris = np.full(shape, np.nan)
-
-        shape = self.dict_mtp["alpha_scalar_moments"], 3, 3
-        self.basis_dbdeps = np.full(shape, np.nan)
+        self.radial_basis_values = np.full((spc, spc, rfc, rbs), np.nan)
 
     def _get_distances(
         self,
@@ -109,8 +113,10 @@ def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
 
 
 class NumpyMTPEngine(EngineBase):
-    def __init__(self, dict_mtp: dict[str, Any] | None = None):
-        """MLIP-2 MTP.
+    """MTP engine based on NumPy."""
+
+    def __init__(self, dict_mtp: dict[str, Any] | None = None) -> None:
+        """Intialize the engine.
 
         Parameters
         ----------
@@ -139,7 +145,14 @@ class NumpyMTPEngine(EngineBase):
         itype = self.dict_mtp["species"][atoms.numbers[i]]
         jtypes = [self.dict_mtp["species"][atoms.numbers[j]] for j in js]
         r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
+
         rb_values, rb_derivs = self.rb.calculate(r_abs, itype, jtypes)
+        np.add.at(
+            self.radial_basis_values[itype],
+            jtypes,
+            self.rb.values0[:, None, :],
+        )
+
         return calc_moment_basis(
             r_ijs,
             r_abs,
@@ -160,6 +173,8 @@ class NumpyMTPEngine(EngineBase):
         self.basis_values[:] = 0.0
         self.basis_dbdris[:, :, :] = 0.0
         self.basis_dbdeps[:, :, :] = 0.0
+
+        self.radial_basis_values[...] = 0.0
 
         moment_coeffs = self.dict_mtp["moment_coeffs"]
 
