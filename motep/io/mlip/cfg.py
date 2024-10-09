@@ -14,18 +14,19 @@ from ase.data import atomic_masses, chemical_symbols
 def read_cfg(
     filename: str | os.PathLike,
     index: int = -1,
-    species: dict[int, str] | list[str] | None = None,
+    species: list[int] | list[str] | None = None,
 ) -> Atoms | list[Atoms]:
     """Read images from a MTP .cfg file.
 
     Parameters
     ----------
-    species : dict[int, str] | list[str], optional
-        List that defines types of chemical symbols (e.g, ['Pd', 'H'] means Pd
-        is type 0 and H type 1), by default None. If None, dummy symbols 'X',
-        'H', 'He', etc. are assigned for type 0, 1, 2, etc.
+    species : list[int] | list[str], optional
+        List or dict defining types of chemical symbols. For example,
+        [46, 1] and ['Pd', 'H'] assign Pd for type 0 and H for type 1. If None,
+        dummy symbols 'X', 'H', 'He', etc. are assigned for types 0, 1, 2, etc.
 
     """
+    species = _convert_species(species)
     atoms_list = []
     with pathlib.Path(filename).open(encoding="utf-8") as file:
         for line in file:
@@ -35,6 +36,12 @@ def read_cfg(
     if index == ":":
         return atoms_list
     return atoms_list[index]
+
+
+def _convert_species(species: list | None) -> list[int] | None:
+    if isinstance(species, list) and isinstance(species[0], str):
+        return [chemical_symbols.index(_) for _ in species]
+    return species  # list[int] | None
 
 
 def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
@@ -76,18 +83,15 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
         results["nbh_grades"] = atomdata["nbh_grades"]
 
     if species is None:
-        symbols = None
         numbers = atomdata["type"]
     else:
-        symbols = [species[_] for _ in atomdata["type"]]
-        numbers = None
+        numbers = [species[_] for _ in atomdata["type"]]
 
     pbc = False if cell is None else True
 
     if all((_ in atomdata) for _ in keys_c):
         positions = list(zip(*[atomdata[_] for _ in keys_c], strict=True))
         atoms = Atoms(
-            symbols=symbols,
             numbers=numbers,
             positions=positions,
             cell=cell,
@@ -96,7 +100,6 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
     elif all((_ in atomdata) for _ in keys_d):
         positions = list(zip(*[atomdata[_] for _ in keys_d], strict=True))
         atoms = Atoms(
-            symbols=symbols,
             numbers=numbers,
             scaled_positions=positions,
             cell=cell,
