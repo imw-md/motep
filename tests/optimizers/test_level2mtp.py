@@ -78,3 +78,139 @@ def test_molecules(
 
     # Check loss functions
     assert f_e00 < f_ref
+
+
+@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize(
+    ("crystal", "species"),
+    [("cubic", [29]), ("noncubic", [29])],
+)
+@pytest.mark.parametrize("engine", ["numpy"])
+def test_crystals(
+    engine: str,
+    crystal: int,
+    species: dict[int, int],
+    level: int,
+    data_path: pathlib.Path,
+) -> None:
+    """Test PyMTP."""
+    original_path = data_path / f"original/crystals/{crystal}"
+    fitting_path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
+    if not (fitting_path / "initial.mtp").exists():
+        pytest.skip()
+    dict_mtp = read_mtp(fitting_path / "initial.mtp")
+    images = read_cfg(original_path / "training.cfg", index=":")[::100]
+
+    setting = {
+        "energy-weight": 1.0,
+        "force-weight": 0.0,
+        "stress-weight": 0.0,
+    }
+
+    optimized = ["radial_coeffs"]
+
+    mtp_data = MTPData(dict_mtp, rng=42)
+    parameters, bounds = mtp_data.initialize(optimized=optimized)
+    mtp_data.update(parameters)
+
+    loss = LossFunction(
+        images,
+        mtp_data=mtp_data,
+        setting=setting,
+        comm=MPI.COMM_WORLD,
+        engine=engine,
+    )
+
+    optimizer = NoInteractionOptimizer(loss)
+    parameters, bounds = mtp_data.initialize(optimized=[])
+    parameters = optimizer.optimize(parameters, bounds)
+    print()
+
+    mtp_data.update(parameters)
+    mtp_data.print()
+    loss(parameters)  # update parameters
+    loss.print_errors()
+
+    parameters_ref = np.array(parameters, copy=True)
+
+    minimized = ["energy"]
+    optimizer = Level2MTPOptimizer(loss, optimized=optimized, minimized=minimized)
+    parameters = optimizer.optimize(parameters, bounds)
+    print()
+
+    mtp_data.update(parameters)
+    mtp_data.print()
+    f0 = loss(parameters)  # update parameters
+    errors0 = loss.print_errors()
+
+    # Check if `parameters` are updated.
+    assert not np.allclose(parameters, parameters_ref)
+
+
+@pytest.mark.parametrize("minimized", [["energy"]])
+@pytest.mark.parametrize("level", [2, 4])
+@pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
+def test_species_coeffs(
+    crystal: int,
+    level: int,
+    minimized: list[str],
+    data_path: pathlib.Path,
+) -> None:
+    """Check if the loss function is smaller when optimizing also `species_coeffs`."""
+    original_path = data_path / f"original/crystals/{crystal}"
+    fitting_path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
+    if not (fitting_path / "initial.mtp").exists():
+        pytest.skip()
+    dict_mtp = read_mtp(fitting_path / "initial.mtp")
+    species = [29]
+    dict_mtp["species"] = species
+    images = read_cfg(original_path / "training.cfg", index=":", species=species)[::100]
+
+    setting = {
+        "energy-weight": 1.0,
+        "force-weight": 0.0,
+        "stress-weight": 0.0,
+    }
+
+    optimized = ["radial_coeffs", "species_coeffs"]
+    mtp_data = MTPData(dict_mtp, rng=42)
+    parameters, bounds = mtp_data.initialize(optimized=optimized)
+    mtp_data.update(parameters)
+
+    loss = LossFunction(
+        images,
+        mtp_data=mtp_data,
+        setting=setting,
+        comm=MPI.COMM_WORLD,
+        engine="numpy",
+    )
+
+    optimizer = NoInteractionOptimizer(loss)
+    parameters, bounds = mtp_data.initialize(optimized=[])
+    parameters = optimizer.optimize(parameters, bounds)
+    print()
+
+    mtp_data.update(parameters)
+    mtp_data.print()
+    loss(parameters)  # update parameters
+
+    optimized = ["radial_coeffs"]
+    optimizer = Level2MTPOptimizer(loss, optimized=optimized, minimized=minimized)
+    parameters = optimizer.optimize(parameters, bounds)
+    print()
+
+    mtp_data.update(parameters)
+    mtp_data.print()
+    f0 = loss(parameters)  # update parameters
+
+    optimized = ["radial_coeffs", "species_coeffs"]
+    optimizer = Level2MTPOptimizer(loss, optimized=optimized, minimized=minimized)
+    parameters = optimizer.optimize(parameters, bounds)
+    print()
+
+    mtp_data.update(parameters)
+    mtp_data.print()
+    f1 = loss(parameters)  # update parameters
+
+    # Check loss functions
+    assert f0 > f1
