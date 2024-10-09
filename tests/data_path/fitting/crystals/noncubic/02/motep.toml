@@ -1,0 +1,11 @@
+configurations = 'training.cfg'
+potential_initial = 'initial.mtp'
+potential_final = 'pot.mtp'
+energy-weight = 1.0
+force-weight = 0.01
+stress-weight = 0.001
+
+[[steps]]
+method = 'Level2MTP'
+minimized = ['energy', 'forces', 'stress']
+optimized = ['radial_coeffs', 'species_coeffs']
