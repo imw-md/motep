@@ -50,12 +50,12 @@ class MTPData:
         """
         dict_mtp = self.dict_mtp
         scaling, bound_scaling = _init_scaling(dict_mtp, optimized)
-        moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
+        species_coeffs, bounds_species_coeffs = _init_species_coeffs(
             dict_mtp,
             optimized,
             self.rng,
         )
-        species_coeffs, bounds_species_coeffs = _init_species_coeffs(
+        moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
             dict_mtp,
             optimized,
             self.rng,
