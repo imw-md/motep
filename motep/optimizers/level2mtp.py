@@ -3,6 +3,7 @@
 from typing import Any
 
 import numpy as np
+from ase import Atoms
 
 from motep.loss_function import LossFunctionBase
 from motep.optimizers.lls import LLSOptimizerBase
@@ -80,15 +81,15 @@ class Level2MTPOptimizer(LLSOptimizerBase):
     def _update_parameters(self, coeffs: np.ndarray) -> np.ndarray:
         mtp_data = self.loss_function.mtp_data
         species_count = mtp_data.dict_mtp["species_count"]
-        rfc = mtp_data.dict_mtp["radial_funcs_count"]
         rbs = mtp_data.dict_mtp["radial_basis_size"]
-        size = species_count * species_count * rfc * rbs
-        shape = species_count, species_count, rfc, rbs
+        size = species_count * species_count * rbs
+        shape = species_count, species_count, rbs
 
         mtp_data.dict_mtp["scaling"] = 1.0
         mtp_data.dict_mtp["moment_coeffs"][...] = 0.0
         mtp_data.dict_mtp["moment_coeffs"][000] = 1.0
-        mtp_data.dict_mtp["radial_coeffs"] = coeffs[:size].reshape(shape)
+        mtp_data.dict_mtp["radial_coeffs"][000] = 0.0
+        mtp_data.dict_mtp["radial_coeffs"][:, :, 0, :] = coeffs[:size].reshape(shape)
         if "species_coeffs" in self.optimized:
             mtp_data.dict_mtp["species_coeffs"] = coeffs[size:]
 
@@ -107,8 +108,14 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         dict_mtp = loss.mtp_data.dict_mtp
         images = loss.images
         setting = loss.setting
-        size = dict_mtp["radial_coeffs"].size
-        values = np.stack([atoms.calc.engine.radial_basis_values for atoms in images])
+        species_count = dict_mtp["species_count"]
+        radial_basis_size = dict_mtp["radial_basis_size"]
+        size = species_count * species_count * radial_basis_size
+
+        def get_radial_basis_values(atoms: Atoms) -> np.ndarray:
+            return atoms.calc.engine.radial_basis_values[:, :, 0, :]
+
+        values = np.stack([get_radial_basis_values(atoms) for atoms in images])
         values = values.reshape(-1, size)
         tmp = []
         if "energy" in self.minimized:
