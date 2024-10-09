@@ -80,17 +80,21 @@ def test_molecules(
     assert f_e00 < f_ref
 
 
-@pytest.mark.parametrize("level", [2, 4])
 @pytest.mark.parametrize(
-    ("crystal", "species"),
-    [("cubic", [29]), ("noncubic", [29])],
+    "optimized",
+    [
+        ["radial_coeffs"],
+        ["radial_coeffs", "species_coeffs"],
+    ],
 )
+@pytest.mark.parametrize("level", [2, 4])
+@pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("engine", ["numpy"])
 def test_crystals(
     engine: str,
     crystal: int,
-    species: dict[int, int],
     level: int,
+    optimized: list[str],
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
@@ -106,8 +110,6 @@ def test_crystals(
         "force-weight": 0.01,
         "stress-weight": 0.001,
     }
-
-    optimized = ["radial_coeffs"]
 
     mtp_data = MTPData(dict_mtp, rng=42)
     parameters, bounds = mtp_data.initialize(optimized=optimized)
