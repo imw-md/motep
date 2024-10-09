@@ -140,7 +140,7 @@ def _init_moment_coeffs(
     data: dict[str, Any],
     optimized: list[str],
     rng: np.random.Generator,
-) -> tuple[list[float], list[tuple[float, float]]]:
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     asm = data["alpha_scalar_moments"]
     key = "moment_coeffs"
     if key in data:
@@ -149,7 +149,7 @@ def _init_moment_coeffs(
         lb, ub = -5.0, +5.0
         parameters = rng.uniform(lb, ub, asm)
     if key in optimized:
-        bounds = [(-np.inf, +np.inf)] * asm
+        bounds = np.array([(-np.inf, +np.inf)] * asm)
     else:
         bounds = np.repeat(parameters[:, None], 2, axis=1)
     return parameters, bounds
@@ -178,7 +178,7 @@ def _init_radial_coeffs(
     data: dict[str, Any],
     optimized: list[str],
     rng: np.random.Generator,
-) -> tuple[list[float], list[tuple[float, float]]]:
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     species_count = data["species_count"]
     rfc = data["radial_funcs_count"]
     rbs = data["radial_basis_size"]
