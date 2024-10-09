@@ -60,9 +60,16 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
     ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         """Calculate (pseudo) Vandermonde matrices.
 
+        Parameters
+        ----------
+        r_abs : npt.NDArray[np.float64]
+            Distances to the neighbors with the shape of (neighbors).
+
         Returns
         -------
         values : npt.NDArray[np.float64]
+            (neighbors, radial_basis_size)
+        derivs : npt.NDArray[np.float64]
             (neighbors, radial_basis_size)
 
         """

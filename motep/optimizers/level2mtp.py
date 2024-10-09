@@ -113,10 +113,10 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         size = species_count * species_count * radial_basis_size
 
         def get_radial_basis_values(atoms: Atoms) -> np.ndarray:
-            return atoms.calc.engine.radial_basis_values[:, :, 0, :]
+            return atoms.calc.engine.radial_basis_values[:, :, :]
 
         def get_radial_basis_derivs(atoms: Atoms) -> np.ndarray:
-            return atoms.calc.engine.radial_basis_derivs[:, :, 0, :, :, :].T
+            return atoms.calc.engine.radial_basis_derivs[:, :, :, :, :].T
 
         values = np.stack([get_radial_basis_values(atoms) for atoms in images])
         derivs = np.stack([get_radial_basis_derivs(atoms) for atoms in images])

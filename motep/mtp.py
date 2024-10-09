@@ -26,6 +26,10 @@ class EngineBase:
         This corresponds to nabla b_j in Eq. (7a) in [Podryabinkin_CMS_2017_Active]_.
     basis_dbdeps : np.ndarray (alpha_moments_count, 3, 3)
         Derivatives of cumulated basis functions with respect to the strain tensor.
+    radial_basis_values : np.ndarray (species_count, species_count, radial_basis_size)
+        Radial basis values summed over atoms.
+    radial_basis_derivs : (species_count, species_count, radial_basis_size, 3, natoms)
+        Derivaties of radial basis functions summed over atoms.
 
     .. [Podryabinkin_CMS_2017_Active]
        E. V. Podryabinkin and A. V. Shapeev, Comput. Mater. Sci. 140, 171 (2017).
@@ -85,7 +89,6 @@ class EngineBase:
 
         natoms = len(atoms)
         spc = self.dict_mtp["species_count"]
-        rfc = self.dict_mtp["radial_funcs_count"]
         rbs = self.dict_mtp["radial_basis_size"]
         asm = self.dict_mtp["alpha_scalar_moments"]
 
@@ -93,8 +96,8 @@ class EngineBase:
         self.basis_dbdris = np.full((asm, 3, natoms), np.nan)
         self.basis_dbdeps = np.full((asm, 3, 3), np.nan)
 
-        self.radial_basis_values = np.full((spc, spc, rfc, rbs), np.nan)
-        self.radial_basis_derivs = np.full((spc, spc, rfc, rbs, 3, natoms), np.nan)
+        self.radial_basis_values = np.full((spc, spc, rbs), np.nan)
+        self.radial_basis_derivs = np.full((spc, spc, rbs, 3, natoms), np.nan)
 
     def _get_distances(
         self,
@@ -148,17 +151,13 @@ class NumpyMTPEngine(EngineBase):
         r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
 
         rb_values, rb_derivs = self.rb.calculate(r_abs, itype, jtypes)
-        np.add.at(
-            self.radial_basis_values[itype],
-            jtypes,
-            self.rb.values0[:, None, :],
-        )
+        np.add.at(self.radial_basis_values[itype], jtypes, self.rb.values0[:, :])
         for k, (j, jtype) in enumerate(zip(js, jtypes, strict=True)):
-            self.radial_basis_derivs[itype, jtype, :, :, :, i] -= (
-                self.rb.derivs0[k, :, None] * r_ijs[:, k] / r_abs[k],
+            self.radial_basis_derivs[itype, jtype, :, :, i] -= (
+                self.rb.derivs0[k, :, None] * r_ijs[:, k] / r_abs[k]
             )
-            self.radial_basis_derivs[itype, jtype, :, :, :, j] += (
-                self.rb.derivs0[k, :, None] * r_ijs[:, k] / r_abs[k],
+            self.radial_basis_derivs[itype, jtype, :, :, j] += (
+                self.rb.derivs0[k, :, None] * r_ijs[:, k] / r_abs[k]
             )
 
         return calc_moment_basis(
