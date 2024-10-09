@@ -15,11 +15,12 @@ class Randomizer(OptimizerBase):
     def __init__(
         self,
         loss_function: LossFunctionBase,
+        *,
         optimized: list[str] | None = None,
         **kwargs: dict[str, Any],
     ) -> None:
         """Initialize `Randomizer`."""
-        super().__init__(loss_function)
+        super().__init__(loss_function, **kwargs)
         if optimized is None:
             optimized = ["species_coeffs", "radial_coeffs", "moment_coeffs"]
         self.optimized = optimized

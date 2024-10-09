@@ -40,8 +40,10 @@ def test_molecules(
         "stress-weight": 0.0,
     }
 
+    optimized = ["moment_coeffs"]
+
     mtp_data = MTPData(data, rng=42)
-    parameters, bounds = mtp_data.initialize(optimized=["moment_coeffs"])
+    parameters, bounds = mtp_data.initialize(optimized=optimized)
     mtp_data.update(parameters)
     mtp_data.print()
 
@@ -57,7 +59,8 @@ def test_molecules(
     loss_function(parameters_ref)  # update paramters
     loss_function.print_errors()
 
-    optimizer = LLSOptimizer(loss_function, minimized=["energy"])
+    minimized = ["energy"]
+    optimizer = LLSOptimizer(loss_function, optimized=optimized, minimized=minimized)
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
@@ -69,7 +72,8 @@ def test_molecules(
     # Check if `parameters` are updated.
     assert not np.allclose(parameters, parameters_ref)
 
-    optimizer = LLSOptimizer(loss_function, minimized=["energy", "forces"])
+    minimized = ["energy", "forces"]
+    optimizer = LLSOptimizer(loss_function, optimized=optimized, minimized=minimized)
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
@@ -117,8 +121,10 @@ def test_crystals(
         "stress-weight": 0.001,
     }
 
+    optimized = ["moment_coeffs"]
+
     mtp_data = MTPData(dict_mtp, rng=42)
-    parameters, bounds = mtp_data.initialize(optimized=["moment_coeffs"])
+    parameters, bounds = mtp_data.initialize(optimized=optimized)
     mtp_data.update(parameters)
 
     loss_function = LossFunction(
@@ -135,7 +141,8 @@ def test_crystals(
     loss_function(parameters_ref)  # update parameters
     loss_function.print_errors()
 
-    optimizer = LLSOptimizer(loss_function, minimized=["energy"])
+    minimized = ["energy"]
+    optimizer = LLSOptimizer(loss_function, optimized=optimized, minimized=minimized)
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
@@ -147,7 +154,8 @@ def test_crystals(
     # Check if `parameters` are updated.
     assert not np.allclose(parameters, parameters_ref)
 
-    optimizer = LLSOptimizer(loss_function, minimized=["energy", "forces"])
+    minimized = ["energy", "forces"]
+    optimizer = LLSOptimizer(loss_function, optimized=optimized, minimized=minimized)
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
@@ -167,7 +175,8 @@ def test_crystals(
     assert errors0["energy"]["RMS"] < errors1["energy"]["RMS"]
     assert errors0["forces"]["RMS"] > errors1["forces"]["RMS"]
 
-    optimizer = LLSOptimizer(loss_function, minimized=["energy", "forces", "stress"])
+    minimized = ["energy", "forces", "stress"]
+    optimizer = LLSOptimizer(loss_function, optimized=optimized, minimized=minimized)
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
@@ -181,3 +190,61 @@ def test_crystals(
 
     # Check RMSEs
     assert errors1["stress"]["RMS"] > errors2["stress"]["RMS"]
+
+
+@pytest.mark.parametrize("minimized", [["energy"], ["energy", "forces"]])
+@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize("molecule", [762, 291])
+def test_species_coeffs(
+    molecule: int,
+    level: int,
+    minimized: list[str],
+    data_path: pathlib.Path,
+) -> None:
+    """Check if the loss function is smaller when optimizing also `species_coeffs`."""
+    original_path = data_path / f"original/molecules/{molecule}"
+    fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
+    if not (fitting_path / "initial.mtp").exists():
+        pytest.skip()
+    dict_mtp = read_mtp(fitting_path / "initial.mtp")
+    images = read_cfg(original_path / "training.cfg", index=":")
+
+    setting = {
+        "energy-weight": 1.0,
+        "force-weight": 0.01,
+        "stress-weight": 0.001,
+    }
+
+    optimized = ["moment_coeffs", "species_coeffs"]
+    mtp_data = MTPData(dict_mtp, rng=42)
+    parameters, bounds = mtp_data.initialize(optimized=optimized)
+    mtp_data.update(parameters)
+
+    loss_function = LossFunction(
+        images,
+        mtp_data=mtp_data,
+        setting=setting,
+        comm=MPI.COMM_WORLD,
+        engine="numpy",
+    )
+
+    optimized = ["moment_coeffs"]
+    optimizer = LLSOptimizer(loss_function, optimized=optimized, minimized=minimized)
+    parameters = optimizer.optimize(parameters, bounds)
+    print()
+
+    mtp_data.update(parameters)
+    mtp_data.print()
+    f0 = loss_function(parameters)  # update parameters
+
+    optimized = ["moment_coeffs", "species_coeffs"]
+    optimizer = LLSOptimizer(loss_function, optimized=optimized, minimized=minimized)
+    parameters = optimizer.optimize(parameters, bounds)
+    print()
+
+    mtp_data.update(parameters)
+    mtp_data.print()
+    f1 = loss_function(parameters)  # update parameters
+
+    # Check loss functions
+    assert f0 > f1
