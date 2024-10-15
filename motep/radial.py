@@ -1,16 +1,17 @@
 """Radial basis functions based on Chebyshev polynomials."""
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 import numpy as np
 import numpy.typing as npt
+
+from motep.io.mlip.mtp import MTPDict
 
 
 class RadialBasisBase(ABC):
     """Base class of `RadialBasis`."""
 
-    def __init__(self, dict_mtp: dict[str, Any]) -> None:
+    def __init__(self, dict_mtp: MTPDict) -> None:
         """Initialize `ChebyshevRadialBasis`."""
         self.dict_mtp = dict_mtp
 
@@ -47,7 +48,7 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
 
     """
 
-    def __init__(self, dict_mtp: dict[str, Any]) -> None:
+    def __init__(self, dict_mtp: MTPDict) -> None:
         """Initialize `ChebyshevRadialBasis`."""
         super().__init__(dict_mtp)
         self.coeffs = None
@@ -140,7 +141,7 @@ class ChebyshevPolynomialRadialBasis(RadialBasisBase):
 
     """
 
-    def __init__(self, dict_mtp: dict[str, Any]) -> None:
+    def __init__(self, dict_mtp: MTPDict) -> None:
         """Initialize `ChebyshevRadialBasis`."""
         super().__init__(dict_mtp)
         self.funcs = None

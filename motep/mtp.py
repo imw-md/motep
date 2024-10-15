@@ -4,12 +4,12 @@ Original version: Axel Forslund
 Modified version: Yuji Ikeda
 """
 
-from typing import Any
-
 import numpy as np
 import numpy.typing as npt
 from ase import Atoms
 from ase.neighborlist import PrimitiveNeighborList
+
+from motep.io.mlip.mtp import MTPDict
 
 
 class EngineBase:
@@ -36,12 +36,12 @@ class EngineBase:
 
     """
 
-    def __init__(self, dict_mtp: dict[str, Any] | None = None) -> None:
+    def __init__(self, dict_mtp: MTPDict | None = None) -> None:
         """MLIP-2 MTP.
 
         Parameters
         ----------
-        dict_mtp : dict[str, Any]
+        dict_mtp : MTPDict
             Parameters in the MLIP .mtp file.
 
         """
@@ -64,7 +64,7 @@ class EngineBase:
         self.radial_basis_dqdris = None
         self.radial_basis_dqdeps = None
 
-    def update(self, dict_mtp: dict[str, Any]) -> None:
+    def update(self, dict_mtp: MTPDict) -> None:
         """Update MTP parameters."""
         self.dict_mtp = dict_mtp
         if "species" not in self.dict_mtp:
@@ -121,12 +121,12 @@ def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
 class NumpyMTPEngine(EngineBase):
     """MTP engine based on NumPy."""
 
-    def __init__(self, dict_mtp: dict[str, Any] | None = None) -> None:
+    def __init__(self, dict_mtp: MTPDict | None = None) -> None:
         """Intialize the engine.
 
         Parameters
         ----------
-        dict_mtp : dict[str, Any]
+        dict_mtp : MTPDict
             Parameters in the MLIP .mtp file.
 
         """
@@ -135,7 +135,7 @@ class NumpyMTPEngine(EngineBase):
         self.rb = ChebyshevArrayRadialBasis(dict_mtp)
         super().__init__(dict_mtp)
 
-    def update(self, dict_mtp: dict[str, Any]) -> None:
+    def update(self, dict_mtp: MTPDict) -> None:
         """Update MTP parameters."""
         super().update(dict_mtp)
         if "radial_coeffs" in self.dict_mtp:

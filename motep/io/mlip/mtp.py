@@ -3,15 +3,41 @@
 import itertools
 import os
 import pathlib
-from typing import Any, TextIO
+from typing import TextIO, TypedDict
 
 import numpy as np
+import numpy.typing as npt
 
 
-def _parse_radial_coeffs(
-    file: TextIO,
-    data: dict[str, Any],
-) -> np.ndarray:
+class MTPDict(TypedDict):
+    """Dictionary with the properties in the .mtp file."""
+
+    version: str
+    potential_name: str
+    scaling: np.float64
+    species_count: np.int64
+    potential_tag: str
+    radial_basis_type: str
+    min_dist: np.float64
+    max_dist: np.float64
+    radial_basis_size: np.int64
+    radial_funcs_count: np.int64
+    radial_coeffs: npt.NDArray[np.float64]
+    alpha_moments_count: np.int64
+    alpha_index_basic_count: np.int64
+    alpha_index_basic: npt.NDArray[np.int64]
+    alpha_index_times_count: np.int64
+    alpha_index_times: npt.NDArray[np.int64]
+    alpha_scalar_moments: np.int64
+    alpha_moment_mapping: npt.NDArray[np.int64]
+    moment_coeffs: npt.NDArray[np.float64]
+    species_coeffs: npt.NDArray[np.float64]
+
+    # custom properties
+    species: npt.NDArray[np.int64]
+
+
+def _parse_radial_coeffs(file: TextIO, data: MTPDict) -> np.ndarray:
     coeffs = []
     for _ in range(data["species_count"]):
         for _ in range(data["species_count"]):
@@ -28,9 +54,9 @@ def _parse_radial_coeffs(
     return np.array(coeffs).reshape(shape)
 
 
-def read_mtp(file: os.PathLike) -> dict[str, Any]:
+def read_mtp(file: os.PathLike) -> MTPDict:
     """Read an MLIP .mtp file."""
-    data = {}
+    data: MTPDict = {}
     with pathlib.Path(file).open("r", encoding="utf-8") as fd:
         for line in fd:
             if line.strip() == "MTP":
@@ -87,7 +113,7 @@ def _format_list(value: list) -> str:
     return "{" + ", ".join(f"{_format_value(_)}" for _ in value) + "}"
 
 
-def write_mtp(file: os.PathLike, data: dict[str, Any]) -> None:
+def write_mtp(file: os.PathLike, data: MTPDict) -> None:
     """Write an MLIP .mtp file."""
     keys0 = [
         "version",
