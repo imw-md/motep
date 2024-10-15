@@ -1,13 +1,13 @@
 """ASE Calculators."""
 
-from typing import Any
-
 from ase import Atoms
 from ase.calculators.calculator import (
     Calculator,
     PropertyNotImplementedError,
     all_changes,
 )
+
+from motep.io.mlip.mtp import MTPDict
 
 
 def make_mtp_engine(engine: str = "numpy") -> type:
@@ -36,7 +36,7 @@ class MTP(Calculator):
 
     def __init__(
         self,
-        dict_mtp: dict[str, Any],
+        dict_mtp: MTPDict,
         *args,
         engine: str = "numpy",
         **kwargs,
@@ -45,7 +45,7 @@ class MTP(Calculator):
         self.engine = make_mtp_engine(engine)(dict_mtp)
         self.engine.update(dict_mtp)
 
-    def update_parameters(self, dict_mtp: dict[str, Any]) -> None:
+    def update_parameters(self, dict_mtp: MTPDict) -> None:
         self.engine.update(dict_mtp)
         self.results = {}  # trigger new calculation
 

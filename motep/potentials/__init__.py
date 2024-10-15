@@ -1,9 +1,9 @@
 """Initializer."""
 
-from typing import Any
-
 import numpy as np
 import numpy.typing as npt
+
+from motep.io.mlip.mtp import MTPDict
 
 
 class MTPData:
@@ -11,14 +11,14 @@ class MTPData:
 
     def __init__(
         self,
-        dict_mtp: dict[str, Any],
+        dict_mtp: MTPDict,
         rng: np.random.Generator | int | None,
     ) -> None:
         """Initialize Initializer.
 
         Parameters
         ----------
-        dict_mtp : dict[str, Any]
+        dict_mtp : MTPDict
             Data in the .mtp file.
         rng : np.random.Generator | int | None, default = None
             Pseudo-random-number generator (PRNG) with the NumPy API.
@@ -126,7 +126,7 @@ class MTPData:
 
 
 def _init_scaling(
-    data: dict[str, Any],
+    data: MTPDict,
     optimized: list[str],
 ) -> tuple[float, tuple[float, float]]:
     key = "scaling"
@@ -137,7 +137,7 @@ def _init_scaling(
 
 
 def _init_moment_coeffs(
-    data: dict[str, Any],
+    data: MTPDict,
     optimized: list[str],
     rng: np.random.Generator,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
@@ -156,7 +156,7 @@ def _init_moment_coeffs(
 
 
 def _init_species_coeffs(
-    data: dict[str, Any],
+    data: MTPDict,
     optimized: list[str],
     rng: np.random.Generator,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
@@ -175,7 +175,7 @@ def _init_species_coeffs(
 
 
 def _init_radial_coeffs(
-    data: dict[str, Any],
+    data: MTPDict,
     optimized: list[str],
     rng: np.random.Generator,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
