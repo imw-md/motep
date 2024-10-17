@@ -18,13 +18,13 @@ def init_mlip(file: str, species: list[int]):
 
 def init_calc(
     file: str,
-    data: MTPData,
+    mtp_data: MTPData,
     parameters: list[float],
     species: list[int],
 ) -> mlippy.MLIP_Calculator:
     """Initialize mlippy ASE calculator."""
-    data.update(parameters)
-    write_mtp(file, data.dict_mtp)
+    mtp_data.parameters = parameters
+    write_mtp(file, mtp_data.dict_mtp)
     mlip = init_mlip(file, species)
     return mlippy.MLIP_Calculator(mlip, {})
 

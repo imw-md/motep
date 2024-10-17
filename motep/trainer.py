@@ -75,7 +75,7 @@ def run(args: argparse.Namespace) -> None:
 
             # Print parameters before optimization.
             parameters, bounds = mtp_data.initialize(step["optimized"], rng)
-            mtp_data.update(parameters)
+            mtp_data.parameters = parameters
             mtp_data.print()
 
             # Instantiate an `Optimizer` class
@@ -86,13 +86,13 @@ def run(args: argparse.Namespace) -> None:
             print()
 
             # Print parameters after optimization.
-            mtp_data.update(parameters)
+            mtp_data.parameters = parameters
             mtp_data.print()
 
             write_mtp(f"intermediate_{i}.mtp", mtp_data.dict_mtp)
             fitness.print_errors()
 
-    mtp_data.update(parameters)
+    mtp_data.parameters = parameters
     write_mtp(setting["potential_final"], mtp_data.dict_mtp)
 
     end_time = time.time()

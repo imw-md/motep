@@ -61,7 +61,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         callback(parameters)
 
         # Update self.data based on the initialized parameters
-        self.loss_function.mtp_data.update(parameters)
+        self.loss_function.mtp_data.parameters = parameters
 
         matrix = self._calc_matrix()
         vector = self._calc_vector()

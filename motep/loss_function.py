@@ -241,7 +241,7 @@ class LossFunction(LossFunctionBase):
         self.configuration_weight = np.ones(len(self.images))
 
     def __call__(self, parameters: list[float]) -> float:
-        self.mtp_data.update(parameters)
+        self.mtp_data.parameters = parameters
         for atoms in self.images:
             atoms.calc.update_parameters(self.mtp_data.dict_mtp)
         return self.calc_loss_function()

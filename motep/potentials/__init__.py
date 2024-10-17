@@ -85,7 +85,8 @@ class MTPData:
             ),
         )
 
-    def update(self, parameters: list[float]) -> None:
+    @parameters.setter
+    def parameters(self, parameters: list[float]) -> None:
         """Update data in the .mtp file.
 
         Parameters
