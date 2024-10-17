@@ -10,6 +10,7 @@ from ase.neighborlist import PrimitiveNeighborList
 
 from motep.potentials.mtp.data import MTPData
 from motep.potentials.mtp.moment import MomentBasis
+from motep.radial import ChebyshevArrayRadialBasis
 
 
 class EngineBase:
@@ -134,8 +135,6 @@ class NumpyMTPEngine(EngineBase):
             Parameters in the MLIP .mtp file.
 
         """
-        from motep.radial import ChebyshevArrayRadialBasis
-
         self.rb = ChebyshevArrayRadialBasis(dict_mtp)
         super().__init__(dict_mtp)
 
@@ -157,15 +156,15 @@ class NumpyMTPEngine(EngineBase):
         r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
         r_ijs_unit = r_ijs / r_abs
 
-        rb_values, rb_derivs = self.rb.calc_radial_part(r_abs, itype, jtypes)
+        self.rb.calc_radial_part(r_abs, itype, jtypes)
         np.add.at(self.radial_basis_values[itype], jtypes, self.rb.basis_vs[:, :])
         for k, (j, jtype) in enumerate(zip(js, jtypes, strict=True)):
             tmp = self.rb.basis_ds[k, :, None] * r_ijs_unit[:, k]
             self.radial_basis_dqdris[itype, jtype, :, :, i] -= tmp
             self.radial_basis_dqdris[itype, jtype, :, :, j] += tmp
             self.radial_basis_dqdeps[itype, jtype] += tmp[:, :, None] * r_ijs[:, k]
-
-        return MomentBasis(self.dict_mtp).calculate(r_ijs, r_abs, rb_values, rb_derivs)
+        moment_basis = MomentBasis(self.dict_mtp)
+        return moment_basis.calculate(itype, jtypes, r_ijs, r_abs, self.rb)
 
     def calculate(self, atoms: Atoms) -> tuple:
         """Calculate properties of the given system."""

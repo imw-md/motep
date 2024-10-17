@@ -4,6 +4,7 @@ import numpy as np
 import numpy.typing as npt
 
 from motep.potentials.mtp.data import MTPData
+from motep.radial import ChebyshevArrayRadialBasis
 
 
 class MomentBasis:
@@ -15,10 +16,11 @@ class MomentBasis:
 
     def calculate(
         self,
+        itype: int,
+        jtypes: list[int],
         r_ijs: npt.NDArray[np.float64],  # (3, neighbors)
         r_abs: npt.NDArray[np.float64],  # (neighbors)
-        rb_values: npt.NDArray[np.float64],  # (mu, neighbors)
-        rb_derivs: npt.NDArray[np.float64],  # (mu, neighbors)
+        rb: ChebyshevArrayRadialBasis,
     ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         r"""Calculate basis functions and their derivatives.
 
@@ -52,30 +54,44 @@ class MomentBasis:
         # Compute basic moments
         mu, xpow, ypow, zpow = alpha_index_basic.T
         k = xpow + ypow + zpow
+
+        # `mult0.shape == (alpha_index_basic_count, neighbors)`
         mult0 = r_unit_pows[xpow, 0] * r_unit_pows[ypow, 1] * r_unit_pows[zpow, 2]
-        val = rb_values[mu] * mult0
-        der = (rb_derivs[mu] * mult0)[:, None, :] * r_ijs_unit
-        der -= (val * k[:, None])[:, None, :] * r_ijs_unit / r_abs
-        der[:, 0] += (
-            rb_values[mu]
-            * (xpow[:, None] * r_unit_pows[xpow - 1, 0])
-            * r_unit_pows[ypow, 1]
-            * r_unit_pows[zpow, 2]
+
+        # `val.shape == (alpha_index_basis_count, radial_basis_size, neighbors)`
+        val = rb.basis_vs.T * mult0[:, None, :]
+
+        # `der.shape == (alpha_index_basis_count, radial_basis_size, 3, neighbors)`
+        der = (rb.basis_ds.T * mult0[:, None, :])[..., None, :] * r_ijs_unit
+
+        der -= (val.T * k).T[:, :, None, :] * r_ijs_unit / r_abs
+        der[:, :, 0, :] += (
+            rb.basis_vs.T[None, :, :]
+            * xpow[:, None, None]
+            * r_unit_pows[xpow - 1, None, 0, :]
+            * r_unit_pows[ypow, None, 1, :]
+            * r_unit_pows[zpow, None, 2, :]
         ) / r_abs
-        der[:, 1] += (
-            rb_values[mu]
-            * r_unit_pows[xpow, 0]
-            * (ypow[:, None] * r_unit_pows[ypow - 1, 1])
-            * r_unit_pows[zpow, 2]
+        der[:, :, 1, :] += (
+            rb.basis_vs.T[None, :, :]
+            * ypow[:, None, None]
+            * r_unit_pows[xpow, None, 0, :]
+            * r_unit_pows[ypow - 1, None, 1, :]
+            * r_unit_pows[zpow, None, 2, :]
         ) / r_abs
-        der[:, 2] += (
-            rb_values[mu]
-            * r_unit_pows[xpow, 0]
-            * r_unit_pows[ypow, 1]
-            * (zpow[:, None] * r_unit_pows[zpow - 1, 2])
+        der[:, :, 2, :] += (
+            rb.basis_vs.T[None, :, :]
+            * zpow[:, None, None]
+            * r_unit_pows[xpow, None, 0, :]
+            * r_unit_pows[ypow, None, 1, :]
+            * r_unit_pows[zpow - 1, None, 2, :]
         ) / r_abs
-        moment_components[: mu.size] = val.sum(axis=-1)
-        moment_jacobian[: mu.size] = der
+
+        # `(alpha_index_basis_count, radial_basis_size, neighbors)`
+        coeffs = rb.coeffs[itype, jtypes][:, mu].transpose(1, 2, 0)
+
+        moment_components[: mu.size] = (coeffs * val).sum(axis=(1, 2))
+        moment_jacobian[: mu.size] = (coeffs[:, :, None, :] * der).sum(axis=1)
 
         _contract_moments(moment_components, moment_jacobian, alpha_index_times)
 
