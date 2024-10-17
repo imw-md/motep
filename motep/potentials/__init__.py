@@ -6,19 +6,12 @@ import numpy.typing as npt
 from motep.io.mlip.mtp import MTPDict
 
 
-class MTPData:
-    """Class to handle MTP parameters."""
+class MTPData(dict):
+    """Subclass of `dict` to handle MTP parameters.
 
-    def __init__(self, dict_mtp: MTPDict) -> None:
-        """Initialize Initializer.
+    `MTPDict` should be passed to `__init__`.
 
-        Parameters
-        ----------
-        dict_mtp : MTPDict
-            Data in the .mtp file.
-
-        """
-        self.dict_mtp = dict_mtp
+    """
 
     def initialize(
         self,
@@ -42,27 +35,26 @@ class MTPData:
             Bounds of the parameters.
 
         """
-        dict_mtp = self.dict_mtp
-        scaling, bound_scaling = _init_scaling(dict_mtp, optimized)
+        scaling, bound_scaling = _init_scaling(self, optimized)
         species_coeffs, bounds_species_coeffs = _init_species_coeffs(
-            dict_mtp,
+            self,
             optimized,
             rng,
         )
         moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
-            dict_mtp,
+            self,
             optimized,
             rng,
         )
         radial_coeffs, bounds_radial_coeffs = _init_radial_coeffs(
-            dict_mtp,
+            self,
             optimized,
             rng,
         )
-        dict_mtp["scaling"] = scaling
-        dict_mtp["moment_coeffs"] = moment_coeffs
-        dict_mtp["species_coeffs"] = species_coeffs
-        dict_mtp["radial_coeffs"] = radial_coeffs
+        self["scaling"] = scaling
+        self["moment_coeffs"] = moment_coeffs
+        self["species_coeffs"] = species_coeffs
+        self["radial_coeffs"] = radial_coeffs
         bounds = np.vstack(
             (
                 np.atleast_1d(bound_scaling),
@@ -78,10 +70,10 @@ class MTPData:
         """Serialized parameters."""
         return np.hstack(
             (
-                np.atleast_1d(self.dict_mtp["scaling"]),
-                self.dict_mtp["moment_coeffs"],
-                self.dict_mtp["species_coeffs"],
-                self.dict_mtp["radial_coeffs"].reshape(-1),
+                np.atleast_1d(self["scaling"]),
+                self["moment_coeffs"],
+                self["species_coeffs"],
+                self["radial_coeffs"].reshape(-1),
             ),
         )
 
@@ -95,28 +87,27 @@ class MTPData:
             MTP parameters.
 
         """
-        dict_mtp = self.dict_mtp
-        species_count = dict_mtp["species_count"]
-        rfc = dict_mtp["radial_funcs_count"]
-        rbs = dict_mtp["radial_basis_size"]
-        asm = dict_mtp["alpha_scalar_moments"]
+        species_count = self["species_count"]
+        rfc = self["radial_funcs_count"]
+        rbs = self["radial_basis_size"]
+        asm = self["alpha_scalar_moments"]
 
-        dict_mtp["scaling"] = parameters[0]
-        dict_mtp["moment_coeffs"] = parameters[1 : asm + 1]
-        dict_mtp["species_coeffs"] = parameters[asm + 1 : asm + 1 + species_count]
+        self["scaling"] = parameters[0]
+        self["moment_coeffs"] = parameters[1 : asm + 1]
+        self["species_coeffs"] = parameters[asm + 1 : asm + 1 + species_count]
         total_radial = parameters[asm + 1 + species_count :]
         shape = species_count, species_count, rfc, rbs
-        dict_mtp["radial_coeffs"] = np.array(total_radial).reshape(shape)
+        self["radial_coeffs"] = np.array(total_radial).reshape(shape)
 
     def print(self) -> None:
         """Print parameters."""
-        print("scaling:", self.dict_mtp["scaling"])
+        print("scaling:", self["scaling"])
         print("moment_coeffs:")
-        print(self.dict_mtp["moment_coeffs"])
+        print(self["moment_coeffs"])
         print("species_coeffs:")
-        print(self.dict_mtp["species_coeffs"])
+        print(self["species_coeffs"])
         print("radial_coeffs:")
-        print(self.dict_mtp["radial_coeffs"])
+        print(self["radial_coeffs"])
         print()
 
 

@@ -44,8 +44,8 @@ class Randomizer(OptimizerBase):
         for key in self.optimized:
             lb = -5.0
             ub = +5.0
-            shape = mtp_data.dict_mtp[key].shape
-            mtp_data.dict_mtp[key] = mtp_data.rng.uniform(lb, ub, size=shape)
+            shape = mtp_data[key].shape
+            mtp_data[key] = mtp_data.rng.uniform(lb, ub, size=shape)
 
         parameters = mtp_data.parameters
 

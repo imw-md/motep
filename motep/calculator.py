@@ -7,7 +7,7 @@ from ase.calculators.calculator import (
     all_changes,
 )
 
-from motep.io.mlip.mtp import MTPDict
+from motep.potentials import MTPData
 
 
 def make_mtp_engine(engine: str = "numpy") -> type:
@@ -36,16 +36,16 @@ class MTP(Calculator):
 
     def __init__(
         self,
-        dict_mtp: MTPDict,
+        mtp_data: MTPData,
         *args,
         engine: str = "numpy",
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.engine = make_mtp_engine(engine)(dict_mtp)
-        self.engine.update(dict_mtp)
+        self.engine = make_mtp_engine(engine)(mtp_data)
+        self.engine.update(mtp_data)
 
-    def update_parameters(self, dict_mtp: MTPDict) -> None:
+    def update_parameters(self, dict_mtp: MTPData) -> None:
         self.engine.update(dict_mtp)
         self.results = {}  # trigger new calculation
 

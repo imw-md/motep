@@ -43,7 +43,7 @@ class LLSOptimizerBase(OptimizerBase):
 
     def _calc_matrix_species_coeffs(self) -> np.ndarray:
         loss = self.loss_function
-        species = loss.mtp_data.dict_mtp["species"]
+        species = loss.mtp_data["species"]
         setting = loss.setting
         tmp = []
         if "energy" in self.minimized:
@@ -59,7 +59,7 @@ class LLSOptimizerBase(OptimizerBase):
 
     def _calc_matrix_energies_species_coeffs(self) -> np.ndarray:
         loss = self.loss_function
-        species = loss.mtp_data.dict_mtp["species"]
+        species = loss.mtp_data["species"]
         images = loss.images
         counts = np.full((len(images), len(species)), np.nan)
         for i, atoms in enumerate(images):
@@ -97,9 +97,9 @@ class LLSOptimizerBase(OptimizerBase):
 
         """
         loss = self.loss_function
-        dict_mtp = loss.mtp_data.dict_mtp
+        mtp_data = loss.mtp_data
         images = loss.images
-        species: list[int] = dict_mtp["species"]
+        species: list[int] = mtp_data["species"]
 
         def get_types(atoms: Atoms) -> list[int]:
             return [species.index(_) for _ in atoms.numbers]
@@ -107,7 +107,7 @@ class LLSOptimizerBase(OptimizerBase):
         energies = self._calc_target_energies()
         if "species_coeffs" not in self.optimized:
             iterable = (
-                np.add.reduce(dict_mtp["species_coeffs"][get_types(atoms)])
+                np.add.reduce(mtp_data["species_coeffs"][get_types(atoms)])
                 for atoms in images
             )
             energies -= np.fromiter(iterable, dtype=float, count=len(images))
@@ -178,10 +178,10 @@ class LLSOptimizer(LLSOptimizerBase):
         coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
 
         # Update `dict_mtp` and `parameters`.
-        asm = self.loss_function.mtp_data.dict_mtp["alpha_scalar_moments"]
-        self.loss_function.mtp_data.dict_mtp["moment_coeffs"] = coeffs[:asm]
+        asm = self.loss_function.mtp_data["alpha_scalar_moments"]
+        self.loss_function.mtp_data["moment_coeffs"] = coeffs[:asm]
         if "species_coeffs" in self.optimized:
-            self.loss_function.mtp_data.dict_mtp["species_coeffs"] = coeffs[asm:]
+            self.loss_function.mtp_data["species_coeffs"] = coeffs[asm:]
         parameters = self.loss_function.mtp_data.parameters
 
         # Print the value of the loss function.
@@ -199,14 +199,14 @@ class LLSOptimizer(LLSOptimizerBase):
 
     def _calc_matrix_moment_coeffs(self) -> np.ndarray:
         loss = self.loss_function
-        dict_mtp = loss.mtp_data.dict_mtp
+        mtp_data = loss.mtp_data
         images = loss.images
         setting = loss.setting
         basis_values = np.array([atoms.calc.engine.basis_values for atoms in images])
         basis_dbdris = np.vstack([atoms.calc.engine.basis_dbdris.T for atoms in images])
         basis_dbdeps = np.vstack([atoms.calc.engine.basis_dbdeps.T for atoms in images])
-        basis_dbdris = basis_dbdris.reshape((-1, dict_mtp["alpha_scalar_moments"]))
-        basis_dbdeps = basis_dbdeps.reshape((-1, dict_mtp["alpha_scalar_moments"]))
+        basis_dbdris = basis_dbdris.reshape((-1, mtp_data["alpha_scalar_moments"]))
+        basis_dbdeps = basis_dbdeps.reshape((-1, mtp_data["alpha_scalar_moments"]))
         tmp = []
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting["energy-weight"]) * basis_values)

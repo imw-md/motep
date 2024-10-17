@@ -35,9 +35,9 @@ class OptimizerBase(ABC):
         """
         self.loss_function = loss_function
         mtp_data = self.loss_function.mtp_data
-        if "species" not in mtp_data.dict_mtp:
-            species = {_: _ for _ in range(mtp_data.dict_mtp["species_count"])}
-            mtp_data.dict_mtp["species"] = species
+        if "species" not in mtp_data:
+            species = {_: _ for _ in range(mtp_data["species_count"])}
+            mtp_data["species"] = species
 
     @abstractmethod
     def optimize(
