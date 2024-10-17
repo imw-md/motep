@@ -5,6 +5,7 @@ import pathlib
 import time
 from pprint import pprint
 
+import numpy as np
 from ase import Atoms
 from mpi4py import MPI
 
@@ -38,6 +39,8 @@ def run(args: argparse.Namespace) -> None:
     pprint(setting, sort_dicts=False)
     print()
 
+    rng = np.random.default_rng(setting["seed"])
+
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     cfg_file = str(pathlib.Path(setting["configurations"]).resolve())
@@ -50,7 +53,7 @@ def run(args: argparse.Namespace) -> None:
 
     dict_mtp = read_mtp(untrained_mtp)
 
-    mtp_data = MTPData(dict_mtp, setting["seed"])
+    mtp_data = MTPData(dict_mtp)
 
     if setting["engine"] == "mlippy":
         from motep.mlippy_loss_function import MlippyLossFunction
@@ -71,7 +74,7 @@ def run(args: argparse.Namespace) -> None:
             print()
 
             # Print parameters before optimization.
-            parameters, bounds = mtp_data.initialize(step["optimized"])
+            parameters, bounds = mtp_data.initialize(step["optimized"], rng)
             mtp_data.update(parameters)
             mtp_data.print()
 
