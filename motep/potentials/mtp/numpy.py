@@ -335,7 +335,7 @@ class NumbaMTPEngine(EngineBase):
         return self.numba_calc_energy_and_forces(atoms)
 
     def numba_calc_energy_and_forces(self, atoms):
-        from motep.numba import numba_calc_energy_and_forces
+        from .numba import numba_calc_energy_and_forces
 
         mlip_params = self.dict_mtp
         energy, forces, stress = numba_calc_energy_and_forces(

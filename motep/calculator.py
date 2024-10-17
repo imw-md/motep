@@ -12,11 +12,11 @@ from motep.potentials.mtp.data import MTPData
 
 def make_mtp_engine(engine: str = "numpy") -> type:
     if engine == "numpy":
-        from .mtp import NumpyMTPEngine
+        from .potentials.mtp.numpy import NumpyMTPEngine
 
         return NumpyMTPEngine
     elif engine == "numba":
-        from .mtp import NumbaMTPEngine
+        from .potentials.mtp.numpy import NumbaMTPEngine
 
         return NumbaMTPEngine
     else:
