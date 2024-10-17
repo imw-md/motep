@@ -13,7 +13,6 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss_function import LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
-from motep.potentials.mtp.data import MTPData
 from motep.setting import make_default_setting, parse_setting
 from motep.utils import cd
 
@@ -51,9 +50,7 @@ def run(args: argparse.Namespace) -> None:
     if "species" not in setting:
         setting["species"] = _get_dummy_species(images)
 
-    dict_mtp = read_mtp(untrained_mtp)
-
-    mtp_data = MTPData(dict_mtp)
+    mtp_data = read_mtp(untrained_mtp)
 
     if setting["engine"] == "mlippy":
         from motep.mlippy_loss_function import MlippyLossFunction

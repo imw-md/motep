@@ -3,15 +3,9 @@
 import numpy as np
 import numpy.typing as npt
 
-from motep.io.mlip.mtp import MTPDict
-
 
 class MTPData(dict):
-    """Subclass of `dict` to handle MTP parameters.
-
-    `MTPDict` should be passed to `__init__`.
-
-    """
+    """Subclass of `dict` to handle MTP parameters."""
 
     def initialize(
         self,
@@ -112,7 +106,7 @@ class MTPData(dict):
 
 
 def _init_scaling(
-    data: MTPDict,
+    data: MTPData,
     optimized: list[str],
 ) -> tuple[float, tuple[float, float]]:
     key = "scaling"
@@ -123,7 +117,7 @@ def _init_scaling(
 
 
 def _init_moment_coeffs(
-    data: MTPDict,
+    data: MTPData,
     optimized: list[str],
     rng: np.random.Generator,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
@@ -142,7 +136,7 @@ def _init_moment_coeffs(
 
 
 def _init_species_coeffs(
-    data: MTPDict,
+    data: MTPData,
     optimized: list[str],
     rng: np.random.Generator,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
@@ -161,7 +155,7 @@ def _init_species_coeffs(
 
 
 def _init_radial_coeffs(
-    data: MTPDict,
+    data: MTPData,
     optimized: list[str],
     rng: np.random.Generator,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
