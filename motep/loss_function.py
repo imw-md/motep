@@ -113,32 +113,34 @@ class LossFunctionBase(ABC):
     def __call__(self, parameters: list[float]) -> float:
         """Evaluate the loss function."""
 
-    def calc_loss_function(self) -> float:
-        """Calculate the value of the loss function."""
-        energies, forces, stresses = calc_properties(self.images, self.comm)
-        # Calculate the energy difference
-        energy_ses = (energies - self.target_energies) ** 2
-        energy_mse = self.configuration_weight @ energy_ses
+    def _calc_loss_energy(self, energies: np.ndarray) -> np.float64:
+        energy_ses = (energies - self.target_energies) ** 2  # squared errors
+        energy_mse = self.configuration_weight @ energy_ses  # mean squared error
+        return self.setting["energy-weight"] * energy_mse
 
-        # Calculate the force difference
+    def _calc_loss_forces(self, forces: list[np.ndarray]) -> np.float64:
         force_ses = [
             np.sum((forces[i] - self.target_forces[i]) ** 2)
             for i in range(len(self.target_forces))
         ]
         force_mse = self.configuration_weight @ force_ses
+        return self.setting["force-weight"] * force_mse
 
-        # Calculate the stress difference
+    def _calc_loss_stress(self, stresses: list[np.ndarray]) -> np.float64:
         stress_ses = [
             np.sum((stresses[i] - self.target_stresses[i]) ** 2)
             for i in range(len(self.target_stresses))
         ]
         stress_mse = self.configuration_weight @ stress_ses
+        return self.setting["stress-weight"] * stress_mse
 
-        return (
-            self.setting["energy-weight"] * energy_mse
-            + self.setting["force-weight"] * force_mse
-            + self.setting["stress-weight"] * stress_mse
-        )
+    def calc_loss_function(self) -> float:
+        """Calculate the value of the loss function."""
+        energies, forces, stresses = calc_properties(self.images, self.comm)
+        loss_energy = self._calc_loss_energy(energies)
+        loss_forces = self._calc_loss_forces(forces)
+        loss_stress = self._calc_loss_stress(stresses)
+        return loss_energy + loss_forces + loss_stress
 
     def _calc_errors_energy(self, energies: np.ndarray) -> dict[str, float]:
         iterable = (
