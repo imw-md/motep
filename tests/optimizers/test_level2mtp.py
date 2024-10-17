@@ -39,7 +39,9 @@ def test_molecules(
         "stress-weight": 0.0,
     }
 
-    mtp_data = MTPData(dict_mtp, rng=42)
+    rng = np.random.default_rng(42)
+
+    mtp_data = MTPData(dict_mtp)
 
     loss = LossFunction(
         images,
@@ -50,7 +52,7 @@ def test_molecules(
     )
 
     optimizer = NoInteractionOptimizer(loss)
-    parameters, bounds = mtp_data.initialize(optimized=[])
+    parameters, bounds = mtp_data.initialize(optimized=[], rng=rng)
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
@@ -111,8 +113,10 @@ def test_crystals(
         "stress-weight": 0.001,
     }
 
-    mtp_data = MTPData(dict_mtp, rng=42)
-    parameters, bounds = mtp_data.initialize(optimized=optimized)
+    rng = np.random.default_rng(42)
+
+    mtp_data = MTPData(dict_mtp)
+    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.update(parameters)
 
     loss = LossFunction(
@@ -124,7 +128,7 @@ def test_crystals(
     )
 
     optimizer = NoInteractionOptimizer(loss)
-    parameters, bounds = mtp_data.initialize(optimized=[])
+    parameters, bounds = mtp_data.initialize(optimized=[], rng=rng)
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
@@ -211,9 +215,11 @@ def test_species_coeffs(
         "stress-weight": 0.0,
     }
 
+    rng = np.random.default_rng(42)
+
+    mtp_data = MTPData(dict_mtp)
     optimized = ["radial_coeffs", "species_coeffs"]
-    mtp_data = MTPData(dict_mtp, rng=42)
-    parameters, bounds = mtp_data.initialize(optimized=optimized)
+    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.update(parameters)
 
     loss = LossFunction(
@@ -225,7 +231,7 @@ def test_species_coeffs(
     )
 
     optimizer = NoInteractionOptimizer(loss)
-    parameters, bounds = mtp_data.initialize(optimized=[])
+    parameters, bounds = mtp_data.initialize(optimized=[], rng=rng)
     parameters = optimizer.optimize(parameters, bounds)
     print()
 

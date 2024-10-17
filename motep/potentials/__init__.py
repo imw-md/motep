@@ -9,36 +9,30 @@ from motep.io.mlip.mtp import MTPDict
 class MTPData:
     """Class to handle MTP parameters."""
 
-    def __init__(
-        self,
-        dict_mtp: MTPDict,
-        rng: np.random.Generator | int | None,
-    ) -> None:
+    def __init__(self, dict_mtp: MTPDict) -> None:
         """Initialize Initializer.
 
         Parameters
         ----------
         dict_mtp : MTPDict
             Data in the .mtp file.
-        rng : np.random.Generator | int | None, default = None
-            Pseudo-random-number generator (PRNG) with the NumPy API.
-            If ``int`` or ``None``, they are treated as the seed of the NumPy
-            default PRNG.
 
         """
         self.dict_mtp = dict_mtp
-        if isinstance(rng, int | None):
-            self.rng = np.random.default_rng(rng)
-        else:
-            self.rng = rng
 
-    def initialize(self, optimized: list[str]) -> tuple[np.ndarray, np.ndarray]:
+    def initialize(
+        self,
+        optimized: list[str],
+        rng: np.random.Generator,
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Initialize MTP parameters.
 
         Parameters
         ----------
         optimized : list[str]
             Parameters to be optimized.
+        rng : np.random.Generator
+            Pseudo-random-number generator (PRNG) with the NumPy API.
 
         Returns
         -------
@@ -53,17 +47,17 @@ class MTPData:
         species_coeffs, bounds_species_coeffs = _init_species_coeffs(
             dict_mtp,
             optimized,
-            self.rng,
+            rng,
         )
         moment_coeffs, bounds_moment_coeffs = _init_moment_coeffs(
             dict_mtp,
             optimized,
-            self.rng,
+            rng,
         )
         radial_coeffs, bounds_radial_coeffs = _init_radial_coeffs(
             dict_mtp,
             optimized,
-            self.rng,
+            rng,
         )
         dict_mtp["scaling"] = scaling
         dict_mtp["moment_coeffs"] = moment_coeffs

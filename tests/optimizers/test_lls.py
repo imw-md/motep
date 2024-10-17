@@ -40,10 +40,12 @@ def test_molecules(
         "stress-weight": 0.0,
     }
 
+    rng = np.random.default_rng(42)
+
     optimized = ["moment_coeffs"]
 
-    mtp_data = MTPData(data, rng=42)
-    parameters, bounds = mtp_data.initialize(optimized=optimized)
+    mtp_data = MTPData(data)
+    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.update(parameters)
     mtp_data.print()
 
@@ -121,10 +123,12 @@ def test_crystals(
         "stress-weight": 0.001,
     }
 
+    rng = np.random.default_rng(42)
+
     optimized = ["moment_coeffs"]
 
-    mtp_data = MTPData(dict_mtp, rng=42)
-    parameters, bounds = mtp_data.initialize(optimized=optimized)
+    mtp_data = MTPData(dict_mtp)
+    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.update(parameters)
 
     loss_function = LossFunction(
@@ -215,9 +219,11 @@ def test_species_coeffs(
         "stress-weight": 0.001,
     }
 
+    rng = np.random.default_rng(42)
+
     optimized = ["moment_coeffs", "species_coeffs"]
-    mtp_data = MTPData(dict_mtp, rng=42)
-    parameters, bounds = mtp_data.initialize(optimized=optimized)
+    mtp_data = MTPData(dict_mtp)
+    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.update(parameters)
 
     loss_function = LossFunction(
