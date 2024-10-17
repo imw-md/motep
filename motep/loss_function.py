@@ -9,7 +9,7 @@ from mpi4py import MPI
 from scipy.constants import eV
 
 from motep.calculator import MTP
-from motep.potentials import MTPData
+from motep.potentials.mtp.data import MTPData
 
 
 def calc_properties(
@@ -236,12 +236,12 @@ class LossFunction(LossFunctionBase):
         super().__init__(*args, **kwargs)
         self.engine = engine
         for atoms in self.images:
-            atoms.calc = MTP(engine=self.engine, dict_mtp=self.mtp_data.dict_mtp)
+            atoms.calc = MTP(engine=self.engine, mtp_data=self.mtp_data)
 
         self.configuration_weight = np.ones(len(self.images))
 
     def __call__(self, parameters: list[float]) -> float:
-        self.mtp_data.update(parameters)
+        self.mtp_data.parameters = parameters
         for atoms in self.images:
-            atoms.calc.update_parameters(self.mtp_data.dict_mtp)
+            atoms.calc.update_parameters(self.mtp_data)
         return self.calc_loss_function()

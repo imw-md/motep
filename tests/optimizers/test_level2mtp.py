@@ -11,7 +11,7 @@ from motep.io.mlip.mtp import read_mtp
 from motep.loss_function import LossFunction
 from motep.optimizers.ideal import NoInteractionOptimizer
 from motep.optimizers.level2mtp import Level2MTPOptimizer
-from motep.potentials import MTPData
+from motep.potentials.mtp.data import MTPData
 
 
 @pytest.mark.parametrize("level", [2, 4, 6])
@@ -56,7 +56,7 @@ def test_molecules(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.update(parameters)
+    mtp_data.parameters = parameters
     mtp_data.print()
     f_ref = loss(parameters)  # update paramters
     loss.print_errors()
@@ -70,7 +70,7 @@ def test_molecules(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.update(parameters)
+    mtp_data.parameters = parameters
     mtp_data.print()
     f_e00 = loss(parameters)  # update paramters
     errors_e00 = loss.print_errors()
@@ -117,7 +117,7 @@ def test_crystals(
 
     mtp_data = MTPData(dict_mtp)
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
-    mtp_data.update(parameters)
+    mtp_data.parameters = parameters
 
     loss = LossFunction(
         images,
@@ -132,7 +132,7 @@ def test_crystals(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.update(parameters)
+    mtp_data.parameters = parameters
     mtp_data.print()
     loss(parameters)  # update parameters
     loss.print_errors()
@@ -144,7 +144,7 @@ def test_crystals(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.update(parameters)
+    mtp_data.parameters = parameters
     mtp_data.print()
     f0 = loss(parameters)  # update parameters
     errors0 = loss.print_errors()
@@ -157,7 +157,7 @@ def test_crystals(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.update(parameters)
+    mtp_data.parameters = parameters
     mtp_data.print()
     f1 = loss(parameters)  # update parameters
     errors1 = loss.print_errors()
@@ -178,7 +178,7 @@ def test_crystals(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.update(parameters)
+    mtp_data.parameters = parameters
     mtp_data.print()
     f2 = loss(parameters)  # update parameters
     errors2 = loss.print_errors()
@@ -220,7 +220,7 @@ def test_species_coeffs(
     mtp_data = MTPData(dict_mtp)
     optimized = ["radial_coeffs", "species_coeffs"]
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
-    mtp_data.update(parameters)
+    mtp_data.parameters = parameters
 
     loss = LossFunction(
         images,
@@ -235,7 +235,7 @@ def test_species_coeffs(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.update(parameters)
+    mtp_data.parameters = parameters
     mtp_data.print()
     loss(parameters)  # update parameters
 
@@ -244,7 +244,7 @@ def test_species_coeffs(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.update(parameters)
+    mtp_data.parameters = parameters
     mtp_data.print()
     f0 = loss(parameters)  # update parameters
 
@@ -253,7 +253,7 @@ def test_species_coeffs(
     parameters = optimizer.optimize(parameters, bounds)
     print()
 
-    mtp_data.update(parameters)
+    mtp_data.parameters = parameters
     mtp_data.print()
     f1 = loss(parameters)  # update parameters
 

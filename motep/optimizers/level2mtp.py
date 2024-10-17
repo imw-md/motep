@@ -61,7 +61,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         callback(parameters)
 
         # Update self.data based on the initialized parameters
-        self.loss_function.mtp_data.update(parameters)
+        self.loss_function.mtp_data.parameters = parameters
 
         matrix = self._calc_matrix()
         vector = self._calc_vector()
@@ -78,18 +78,18 @@ class Level2MTPOptimizer(LLSOptimizerBase):
 
     def _update_parameters(self, coeffs: np.ndarray) -> np.ndarray:
         mtp_data = self.loss_function.mtp_data
-        species_count = mtp_data.dict_mtp["species_count"]
-        rbs = mtp_data.dict_mtp["radial_basis_size"]
+        species_count = mtp_data["species_count"]
+        rbs = mtp_data["radial_basis_size"]
         size = species_count * species_count * rbs
         shape = species_count, species_count, rbs
 
-        mtp_data.dict_mtp["scaling"] = 1.0
-        mtp_data.dict_mtp["moment_coeffs"][...] = 0.0
-        mtp_data.dict_mtp["moment_coeffs"][000] = 1.0
-        mtp_data.dict_mtp["radial_coeffs"][000] = 0.0
-        mtp_data.dict_mtp["radial_coeffs"][:, :, 0, :] = coeffs[:size].reshape(shape)
+        mtp_data["scaling"] = 1.0
+        mtp_data["moment_coeffs"][...] = 0.0
+        mtp_data["moment_coeffs"][000] = 1.0
+        mtp_data["radial_coeffs"][000] = 0.0
+        mtp_data["radial_coeffs"][:, :, 0, :] = coeffs[:size].reshape(shape)
         if "species_coeffs" in self.optimized:
-            mtp_data.dict_mtp["species_coeffs"] = coeffs[size:]
+            mtp_data["species_coeffs"] = coeffs[size:]
 
         return mtp_data.parameters
 
@@ -103,11 +103,11 @@ class Level2MTPOptimizer(LLSOptimizerBase):
 
     def _calc_matrix_radial_coeffs(self) -> np.ndarray:
         loss = self.loss_function
-        dict_mtp = loss.mtp_data.dict_mtp
+        mtp_data = loss.mtp_data
         images = loss.images
         setting = loss.setting
-        species_count = dict_mtp["species_count"]
-        radial_basis_size = dict_mtp["radial_basis_size"]
+        species_count = mtp_data["species_count"]
+        radial_basis_size = mtp_data["radial_basis_size"]
         size = species_count * species_count * radial_basis_size
 
         values = np.stack([atoms.calc.engine.radial_basis_values for atoms in images])

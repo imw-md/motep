@@ -5,13 +5,13 @@ from abc import ABC, abstractmethod
 import numpy as np
 import numpy.typing as npt
 
-from motep.io.mlip.mtp import MTPDict
+from motep.potentials.mtp.data import MTPData
 
 
 class RadialBasisBase(ABC):
     """Base class of `RadialBasis`."""
 
-    def __init__(self, dict_mtp: MTPDict) -> None:
+    def __init__(self, dict_mtp: MTPData) -> None:
         """Initialize `ChebyshevRadialBasis`."""
         self.dict_mtp = dict_mtp
 
@@ -48,7 +48,7 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
 
     """
 
-    def __init__(self, dict_mtp: MTPDict) -> None:
+    def __init__(self, dict_mtp: MTPData) -> None:
         """Initialize `ChebyshevRadialBasis`."""
         super().__init__(dict_mtp)
         self.coeffs = None
@@ -141,7 +141,7 @@ class ChebyshevPolynomialRadialBasis(RadialBasisBase):
 
     """
 
-    def __init__(self, dict_mtp: MTPDict) -> None:
+    def __init__(self, dict_mtp: MTPData) -> None:
         """Initialize `ChebyshevRadialBasis`."""
         super().__init__(dict_mtp)
         self.funcs = None

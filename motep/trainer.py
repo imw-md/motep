@@ -13,7 +13,6 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss_function import LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
-from motep.potentials import MTPData
 from motep.setting import make_default_setting, parse_setting
 from motep.utils import cd
 
@@ -51,9 +50,7 @@ def run(args: argparse.Namespace) -> None:
     if "species" not in setting:
         setting["species"] = _get_dummy_species(images)
 
-    dict_mtp = read_mtp(untrained_mtp)
-
-    mtp_data = MTPData(dict_mtp)
+    mtp_data = read_mtp(untrained_mtp)
 
     if setting["engine"] == "mlippy":
         from motep.mlippy_loss_function import MlippyLossFunction
@@ -75,7 +72,7 @@ def run(args: argparse.Namespace) -> None:
 
             # Print parameters before optimization.
             parameters, bounds = mtp_data.initialize(step["optimized"], rng)
-            mtp_data.update(parameters)
+            mtp_data.parameters = parameters
             mtp_data.print()
 
             # Instantiate an `Optimizer` class
@@ -86,14 +83,14 @@ def run(args: argparse.Namespace) -> None:
             print()
 
             # Print parameters after optimization.
-            mtp_data.update(parameters)
+            mtp_data.parameters = parameters
             mtp_data.print()
 
-            write_mtp(f"intermediate_{i}.mtp", mtp_data.dict_mtp)
+            write_mtp(f"intermediate_{i}.mtp", mtp_data)
             fitness.print_errors()
 
-    mtp_data.update(parameters)
-    write_mtp(setting["potential_final"], mtp_data.dict_mtp)
+    mtp_data.parameters = parameters
+    write_mtp(setting["potential_final"], mtp_data)
 
     end_time = time.time()
     print("Total time taken:", end_time - start_time, "seconds")
