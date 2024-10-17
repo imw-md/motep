@@ -79,4 +79,4 @@ class NoInteractionOptimizer(OptimizerBase):
 
     def _calc_vector(self) -> np.ndarray:
         """Calculate the vector for linear least squares (LLS)."""
-        return self.loss_function.target_energies.copy()
+        return self.loss_function.target["energies"].copy()

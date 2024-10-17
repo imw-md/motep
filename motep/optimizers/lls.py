@@ -50,10 +50,10 @@ class LLSOptimizerBase(OptimizerBase):
             v = self._calc_matrix_energies_species_coeffs()
             tmp.append(np.sqrt(setting["energy-weight"]) * v)
         if "forces" in self.minimized:
-            shape = sum(_.size for _ in loss.target_forces), len(species)
+            shape = sum(_.size for _ in loss.target["forces"]), len(species)
             tmp.append(np.zeros(shape))
         if "stress" in self.minimized:
-            shape = sum(_.size for _ in loss.target_stresses), len(species)
+            shape = sum(_.size for _ in loss.target["stresses"]), len(species)
             tmp.append(np.zeros(shape))
         return np.vstack(tmp)
 
@@ -73,8 +73,8 @@ class LLSOptimizerBase(OptimizerBase):
         setting = loss.setting
         n = len(loss.images)
         energies = self._calc_energies()
-        forces = np.hstack([loss.target_forces[i].flatten() for i in range(n)])
-        stresses = np.hstack([loss.target_stresses[i].flatten() for i in range(n)])
+        forces = np.hstack([loss.target["forces"][i].flatten() for i in range(n)])
+        stresses = np.hstack([loss.target["stresses"][i].flatten() for i in range(n)])
         tmp = []
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting["energy-weight"]) * energies)
@@ -115,7 +115,7 @@ class LLSOptimizerBase(OptimizerBase):
 
     def _calc_target_energies(self) -> np.ndarray:
         """Calculate the target energies."""
-        return self.loss_function.target_energies.copy()
+        return self.loss_function.target["energies"].copy()
 
 
 class LLSOptimizer(LLSOptimizerBase):
