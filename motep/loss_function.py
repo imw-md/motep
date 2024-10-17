@@ -20,9 +20,9 @@ def calc_properties(
     rank = comm.Get_rank()
     size = comm.Get_size()
     # Initialize lists to store energies, forces, and stresses
-    current_energies = []
-    current_forces = []
-    current_stress = []
+    energies = []
+    forceses = []
+    stresses = []
 
     # Determine the chunk of atoms to process for each MPI process
     chunk_size = len(images) // size
@@ -32,7 +32,7 @@ def calc_properties(
     local_atoms = images[start_idx:end_idx]
 
     # Perform local calculations
-    local_results = [calculate_energy_force_stress(atoms) for atoms in local_atoms]
+    local_results = [_calc_efs(atoms) for atoms in local_atoms]
 
     # Gather results from all processes
     all_results = comm.gather(local_results, root=0)
@@ -40,20 +40,20 @@ def calc_properties(
     # Process results on root process
     if rank == 0:
         for result_list in all_results:
-            for energy, force, stress in result_list:
-                current_energies.append(energy)
-                current_forces.append(force)
-                current_stress.append(stress)
+            for energy, forces, stress in result_list:
+                energies.append(energy)
+                forceses.append(forces)
+                stresses.append(stress)
 
     # Broadcast the processed results to all processes
-    current_energies = comm.bcast(current_energies, root=0)
-    current_forces = comm.bcast(current_forces, root=0)
-    current_stress = comm.bcast(current_stress, root=0)
+    energies = comm.bcast(energies, root=0)
+    forceses = comm.bcast(forceses, root=0)
+    stresses = comm.bcast(stresses, root=0)
 
-    return np.array(current_energies), current_forces, current_stress
+    return np.array(energies), forceses, stresses
 
 
-def calculate_energy_force_stress(atoms: Atoms) -> tuple:
+def _calc_efs(atoms: Atoms) -> tuple:
     energy = atoms.get_potential_energy()
     forces = atoms.get_forces()
     stress = (
