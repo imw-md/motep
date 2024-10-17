@@ -54,8 +54,9 @@ def calc_properties(
 
 
 def _calc_efs(atoms: Atoms) -> tuple:
+    # `atoms.calc.get_potential_energy()` triggers also `forces` and `stress`.
     energy = atoms.get_potential_energy()
-    forces = atoms.get_forces()
+    forces = atoms.calc.results["forces"].copy()
     stress = (
         atoms.get_stress(voigt=False)
         if "stress" in atoms.calc.results
