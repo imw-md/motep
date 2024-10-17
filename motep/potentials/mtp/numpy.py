@@ -9,7 +9,7 @@ from ase import Atoms
 from ase.neighborlist import PrimitiveNeighborList
 
 from motep.potentials.mtp.data import MTPData
-from motep.potentials.mtp.moment import calc_moment_basis
+from motep.potentials.mtp.moment import MomentBasis
 
 
 class EngineBase:
@@ -165,16 +165,7 @@ class NumpyMTPEngine(EngineBase):
             self.radial_basis_dqdris[itype, jtype, :, :, j] += tmp
             self.radial_basis_dqdeps[itype, jtype] += tmp[:, :, None] * r_ijs[:, k]
 
-        return calc_moment_basis(
-            r_ijs,
-            r_abs,
-            rb_values,
-            rb_derivs,
-            self.dict_mtp["alpha_moments_count"],
-            self.dict_mtp["alpha_index_basic"],
-            self.dict_mtp["alpha_index_times"],
-            self.dict_mtp["alpha_moment_mapping"],
-        )
+        return MomentBasis(self.dict_mtp).calculate(r_ijs, r_abs, rb_values, rb_derivs)
 
     def calculate(self, atoms: Atoms) -> tuple:
         """Calculate properties of the given system."""
