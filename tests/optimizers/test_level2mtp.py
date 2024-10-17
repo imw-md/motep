@@ -11,7 +11,7 @@ from motep.io.mlip.mtp import read_mtp
 from motep.loss_function import LossFunction
 from motep.optimizers.ideal import NoInteractionOptimizer
 from motep.optimizers.level2mtp import Level2MTPOptimizer
-from motep.potentials import MTPData
+from motep.potentials.mtp.data import MTPData
 
 
 @pytest.mark.parametrize("level", [2, 4, 6])

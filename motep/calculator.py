@@ -7,7 +7,7 @@ from ase.calculators.calculator import (
     all_changes,
 )
 
-from motep.potentials import MTPData
+from motep.potentials.mtp.data import MTPData
 
 
 def make_mtp_engine(engine: str = "numpy") -> type:

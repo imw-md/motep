@@ -4,7 +4,7 @@ import mlippy
 
 from motep.io.mlip.mtp import write_mtp
 from motep.loss_function import LossFunctionBase
-from motep.potentials import MTPData
+from motep.potentials.mtp.data import MTPData
 
 
 def init_mlip(file: str, species: list[int]):

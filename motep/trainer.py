@@ -13,7 +13,7 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss_function import LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
-from motep.potentials import MTPData
+from motep.potentials.mtp.data import MTPData
 from motep.setting import make_default_setting, parse_setting
 from motep.utils import cd
 
