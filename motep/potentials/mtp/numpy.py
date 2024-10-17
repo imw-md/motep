@@ -157,10 +157,10 @@ class NumpyMTPEngine(EngineBase):
         r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
         r_ijs_unit = r_ijs / r_abs
 
-        rb_values, rb_derivs = self.rb.calculate(r_abs, itype, jtypes)
-        np.add.at(self.radial_basis_values[itype], jtypes, self.rb.values0[:, :])
+        rb_values, rb_derivs = self.rb.calc_radial_part(r_abs, itype, jtypes)
+        np.add.at(self.radial_basis_values[itype], jtypes, self.rb.basis_vs[:, :])
         for k, (j, jtype) in enumerate(zip(js, jtypes, strict=True)):
-            tmp = self.rb.derivs0[k, :, None] * r_ijs_unit[:, k]
+            tmp = self.rb.basis_ds[k, :, None] * r_ijs_unit[:, k]
             self.radial_basis_dqdris[itype, jtype, :, :, i] -= tmp
             self.radial_basis_dqdris[itype, jtype, :, :, j] += tmp
             self.radial_basis_dqdeps[itype, jtype] += tmp[:, :, None] * r_ijs[:, k]
