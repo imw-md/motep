@@ -103,9 +103,12 @@ class LossFunctionBase(ABC):
         self.setting = setting
         self.comm = comm
 
-        self.target_energies, self.target_forces, self.target_stresses = (
-            calc_properties(self.images, self.comm)
-        )
+        energies, forces, stresses = calc_properties(self.images, self.comm)
+        self.target = {
+            "energies": energies,
+            "forces": forces,
+            "stresses": stresses,
+        }
 
         self.configuration_weight = np.ones(len(self.images))
 
@@ -114,22 +117,22 @@ class LossFunctionBase(ABC):
         """Evaluate the loss function."""
 
     def _calc_loss_energy(self, energies: np.ndarray) -> np.float64:
-        energy_ses = (energies - self.target_energies) ** 2  # squared errors
+        energy_ses = (energies - self.target["energies"]) ** 2  # squared errors
         energy_mse = self.configuration_weight @ energy_ses  # mean squared error
         return self.setting["energy-weight"] * energy_mse
 
     def _calc_loss_forces(self, forces: list[np.ndarray]) -> np.float64:
         force_ses = [
-            np.sum((forces[i] - self.target_forces[i]) ** 2)
-            for i in range(len(self.target_forces))
+            np.sum((forces[i] - self.target["forces"][i]) ** 2)
+            for i in range(len(self.target["forces"]))
         ]
         force_mse = self.configuration_weight @ force_ses
         return self.setting["force-weight"] * force_mse
 
     def _calc_loss_stress(self, stresses: list[np.ndarray]) -> np.float64:
         stress_ses = [
-            np.sum((stresses[i] - self.target_stresses[i]) ** 2)
-            for i in range(len(self.target_stresses))
+            np.sum((stresses[i] - self.target["stresses"][i]) ** 2)
+            for i in range(len(self.target["stresses"]))
         ]
         stress_mse = self.configuration_weight @ stress_ses
         return self.setting["stress-weight"] * stress_mse
@@ -144,20 +147,20 @@ class LossFunctionBase(ABC):
 
     def _calc_errors_energy(self, energies: np.ndarray) -> dict[str, float]:
         iterable = (
-            energies[i] - self.target_energies[i] for i in range(len(self.images))
+            energies[i] - self.target["energies"][i] for i in range(len(self.images))
         )
         return _calc_errors_from_diff(np.fromiter(iterable, dtype=float))
 
     def _calc_errors_energy_per_atom(self, energies: np.ndarray) -> dict[str, float]:
         iterable = (
-            ((energies[i] - self.target_energies[i]) / len(atoms))
+            ((energies[i] - self.target["energies"][i]) / len(atoms))
             for i, atoms in enumerate(self.images)
         )
         return _calc_errors_from_diff(np.fromiter(iterable, dtype=float))
 
     def _calc_errors_forces(self, forces: np.ndarray) -> dict[str, float]:
         iterable = (
-            forces[i][j][k] - self.target_forces[i][j][k]
+            forces[i][j][k] - self.target["forces"][i][j][k]
             for i, atoms in enumerate(self.images)
             for j in range(len(atoms))
             for k in range(3)
@@ -166,7 +169,7 @@ class LossFunctionBase(ABC):
 
     def _calc_errors_stress(self, stresses: np.ndarray) -> dict[str, float]:
         iterable = (
-            stresses[i][j][k] - self.target_stresses[i][j][k]
+            stresses[i][j][k] - self.target["stresses"][i][j][k]
             for i in range(len(self.images))
             for j in range(3)
             for k in range(3)
