@@ -32,9 +32,7 @@ def calc_properties(
     local_atoms = images[start_idx:end_idx]
 
     # Perform local calculations
-    local_results = []
-    for atoms in local_atoms:
-        local_results.append(calculate_energy_force_stress(atoms))
+    local_results = [calculate_energy_force_stress(atoms) for atoms in local_atoms]
 
     # Gather results from all processes
     all_results = comm.gather(local_results, root=0)
