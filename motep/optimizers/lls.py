@@ -10,6 +10,7 @@ from ase.stress import voigt_6_to_full_3x3_stress
 from motep.loss_function import LossFunctionBase
 from motep.optimizers.base import OptimizerBase
 from motep.optimizers.scipy import Callback
+from motep.potentials.mtp.numpy import get_types
 
 
 class LLSOptimizerBase(OptimizerBase):
@@ -108,13 +109,10 @@ class LLSOptimizerBase(OptimizerBase):
         images = loss.images
         species: list[int] = mtp_data["species"]
 
-        def get_types(atoms: Atoms) -> list[int]:
-            return [species.index(_) for _ in atoms.numbers]
-
         energies = self._calc_target_energies()
         if "species_coeffs" not in self.optimized:
             iterable = (
-                np.add.reduce(mtp_data["species_coeffs"][get_types(atoms)])
+                np.add.reduce(mtp_data["species_coeffs"][get_types(atoms, species)])
                 for atoms in images
             )
             energies -= np.fromiter(iterable, dtype=float, count=len(images))

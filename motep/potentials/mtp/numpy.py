@@ -118,6 +118,10 @@ def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
     return [nl.get_neighbors(j)[1] @ cell for j in range(len(atoms))]
 
 
+def get_types(atoms: Atoms, species: list[int]) -> list[int]:
+    return [species.index(_) for _ in atoms.numbers]
+
+
 class NumpyMTPEngine(EngineBase):
     """MTP engine based on NumPy."""
 
@@ -175,7 +179,7 @@ class NumpyMTPEngine(EngineBase):
     def calculate(self, atoms: Atoms) -> tuple:
         """Calculate properties of the given system."""
         self.update_neighbor_list(atoms)
-        itypes = [self.dict_mtp["species"].index(_) for _ in atoms.numbers]
+        itypes = get_types(atoms, self.dict_mtp["species"])
         self.energies = self.dict_mtp["species_coeffs"][itypes]
 
         self.basis_values[:] = 0.0
