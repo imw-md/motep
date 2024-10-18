@@ -5,6 +5,7 @@ Modified version: Yuji Ikeda
 """
 
 import numpy as np
+import numpy.typing as npt
 from ase import Atoms
 from ase.neighborlist import PrimitiveNeighborList
 
@@ -91,12 +92,14 @@ class EngineBase:
 
         natoms = len(atoms)
         spc = self.dict_mtp["species_count"]
+        rfc = self.dict_mtp["radial_funcs_count"]
         rbs = self.dict_mtp["radial_basis_size"]
         asm = self.dict_mtp["alpha_scalar_moments"]
 
         self.basis_values = np.full((asm), np.nan)
         self.basis_dbdris = np.full((asm, 3, natoms), np.nan)
         self.basis_dbdeps = np.full((asm, 3, 3), np.nan)
+        self.basis_dedrcs = np.full((spc, spc, rfc, rbs), np.nan)
 
         self.radial_basis_values = np.full((spc, spc, rbs), np.nan)
         self.radial_basis_dqdris = np.full((spc, spc, rbs, 3, natoms), np.nan)
@@ -119,8 +122,8 @@ def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
     return [nl.get_neighbors(j)[1] @ cell for j in range(len(atoms))]
 
 
-def get_types(atoms: Atoms, species: list[int]) -> list[int]:
-    return [species.index(_) for _ in atoms.numbers]
+def get_types(atoms: Atoms, species: list[int]) -> npt.NDArray[np.int64]:
+    return np.fromiter((species.index(_) for _ in atoms.numbers), dtype=int)
 
 
 class NumpyMTPEngine(EngineBase):
@@ -175,6 +178,7 @@ class NumpyMTPEngine(EngineBase):
         self.basis_values[:] = 0.0
         self.basis_dbdris[:, :, :] = 0.0
         self.basis_dbdeps[:, :, :] = 0.0
+        self.basis_dedrcs[...] = 0.0
 
         self.radial_basis_values[...] = 0.0
         self.radial_basis_dqdris[...] = 0.0
@@ -182,9 +186,14 @@ class NumpyMTPEngine(EngineBase):
 
         moment_coeffs = self.dict_mtp["moment_coeffs"]
 
-        for i in range(len(atoms)):
+        for i, itype in enumerate(itypes):
             js, r_ijs = self._get_distances(atoms, i)
-            basis_values, basis_derivs = self._calc_basis(atoms, i, js, r_ijs)
+            basis_values, basis_jac_rs, basis_jac_cs = self._calc_basis(
+                atoms,
+                i,
+                js,
+                r_ijs,
+            )
 
             self.basis_values += basis_values
 
@@ -199,9 +208,11 @@ class NumpyMTPEngine(EngineBase):
             #    with respect to the i-th atom.
             # Thus, the negative signs of the two contributions are cancelled out below.
             for k, j in enumerate(js):
-                self.basis_dbdris[:, :, i] -= basis_derivs[:, :, k]
-                self.basis_dbdris[:, :, j] += basis_derivs[:, :, k]
-            self.basis_dbdeps += basis_derivs @ r_ijs.T
+                self.basis_dbdris[:, :, i] -= basis_jac_rs[:, :, k]
+                self.basis_dbdris[:, :, j] += basis_jac_rs[:, :, k]
+            self.basis_dbdeps += basis_jac_rs @ r_ijs.T
+
+            self.basis_dedrcs[itype] += (moment_coeffs * basis_jac_cs.T).sum(axis=-1).T
 
         self.forces = np.sum(moment_coeffs * self.basis_dbdris.T, axis=-1) * -1.0
         self.stress = np.sum(moment_coeffs * self.basis_dbdeps.T, axis=-1).T
@@ -226,6 +237,22 @@ class NumpyMTPEngine(EngineBase):
         self.results["stress"] = self.stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return self.results["energy"], self.results["forces"], self.results["stress"]
+
+    def jac_energy(self, atoms: Atoms) -> MTPData:
+        """Calculate the gradient of the energy with respect to the MTP parameters."""
+        spc = self.dict_mtp["species_count"]
+        rfc = self.dict_mtp["radial_funcs_count"]
+        rbs = self.dict_mtp["radial_basis_size"]
+        sps = self.dict_mtp["species"]
+        nbs = list(atoms.numbers)
+
+        jac = MTPData()  # placeholder of the derivaties of the parameters
+        jac["scaling"] = 0.0  # `scaling` is not so far assumed to be updated.
+        jac["moment_coeffs"] = self.basis_values.copy()
+        jac["species_coeffs"] = np.fromiter((nbs.count(s) for s in sps), dtype=float)
+        jac["radial_coeffs"] = self.basis_dedrcs.reshape(spc, spc, rfc, rbs).copy()
+
+        return jac
 
 
 #
