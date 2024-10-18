@@ -21,7 +21,7 @@ def test_jac_energy(
     data_path: pathlib.Path,
 ) -> None:
     """Test the Jacobian for the energy with respect to the parameters."""
-    path = data_path / f"fitting/crystals/noncubic/{level:02d}"
+    path = data_path / f"fitting/crystals/multi/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
     atoms = read_cfg(path / "out.cfg", index=-1)

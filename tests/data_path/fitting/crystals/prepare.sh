@@ -11,11 +11,12 @@ mlip=~/codes/mlip-2
 mlp=$mlip/bin/mlp
 root=$PWD
 original=$(realpath $(dirname $0))/../../original/crystals
-crystals=(cubic noncubic)
-species_counts=(["cubic"]=1 ["noncubic"]=1)
+# crystals=(cubic noncubic)
+crystals=(multi)
+species_counts=(["cubic"]=1 ["noncubic"]=1 ["multi"]=3)
 
 for crystal in $crystals; do
-  for level in 20; do
+  for level in 02 04 06 08 10; do
     echo $crystal
     echo $level
     d=$crystal/$level
