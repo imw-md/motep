@@ -60,6 +60,8 @@ class EngineBase:
         self.basis_values = None
         self.basis_dbdris = None
         self.basis_dbdeps = None
+        self.basis_de_dcs = None
+        self.basis_ddedcs = None
 
         # used for `Level2MTPOptimizer`
         self.radial_basis_values = None
@@ -99,7 +101,8 @@ class EngineBase:
         self.basis_values = np.full((asm), np.nan)
         self.basis_dbdris = np.full((asm, 3, natoms), np.nan)
         self.basis_dbdeps = np.full((asm, 3, 3), np.nan)
-        self.basis_dedrcs = np.full((spc, spc, rfc, rbs), np.nan)
+        self.basis_de_dcs = np.full((spc, spc, rfc, rbs), np.nan)
+        self.basis_ddedcs = np.full((spc, spc, rfc, rbs, 3), np.nan)
 
         self.radial_basis_values = np.full((spc, spc, rbs), np.nan)
         self.radial_basis_dqdris = np.full((spc, spc, rbs, 3, natoms), np.nan)
@@ -178,7 +181,8 @@ class NumpyMTPEngine(EngineBase):
         self.basis_values[:] = 0.0
         self.basis_dbdris[:, :, :] = 0.0
         self.basis_dbdeps[:, :, :] = 0.0
-        self.basis_dedrcs[...] = 0.0
+        self.basis_de_dcs[...] = 0.0
+        self.basis_ddedcs[...] = 0.0
 
         self.radial_basis_values[...] = 0.0
         self.radial_basis_dqdris[...] = 0.0
@@ -188,7 +192,7 @@ class NumpyMTPEngine(EngineBase):
 
         for i, itype in enumerate(itypes):
             js, r_ijs = self._get_distances(atoms, i)
-            basis_values, basis_jac_rs, basis_jac_cs = self._calc_basis(
+            basis_values, basis_jac_rs, basis_jac_cs, basis_jac_rc = self._calc_basis(
                 atoms,
                 i,
                 js,
@@ -212,7 +216,9 @@ class NumpyMTPEngine(EngineBase):
                 self.basis_dbdris[:, :, j] += basis_jac_rs[:, :, k]
             self.basis_dbdeps += basis_jac_rs @ r_ijs.T
 
-            self.basis_dedrcs[itype] += (moment_coeffs * basis_jac_cs.T).sum(axis=-1).T
+            self.basis_de_dcs[itype] += (moment_coeffs * basis_jac_cs.T).sum(axis=-1).T
+
+            self.basis_ddedcs[itype] += (moment_coeffs * basis_jac_rc.T).sum(axis=-1).T
 
         self.forces = np.sum(moment_coeffs * self.basis_dbdris.T, axis=-1) * -1.0
         self.stress = np.sum(moment_coeffs * self.basis_dbdeps.T, axis=-1).T
@@ -247,10 +253,10 @@ class NumpyMTPEngine(EngineBase):
         nbs = list(atoms.numbers)
 
         jac = MTPData()  # placeholder of the derivaties of the parameters
-        jac["scaling"] = 0.0  # `scaling` is not so far assumed to be updated.
+        jac["scaling"] = 0.0  # `scaling` is so far assumed to not be updated.
         jac["moment_coeffs"] = self.basis_values.copy()
         jac["species_coeffs"] = np.fromiter((nbs.count(s) for s in sps), dtype=float)
-        jac["radial_coeffs"] = self.basis_dedrcs.reshape(spc, spc, rfc, rbs).copy()
+        jac["radial_coeffs"] = self.basis_de_dcs.reshape(spc, spc, rfc, rbs).copy()
 
         return jac
 

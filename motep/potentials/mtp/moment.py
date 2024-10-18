@@ -38,16 +38,19 @@ class MomentBasis:
             Derivatives of the basis functions with respect to :math:`x_j, y_j, z_j`.
 
         """
+        species_count = self.mtp_data["species_count"]
+        rfs = self.mtp_data["radial_funcs_count"]
+        rbs = self.mtp_data["radial_basis_size"]
         alpha_moments_count = self.mtp_data["alpha_moments_count"]
         alpha_index_basic = self.mtp_data["alpha_index_basic"]
         alpha_index_times = self.mtp_data["alpha_index_times"]
         alpha_moment_mapping = self.mtp_data["alpha_moment_mapping"]
-        radial_coeffs = self.mtp_data["radial_coeffs"]
 
         r_ijs_unit = r_ijs / r_abs
         moment_values = np.zeros(alpha_moments_count)
         moment_jac_rs = np.zeros((alpha_moments_count, *r_ijs.shape))  # dEi/dxj
-        moment_jac_cs = np.zeros((alpha_moments_count, *radial_coeffs.shape[1:]))
+        moment_jac_cs = np.zeros((alpha_moments_count, species_count, rfs, rbs))
+        moment_jac_rc = np.zeros((alpha_moments_count, species_count, rfs, rbs, 3))
 
         # Precompute powers
         max_pow = np.max(alpha_index_basic)
@@ -98,11 +101,14 @@ class MomentBasis:
         moment_jac_rs[: mu.size] = (coeffs[:, :, None, :] * der).sum(axis=1)
         for imu, _ in enumerate(mu):
             np.add.at(moment_jac_cs[imu, :, _], jtypes, val.T[:, :, imu])
+            axes = 3, 0, 1, 2
+            np.add.at(moment_jac_rc[imu, :, _], jtypes, der.transpose(axes)[:, imu])
 
         _contract_moments(
             moment_values,
             moment_jac_rs,
             moment_jac_cs,
+            moment_jac_rc,
             alpha_index_times,
         )
 
@@ -110,6 +116,7 @@ class MomentBasis:
             moment_values[alpha_moment_mapping],
             moment_jac_rs[alpha_moment_mapping],
             moment_jac_cs[alpha_moment_mapping],
+            moment_jac_rc[alpha_moment_mapping],
         )
 
 
@@ -125,13 +132,19 @@ def _contract_moments(
     moment_values: npt.NDArray[np.float64],
     moment_jac_rs: npt.NDArray[np.float64],
     moment_jac_cs: npt.NDArray[np.float64],
+    moment_jac_rc: npt.NDArray[np.float64],
     alpha_index_times: npt.NDArray[np.int64],
 ) -> None:
     """Compute contractions of moments."""
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
         moment_values[i3] += mult * moment_values[i1] * moment_values[i2]
+
         moment_jac_rs[i3] += mult * moment_jac_rs[i1] * moment_values[i2]
         moment_jac_rs[i3] += mult * moment_values[i1] * moment_jac_rs[i2]
+
         moment_jac_cs[i3] += mult * moment_jac_cs[i1] * moment_values[i2]
         moment_jac_cs[i3] += mult * moment_values[i1] * moment_jac_cs[i2]
+
+        moment_jac_rc[i3] += mult * moment_jac_rc[i1] * moment_values[i2]
+        moment_jac_rc[i3] += mult * moment_values[i1] * moment_jac_rc[i2]
