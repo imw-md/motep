@@ -19,20 +19,31 @@ def init_mlip(file: str, species: list[int]):
 def init_calc(
     file: str,
     mtp_data: MTPData,
-    parameters: list[float],
     species: list[int],
 ) -> mlippy.MLIP_Calculator:
     """Initialize mlippy ASE calculator."""
-    mtp_data.parameters = parameters
     write_mtp(file, mtp_data)
-    mlip = init_mlip(file, species)
-    return mlippy.MLIP_Calculator(mlip, {})
+    return init_mlip(file, species)
 
 
 class MlippyLossFunction(LossFunctionBase):
+    def __init__(self, *args: tuple, **kwargs: dict) -> None:
+        super().__init__(*args, **kwargs)
+        file = self.setting["potential_initial"]
+        mlip = init_calc(file, self.mtp_data, self.setting["species"])
+        for atoms in self.images:
+            targets = atoms.calc.results
+            atoms.calc = mlippy.MLIP_Calculator(mlip, {})
+            atoms.calc.targets = targets
+
     def __call__(self, parameters: list[float]) -> float:
         file = self.setting["potential_final"]
-        calc = init_calc(file, self.mtp_data, parameters, self.setting["species"])
+        self.mtp_data.parameters = parameters
+        write_mtp(file, self.mtp_data)
+        options = {"mtp-filename": file}
         for atoms in self.images:
-            atoms.calc = calc
+            targets = atoms.calc.targets
+            atoms.calc.mlip.init_wrapper(options)
+            atoms.calc.results = {}
+            atoms.calc.targets = targets
         return self.calc_loss_function()

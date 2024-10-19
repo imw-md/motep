@@ -38,7 +38,7 @@ def run(args: argparse.Namespace) -> None:
     pprint(setting, sort_dicts=False)
     print()
 
-    rng = np.random.default_rng(setting["seed"])
+    setting["rng"] = np.random.default_rng(setting["seed"])
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -55,10 +55,10 @@ def run(args: argparse.Namespace) -> None:
     if setting["engine"] == "mlippy":
         from motep.mlippy_loss_function import MlippyLossFunction
 
-        fitness = MlippyLossFunction(images, mtp_data, setting, comm=comm)
+        loss = MlippyLossFunction(images, mtp_data, setting, comm=comm)
     else:
         engine = setting["engine"]
-        fitness = LossFunction(images, mtp_data, setting, comm=comm, engine=engine)
+        loss = LossFunction(images, mtp_data, setting, comm=comm, engine=engine)
 
     # Create folders for each rank
     folder_name = f"rank_{rank}"
@@ -71,12 +71,12 @@ def run(args: argparse.Namespace) -> None:
             print()
 
             # Print parameters before optimization.
-            parameters, bounds = mtp_data.initialize(step["optimized"], rng)
+            parameters, bounds = mtp_data.initialize(step["optimized"], setting["rng"])
             mtp_data.parameters = parameters
             mtp_data.print()
 
             # Instantiate an `Optimizer` class
-            optimizer: OptimizerBase = make_optimizer(step["method"])(fitness, **step)
+            optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
 
             kwargs = step.get("kwargs", {})
             parameters = optimizer.optimize(parameters, bounds, **kwargs)
@@ -87,7 +87,7 @@ def run(args: argparse.Namespace) -> None:
             mtp_data.print()
 
             write_mtp(f"intermediate_{i}.mtp", mtp_data)
-            fitness.print_errors()
+            loss.print_errors()
 
     mtp_data.parameters = parameters
     write_mtp(setting["potential_final"], mtp_data)

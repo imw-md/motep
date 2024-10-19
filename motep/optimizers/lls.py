@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 from ase import Atoms
+from ase.stress import voigt_6_to_full_3x3_stress
 
 from motep.loss_function import LossFunctionBase
 from motep.optimizers.base import OptimizerBase
@@ -43,6 +44,7 @@ class LLSOptimizerBase(OptimizerBase):
 
     def _calc_matrix_species_coeffs(self) -> np.ndarray:
         loss = self.loss_function
+        images = loss.images
         species = loss.mtp_data["species"]
         setting = loss.setting
         tmp = []
@@ -50,10 +52,13 @@ class LLSOptimizerBase(OptimizerBase):
             v = self._calc_matrix_energies_species_coeffs()
             tmp.append(np.sqrt(setting["energy-weight"]) * v)
         if "forces" in self.minimized:
-            shape = sum(_.size for _ in loss.target["forces"]), len(species)
+            shape = (
+                sum(atoms.calc.results["forces"].size for atoms in images),
+                len(species),
+            )
             tmp.append(np.zeros(shape))
         if "stress" in self.minimized:
-            shape = sum(_.size for _ in loss.target["stresses"]), len(species)
+            shape = (9 * len(images), len(species))
             tmp.append(np.zeros(shape))
         return np.vstack(tmp)
 
@@ -69,18 +74,20 @@ class LLSOptimizerBase(OptimizerBase):
 
     def _calc_vector(self) -> np.ndarray:
         """Calculate the vector for linear least squares (LLS)."""
-        loss = self.loss_function
-        setting = loss.setting
-        n = len(loss.images)
+        setting = self.loss_function.setting
+        images = self.loss_function.images
         energies = self._calc_energies()
-        forces = np.hstack([loss.target["forces"][i].flatten() for i in range(n)])
-        stresses = np.hstack([loss.target["stresses"][i].flatten() for i in range(n)])
         tmp = []
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting["energy-weight"]) * energies)
         if "forces" in self.minimized:
+            forces = np.hstack([atoms.calc.targets["forces"].flat for atoms in images])
             tmp.append(np.sqrt(setting["force-weight"]) * forces * -1.0)
         if "stress" in self.minimized:
+            f = voigt_6_to_full_3x3_stress
+            stresses = np.hstack(
+                [f(atoms.calc.targets["stress"]).flat for atoms in images],
+            )
             tmp.append(np.sqrt(setting["stress-weight"]) * stresses)
         return np.hstack(tmp)
 
@@ -115,7 +122,12 @@ class LLSOptimizerBase(OptimizerBase):
 
     def _calc_target_energies(self) -> np.ndarray:
         """Calculate the target energies."""
-        return self.loss_function.target["energies"].copy()
+        images = self.loss_function.images
+        return np.fromiter(
+            (atoms.calc.targets["energy"] for atoms in images),
+            dtype=float,
+            count=len(images),
+        )
 
 
 class LLSOptimizer(LLSOptimizerBase):
