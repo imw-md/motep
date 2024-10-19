@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 from ase import Atoms
+from ase.stress import voigt_6_to_full_3x3_stress
 from mpi4py import MPI
 from scipy.constants import eV
 
@@ -66,12 +67,14 @@ def _calc_efs(atoms: Atoms) -> tuple:
 
 
 def _calc_errors_from_diff(diff: np.ndarray) -> dict[str, float]:
-    errors = {}
-    errors["N"] = diff.size
-    errors["MAX"] = np.max(np.abs(diff))
-    errors["ABS"] = np.mean(np.abs(diff))
-    errors["RMS"] = np.sqrt(np.mean(diff**2))
-    return errors
+    if diff.size == 0:
+        return {"N": diff.size, "MAX": np.nan, "ABS": np.nan, "RMS": np.nan}
+    return {
+        "N": diff.size,
+        "MAX": np.max(np.abs(diff)),
+        "ABS": np.mean(np.abs(diff)),
+        "RMS": np.sqrt(np.mean(diff**2)),
+    }
 
 
 class LossFunctionBase(ABC):
@@ -104,74 +107,82 @@ class LossFunctionBase(ABC):
         self.setting = setting
         self.comm = comm
 
-        energies, forces, stresses = calc_properties(self.images, self.comm)
-        self.target = {
-            "energies": energies,
-            "forces": forces,
-            "stresses": stresses,
-        }
-
         self.configuration_weight = np.ones(len(self.images))
 
     @abstractmethod
     def __call__(self, parameters: list[float]) -> float:
         """Evaluate the loss function."""
 
-    def _calc_loss_energy(self, energies: np.ndarray) -> np.float64:
-        energy_ses = (energies - self.target["energies"]) ** 2  # squared errors
+    def _calc_loss_energy(self) -> np.float64:
+        energy_ses = [
+            (atoms.calc.results["energy"] - atoms.calc.targets["energy"]) ** 2
+            for atoms in self.images
+        ]  # squared errors
         energy_mse = self.configuration_weight @ energy_ses  # mean squared error
         return self.setting["energy-weight"] * energy_mse
 
-    def _calc_loss_forces(self, forces: list[np.ndarray]) -> np.float64:
+    def _calc_loss_forces(self) -> np.float64:
         force_ses = [
-            np.sum((forces[i] - self.target["forces"][i]) ** 2)
-            for i in range(len(self.target["forces"]))
+            np.sum((atoms.calc.results["forces"] - atoms.calc.targets["forces"]) ** 2)
+            for atoms in self.images
         ]
         force_mse = self.configuration_weight @ force_ses
         return self.setting["force-weight"] * force_mse
 
-    def _calc_loss_stress(self, stresses: list[np.ndarray]) -> np.float64:
+    def _calc_loss_stress(self) -> np.float64:
+        key = "stress"
+        images = self.images
+        indices = [i for i, atoms in enumerate(images) if key in atoms.calc.targets]
+        f = voigt_6_to_full_3x3_stress
         stress_ses = [
-            np.sum((stresses[i] - self.target["stresses"][i]) ** 2)
-            for i in range(len(self.target["stresses"]))
+            np.sum((f(images[i].calc.results[key] - images[i].calc.targets[key])) ** 2)
+            for i in indices
         ]
-        stress_mse = self.configuration_weight @ stress_ses
+        stress_mse = self.configuration_weight[indices] @ stress_ses
         return self.setting["stress-weight"] * stress_mse
 
     def calc_loss_function(self) -> float:
         """Calculate the value of the loss function."""
-        energies, forces, stresses = calc_properties(self.images, self.comm)
-        loss_energy = self._calc_loss_energy(energies)
-        loss_forces = self._calc_loss_forces(forces)
-        loss_stress = self._calc_loss_stress(stresses)
+        # trigger calculations of the properties
+        for atoms in self.images:
+            atoms.get_potential_energy()
+
+        loss_energy = self._calc_loss_energy()
+        loss_forces = self._calc_loss_forces()
+        loss_stress = self._calc_loss_stress()
+
         return loss_energy + loss_forces + loss_stress
 
-    def _calc_errors_energy(self, energies: np.ndarray) -> dict[str, float]:
+    def _calc_errors_energy(self) -> dict[str, float]:
         iterable = (
-            energies[i] - self.target["energies"][i] for i in range(len(self.images))
+            atoms.calc.results["energy"] - atoms.calc.targets["energy"]
+            for atoms in self.images
         )
         return _calc_errors_from_diff(np.fromiter(iterable, dtype=float))
 
-    def _calc_errors_energy_per_atom(self, energies: np.ndarray) -> dict[str, float]:
+    def _calc_errors_energy_per_atom(self) -> dict[str, float]:
         iterable = (
-            ((energies[i] - self.target["energies"][i]) / len(atoms))
+            ((atoms.calc.results["energy"] - atoms.calc.targets["energy"]) / len(atoms))
             for i, atoms in enumerate(self.images)
         )
         return _calc_errors_from_diff(np.fromiter(iterable, dtype=float))
 
-    def _calc_errors_forces(self, forces: np.ndarray) -> dict[str, float]:
+    def _calc_errors_forces(self) -> dict[str, float]:
         iterable = (
-            forces[i][j][k] - self.target["forces"][i][j][k]
-            for i, atoms in enumerate(self.images)
+            atoms.calc.results["forces"][j][k] - atoms.calc.targets["forces"][j][k]
+            for atoms in self.images
             for j in range(len(atoms))
             for k in range(3)
         )
         return _calc_errors_from_diff(np.fromiter(iterable, dtype=float))
 
-    def _calc_errors_stress(self, stresses: np.ndarray) -> dict[str, float]:
+    def _calc_errors_stress(self) -> dict[str, float]:
+        f = voigt_6_to_full_3x3_stress
         iterable = (
-            stresses[i][j][k] - self.target["stresses"][i][j][k]
-            for i in range(len(self.images))
+            f(atoms.calc.results["stress"])[j, k]
+            - f(atoms.calc.targets["stress"])[j, k]
+            for atoms in self.images
+            if "stress" in atoms.calc.targets
             for j in range(3)
             for k in range(3)
         )
@@ -180,18 +191,19 @@ class LossFunctionBase(ABC):
     def calc_errors(self) -> dict[str, float]:
         """Calculate errors.
 
+        The properties should be computed before called.
+
         Returns
         -------
         dict[str, float]
             Errors for the properties.
 
         """
-        energies, forces, stresses = calc_properties(self.images, self.comm)
         errors = {}
-        errors["energy"] = self._calc_errors_energy(energies)
-        errors["energy_per_atom"] = self._calc_errors_energy_per_atom(energies)
-        errors["forces"] = self._calc_errors_forces(forces)
-        errors["stress"] = self._calc_errors_stress(stresses)  # eV/Ang^3
+        errors["energy"] = self._calc_errors_energy()
+        errors["energy_per_atom"] = self._calc_errors_energy_per_atom()
+        errors["forces"] = self._calc_errors_forces()
+        errors["stress"] = self._calc_errors_stress()  # eV/Ang^3
         return errors
 
     def print_errors(self) -> dict[str, float]:
@@ -236,7 +248,9 @@ class LossFunction(LossFunctionBase):
         super().__init__(*args, **kwargs)
         self.engine = engine
         for atoms in self.images:
+            targets = atoms.calc.results
             atoms.calc = MTP(engine=self.engine, mtp_data=self.mtp_data)
+            atoms.calc.targets = targets
 
     def __call__(self, parameters: list[float]) -> float:
         self.mtp_data.parameters = parameters
