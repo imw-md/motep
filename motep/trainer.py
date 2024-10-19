@@ -38,7 +38,7 @@ def run(args: argparse.Namespace) -> None:
     pprint(setting, sort_dicts=False)
     print()
 
-    rng = np.random.default_rng(setting["seed"])
+    setting["rng"] = np.random.default_rng(setting["seed"])
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -71,7 +71,7 @@ def run(args: argparse.Namespace) -> None:
             print()
 
             # Print parameters before optimization.
-            parameters, bounds = mtp_data.initialize(step["optimized"], rng)
+            parameters, bounds = mtp_data.initialize(step["optimized"], setting["rng"])
             mtp_data.parameters = parameters
             mtp_data.print()
 

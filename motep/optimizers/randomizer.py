@@ -34,6 +34,7 @@ class Randomizer(OptimizerBase):
         """Randomize parameters."""
         # Calculate basis functions of `fitness.images`
         self.loss_function(parameters)
+        rng: np.random.Generator = self.loss_function.setting["rng"]
 
         callback = Callback(self.loss_function)
 
@@ -45,7 +46,7 @@ class Randomizer(OptimizerBase):
             lb = -5.0
             ub = +5.0
             shape = mtp_data[key].shape
-            mtp_data[key] = mtp_data.rng.uniform(lb, ub, size=shape)
+            mtp_data[key] = rng.uniform(lb, ub, size=shape)
 
         parameters = mtp_data.parameters
 
