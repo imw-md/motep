@@ -238,8 +238,6 @@ class LossFunction(LossFunctionBase):
         for atoms in self.images:
             atoms.calc = MTP(engine=self.engine, mtp_data=self.mtp_data)
 
-        self.configuration_weight = np.ones(len(self.images))
-
     def __call__(self, parameters: list[float]) -> float:
         self.mtp_data.parameters = parameters
         for atoms in self.images:
