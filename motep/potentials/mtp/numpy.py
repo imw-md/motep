@@ -62,6 +62,7 @@ class EngineBase:
         self.basis_dbdeps = None
         self.basis_de_dcs = None
         self.basis_ddedcs = None
+        self.basis_ds_dcs = None
 
         # used for `Level2MTPOptimizer`
         self.radial_basis_values = None
@@ -103,6 +104,7 @@ class EngineBase:
         self.basis_dbdeps = np.full((asm, 3, 3), np.nan)
         self.basis_de_dcs = np.full((spc, spc, rfc, rbs), np.nan)
         self.basis_ddedcs = np.full((spc, spc, rfc, rbs, 3, natoms), np.nan)
+        self.basis_ds_dcs = np.full((spc, spc, rfc, rbs, 3, 3), np.nan)
 
         self.radial_basis_values = np.full((spc, spc, rbs), np.nan)
         self.radial_basis_dqdris = np.full((spc, spc, rbs, 3, natoms), np.nan)
@@ -182,6 +184,7 @@ class NumpyMTPEngine(EngineBase):
         self.basis_dbdeps[:, :, :] = 0.0
         self.basis_de_dcs[...] = 0.0
         self.basis_ddedcs[...] = 0.0
+        self.basis_ds_dcs[...] = 0.0
 
         self.radial_basis_values[...] = 0.0
         self.radial_basis_dqdris[...] = 0.0
@@ -223,6 +226,7 @@ class NumpyMTPEngine(EngineBase):
             for k, j in enumerate(js):
                 self.basis_ddedcs[itype, :, :, :, :, i] -= tmp[:, :, :, :, k]
                 self.basis_ddedcs[itype, :, :, :, :, j] += tmp[:, :, :, :, k]
+            self.basis_ds_dcs[itype] += tmp @ r_ijs.T
 
         self.forces = np.sum(moment_coeffs * self.basis_dbdris.T, axis=-1) * -1.0
         self.stress = np.sum(moment_coeffs * self.basis_dbdeps.T, axis=-1).T
@@ -232,13 +236,16 @@ class NumpyMTPEngine(EngineBase):
         self.results["forces"] = self.forces
 
         if atoms.cell.rank == 3:
+            volume = atoms.get_volume()
             self.stress = (self.stress + self.stress.T) * 0.5  # symmetrize
-            self.stress /= atoms.get_volume()
+            self.stress /= volume
             self.basis_dbdeps += self.basis_dbdeps.transpose(0, 2, 1)
-            self.basis_dbdeps *= 0.5 / atoms.get_volume()
+            self.basis_dbdeps *= 0.5 / volume
+            self.basis_ds_dcs += self.basis_ds_dcs.swapaxes(-2, -1)
+            self.basis_ds_dcs *= 0.5 / volume
             axes = 0, 1, 2, 4, 3
             self.radial_basis_dqdeps += self.radial_basis_dqdeps.transpose(axes)
-            self.radial_basis_dqdeps *= 0.5 / atoms.get_volume()
+            self.radial_basis_dqdeps *= 0.5 / volume
         else:
             self.stress[:, :] = np.nan
             self.basis_dbdeps[:, :, :] = np.nan
@@ -275,6 +282,22 @@ class NumpyMTPEngine(EngineBase):
         jac["moment_coeffs"] = self.basis_dbdris.transpose(0, 2, 1) * -1.0
         jac["species_coeffs"] = np.zeros((spc, number_of_atoms, 3))
         jac["radial_coeffs"] = self.basis_ddedcs.transpose(0, 1, 2, 3, 5, 4) * -1.0
+
+        return jac
+
+    def jac_stress(self, atoms: Atoms) -> MTPData:
+        """Calculate the Jacobian of the forces with respect to the MTP parameters.
+
+        `jac.parameters` have the shape of `(nparams, natoms, 3)`.
+
+        """
+        spc = self.dict_mtp["species_count"]
+
+        jac = MTPData()  # placeholder of the Jacobian with respect to the parameters
+        jac["scaling"] = np.zeros((1, 3, 3))
+        jac["moment_coeffs"] = self.basis_dbdeps.copy()
+        jac["species_coeffs"] = np.zeros((spc, 3, 3))
+        jac["radial_coeffs"] = self.basis_ds_dcs.copy()
 
         return jac
 
