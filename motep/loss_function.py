@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 from ase import Atoms
 from ase.stress import voigt_6_to_full_3x3_stress
 from mpi4py import MPI
@@ -152,6 +153,53 @@ class LossFunctionBase(ABC):
         loss_stress = self._calc_loss_stress()
 
         return loss_energy + loss_forces + loss_stress
+
+    def _jac_energy(self) -> npt.NDArray[np.float64]:
+        def per_configuration(atoms: Atoms) -> np.float64:
+            return (
+                2.0
+                * (atoms.calc.results["energy"] - atoms.calc.targets["energy"])
+                * atoms.calc.engine.jac_energy(atoms).parameters
+            )
+
+        jacs = np.array([per_configuration(atoms) for atoms in self.images])
+        jac = self.configuration_weight @ jacs
+        return self.setting["energy-weight"] * jac
+
+    def _jac_forces(self) -> npt.NDArray[np.float64]:
+        def per_configuration(atoms: Atoms) -> np.float64:
+            return np.sum(
+                2.0
+                * (atoms.calc.results["forces"] - atoms.calc.targets["forces"])
+                * atoms.calc.engine.jac_forces(atoms).parameters,
+                axis=(-2, -1),
+            )
+
+        jacs = np.array([per_configuration(atoms) for atoms in self.images])
+        jac = self.configuration_weight @ jacs
+        return self.setting["force-weight"] * jac
+
+    def _jac_stress(self) -> npt.NDArray[np.float64]:
+        f = voigt_6_to_full_3x3_stress
+
+        def per_configuration(atoms: Atoms) -> np.float64:
+            return np.sum(
+                2.0
+                * f(atoms.calc.results["stress"] - atoms.calc.targets["stress"])
+                * atoms.calc.engine.jac_stress(atoms).parameters,
+                axis=(-2, -1),
+            )
+
+        jacs = np.array([per_configuration(atoms) for atoms in self.images])
+        jac = self.configuration_weight @ jacs
+        return self.setting["stress-weight"] * jac
+
+    def jac(self) -> npt.NDArray[np.float64]:
+        """Calculate the Jacobian of the loss function."""
+        jac_energy = self._jac_energy()
+        jac_forces = self._jac_forces()
+        jac_stress = self._jac_stress()
+        return jac_energy + jac_forces + jac_stress
 
     def _calc_errors_energy(self) -> dict[str, float]:
         iterable = (

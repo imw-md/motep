@@ -14,6 +14,20 @@ from motep.potentials.mtp.moment import MomentBasis
 from motep.radial import ChebyshevArrayRadialBasis
 
 
+class Jac(dict):
+    @property
+    def parameters(self) -> npt.NDArray[np.float64]:
+        shape = self["radial_coeffs"].shape
+        return np.concatenate(
+            (
+                self["scaling"],
+                self["moment_coeffs"],
+                self["species_coeffs"],
+                self["radial_coeffs"].reshape(-1, *shape[4::]),
+            ),
+        )
+
+
 class EngineBase:
     """Engine to compute an MTP.
 
@@ -261,7 +275,7 @@ class NumpyMTPEngine(EngineBase):
         nbs = list(atoms.numbers)
 
         jac = MTPData()  # placeholder of the Jacobian with respect to the parameters
-        jac["scaling"] = 0.0  # `scaling` is so far assumed to not be updated.
+        jac["scaling"] = 0.0
         jac["moment_coeffs"] = self.basis_values.copy()
         jac["species_coeffs"] = np.fromiter((nbs.count(s) for s in sps), dtype=float)
         jac["radial_coeffs"] = self.basis_de_dcs.copy()
@@ -277,7 +291,7 @@ class NumpyMTPEngine(EngineBase):
         spc = self.dict_mtp["species_count"]
         number_of_atoms = len(atoms)
 
-        jac = MTPData()  # placeholder of the Jacobian with respect to the parameters
+        jac = Jac()  # placeholder of the Jacobian with respect to the parameters
         jac["scaling"] = np.zeros((1, number_of_atoms, 3))
         jac["moment_coeffs"] = self.basis_dbdris.transpose(0, 2, 1) * -1.0
         jac["species_coeffs"] = np.zeros((spc, number_of_atoms, 3))
@@ -293,7 +307,7 @@ class NumpyMTPEngine(EngineBase):
         """
         spc = self.dict_mtp["species_count"]
 
-        jac = MTPData()  # placeholder of the Jacobian with respect to the parameters
+        jac = Jac()  # placeholder of the Jacobian with respect to the parameters
         jac["scaling"] = np.zeros((1, 3, 3))
         jac["moment_coeffs"] = self.basis_dbdeps.copy()
         jac["species_coeffs"] = np.zeros((spc, 3, 3))
