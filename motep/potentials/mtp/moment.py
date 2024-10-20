@@ -41,16 +41,16 @@ class MomentBasis:
         species_count = self.mtp_data["species_count"]
         rfs = self.mtp_data["radial_funcs_count"]
         rbs = self.mtp_data["radial_basis_size"]
-        alpha_moments_count = self.mtp_data["alpha_moments_count"]
+        amc = self.mtp_data["alpha_moments_count"]
         alpha_index_basic = self.mtp_data["alpha_index_basic"]
         alpha_index_times = self.mtp_data["alpha_index_times"]
         alpha_moment_mapping = self.mtp_data["alpha_moment_mapping"]
 
         r_ijs_unit = r_ijs / r_abs
-        moment_values = np.zeros(alpha_moments_count)
-        moment_jac_rs = np.zeros((alpha_moments_count, *r_ijs.shape))  # dEi/dxj
-        moment_jac_cs = np.zeros((alpha_moments_count, species_count, rfs, rbs))
-        moment_jac_rc = np.zeros((alpha_moments_count, species_count, rfs, rbs, 3))
+        moment_values = np.zeros(amc)
+        moment_jac_rs = np.zeros((amc, *r_ijs.shape))  # dEi/dxj
+        moment_jac_cs = np.zeros((amc, species_count, rfs, rbs))
+        moment_jac_rc = np.zeros((amc, species_count, rfs, rbs, *r_ijs.shape))
 
         # Precompute powers
         max_pow = np.max(alpha_index_basic)
@@ -101,8 +101,8 @@ class MomentBasis:
         moment_jac_rs[: mu.size] = (coeffs[:, :, None, :] * der).sum(axis=1)
         for imu, _ in enumerate(mu):
             np.add.at(moment_jac_cs[imu, :, _], jtypes, val.T[:, :, imu])
-            axes = 3, 0, 1, 2
-            np.add.at(moment_jac_rc[imu, :, _], jtypes, der.transpose(axes)[:, imu])
+            for ij, jtype in enumerate(jtypes):
+                moment_jac_rc[imu, jtype, _, :, :, ij] = der[imu, :, :, ij]
 
         _contract_moments(
             moment_values,
@@ -147,4 +147,10 @@ def _contract_moments(
         moment_jac_cs[i3] += mult * moment_values[i1] * moment_jac_cs[i2]
 
         moment_jac_rc[i3] += mult * moment_jac_rc[i1] * moment_values[i2]
+        moment_jac_rc[i3] += (
+            mult * moment_jac_rs[i1] * moment_jac_cs[i2][..., None, None]
+        )
+        moment_jac_rc[i3] += (
+            mult * moment_jac_cs[i1][..., None, None] * moment_jac_rs[i2]
+        )
         moment_jac_rc[i3] += mult * moment_values[i1] * moment_jac_rc[i2]

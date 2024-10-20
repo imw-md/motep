@@ -102,7 +102,7 @@ class EngineBase:
         self.basis_dbdris = np.full((asm, 3, natoms), np.nan)
         self.basis_dbdeps = np.full((asm, 3, 3), np.nan)
         self.basis_de_dcs = np.full((spc, spc, rfc, rbs), np.nan)
-        self.basis_ddedcs = np.full((spc, spc, rfc, rbs, 3), np.nan)
+        self.basis_ddedcs = np.full((spc, spc, rfc, rbs, 3, natoms), np.nan)
 
         self.radial_basis_values = np.full((spc, spc, rbs), np.nan)
         self.radial_basis_dqdris = np.full((spc, spc, rbs, 3, natoms), np.nan)
@@ -152,13 +152,12 @@ class NumpyMTPEngine(EngineBase):
 
     def _calc_basis(
         self,
-        atoms: Atoms,
         i: int,
+        itype: int,
         js: list[int],
+        jtypes: list[int],
         r_ijs: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
-        itype = self.dict_mtp["species"].index(atoms.numbers[i])
-        jtypes = [self.dict_mtp["species"].index(atoms.numbers[j]) for j in js]
         r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
         r_ijs_unit = r_ijs / r_abs
 
@@ -192,10 +191,12 @@ class NumpyMTPEngine(EngineBase):
 
         for i, itype in enumerate(itypes):
             js, r_ijs = self._get_distances(atoms, i)
+            jtypes = [self.dict_mtp["species"].index(atoms.numbers[j]) for j in js]
             basis_values, basis_jac_rs, basis_jac_cs, basis_jac_rc = self._calc_basis(
-                atoms,
                 i,
+                itype,
                 js,
+                jtypes,
                 r_ijs,
             )
 
@@ -218,7 +219,10 @@ class NumpyMTPEngine(EngineBase):
 
             self.basis_de_dcs[itype] += (moment_coeffs * basis_jac_cs.T).sum(axis=-1).T
 
-            self.basis_ddedcs[itype] += (moment_coeffs * basis_jac_rc.T).sum(axis=-1).T
+            tmp = (moment_coeffs * basis_jac_rc.T).sum(axis=-1).T
+            for k, j in enumerate(js):
+                self.basis_ddedcs[itype, :, :, :, :, i] -= tmp[:, :, :, :, k]
+                self.basis_ddedcs[itype, :, :, :, :, j] += tmp[:, :, :, :, k]
 
         self.forces = np.sum(moment_coeffs * self.basis_dbdris.T, axis=-1) * -1.0
         self.stress = np.sum(moment_coeffs * self.basis_dbdeps.T, axis=-1).T
@@ -245,18 +249,32 @@ class NumpyMTPEngine(EngineBase):
         return self.results["energy"], self.results["forces"], self.results["stress"]
 
     def jac_energy(self, atoms: Atoms) -> MTPData:
-        """Calculate the gradient of the energy with respect to the MTP parameters."""
-        spc = self.dict_mtp["species_count"]
-        rfc = self.dict_mtp["radial_funcs_count"]
-        rbs = self.dict_mtp["radial_basis_size"]
+        """Calculate the Jacobian of the energy with respect to the MTP parameters."""
         sps = self.dict_mtp["species"]
         nbs = list(atoms.numbers)
 
-        jac = MTPData()  # placeholder of the derivaties of the parameters
+        jac = MTPData()  # placeholder of the Jacobian with respect to the parameters
         jac["scaling"] = 0.0  # `scaling` is so far assumed to not be updated.
         jac["moment_coeffs"] = self.basis_values.copy()
         jac["species_coeffs"] = np.fromiter((nbs.count(s) for s in sps), dtype=float)
-        jac["radial_coeffs"] = self.basis_de_dcs.reshape(spc, spc, rfc, rbs).copy()
+        jac["radial_coeffs"] = self.basis_de_dcs.copy()
+
+        return jac
+
+    def jac_forces(self, atoms: Atoms) -> MTPData:
+        """Calculate the Jacobian of the forces with respect to the MTP parameters.
+
+        `jac.parameters` have the shape of `(nparams, natoms, 3)`.
+
+        """
+        spc = self.dict_mtp["species_count"]
+        number_of_atoms = len(atoms)
+
+        jac = MTPData()  # placeholder of the Jacobian with respect to the parameters
+        jac["scaling"] = np.zeros((1, number_of_atoms, 3))
+        jac["moment_coeffs"] = self.basis_dbdris.transpose(0, 2, 1) * -1.0
+        jac["species_coeffs"] = np.zeros((spc, number_of_atoms, 3))
+        jac["radial_coeffs"] = self.basis_ddedcs.transpose(0, 1, 2, 3, 5, 4) * -1.0
 
         return jac
 
