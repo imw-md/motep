@@ -26,14 +26,14 @@ class LLSOptimizerBase(OptimizerBase):
 
     def __init__(
         self,
-        loss_function: LossFunctionBase,
+        loss: LossFunctionBase,
         *,
         optimized: list[str] | None = None,
         minimized: list[str] | None = None,
         **kwargs: dict[str, Any],
     ) -> None:
         """Initialize the optimizer."""
-        super().__init__(loss_function, **kwargs)
+        super().__init__(loss=loss, **kwargs)
         if minimized is None:
             minimized = ["energy", "forces"]
         self.minimized = minimized
@@ -44,7 +44,7 @@ class LLSOptimizerBase(OptimizerBase):
         """Calculate the matrix for linear least squares (LLS)."""
 
     def _calc_matrix_species_coeffs(self) -> np.ndarray:
-        loss = self.loss_function
+        loss = self.loss
         images = loss.images
         species = loss.mtp_data["species"]
         setting = loss.setting
@@ -64,7 +64,7 @@ class LLSOptimizerBase(OptimizerBase):
         return np.vstack(tmp)
 
     def _calc_matrix_energies_species_coeffs(self) -> np.ndarray:
-        loss = self.loss_function
+        loss = self.loss
         species = loss.mtp_data["species"]
         images = loss.images
         counts = np.full((len(images), len(species)), np.nan)
@@ -75,8 +75,8 @@ class LLSOptimizerBase(OptimizerBase):
 
     def _calc_vector(self) -> np.ndarray:
         """Calculate the vector for linear least squares (LLS)."""
-        setting = self.loss_function.setting
-        images = self.loss_function.images
+        setting = self.loss.setting
+        images = self.loss.images
         energies = self._calc_energies()
         tmp = []
         if "energy" in self.minimized:
@@ -104,7 +104,7 @@ class LLSOptimizerBase(OptimizerBase):
             Otherwise, this is the raw energies including site energies.
 
         """
-        loss = self.loss_function
+        loss = self.loss
         mtp_data = loss.mtp_data
         images = loss.images
         species: list[int] = mtp_data["species"]
@@ -120,7 +120,7 @@ class LLSOptimizerBase(OptimizerBase):
 
     def _calc_target_energies(self) -> np.ndarray:
         """Calculate the target energies."""
-        images = self.loss_function.images
+        images = self.loss.images
         return np.fromiter(
             (atoms.calc.targets["energy"] for atoms in images),
             dtype=float,
@@ -141,11 +141,11 @@ class LLSOptimizer(LLSOptimizerBase):
 
     def __init__(
         self,
-        loss_function: LossFunctionBase,
+        loss: LossFunctionBase,
         **kwargs: dict[str, Any],
     ) -> None:
         """Initialize the optimizer."""
-        super().__init__(loss_function, **kwargs)
+        super().__init__(loss=loss, **kwargs)
         if self.optimized is None:
             self.optimized = ["species_coeffs", "moment_coeffs"]
 
@@ -171,16 +171,16 @@ class LLSOptimizer(LLSOptimizerBase):
             Optimized parameters.
 
         """
-        # Calculate basis functions of `fitness.images`
-        self.loss_function(parameters)
+        # Calculate basis functions of `loss.images`
+        self.loss(parameters)
 
-        callback = Callback(self.loss_function)
+        callback = Callback(self.loss)
 
         # Print the value of the loss function.
         callback(parameters)
 
         # Update self.data based on the initialized parameters
-        self.loss_function.mtp_data.parameters = parameters
+        self.loss.mtp_data.parameters = parameters
 
         matrix = self._calc_matrix()
         vector = self._calc_vector()
@@ -188,11 +188,11 @@ class LLSOptimizer(LLSOptimizerBase):
         coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
 
         # Update `dict_mtp` and `parameters`.
-        asm = self.loss_function.mtp_data["alpha_scalar_moments"]
-        self.loss_function.mtp_data["moment_coeffs"] = coeffs[:asm]
+        asm = self.loss.mtp_data["alpha_scalar_moments"]
+        self.loss.mtp_data["moment_coeffs"] = coeffs[:asm]
         if "species_coeffs" in self.optimized:
-            self.loss_function.mtp_data["species_coeffs"] = coeffs[asm:]
-        parameters = self.loss_function.mtp_data.parameters
+            self.loss.mtp_data["species_coeffs"] = coeffs[asm:]
+        parameters = self.loss.mtp_data.parameters
 
         # Print the value of the loss function.
         callback(parameters)
@@ -208,7 +208,7 @@ class LLSOptimizer(LLSOptimizerBase):
         return np.hstack(tmp)
 
     def _calc_matrix_moment_coeffs(self) -> np.ndarray:
-        loss = self.loss_function
+        loss = self.loss
         mtp_data = loss.mtp_data
         images = loss.images
         setting = loss.setting

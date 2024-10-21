@@ -39,27 +39,27 @@ class NoInteractionOptimizer(OptimizerBase):
 
         """
         # Calculate basis functions of `fitness.images`
-        self.loss_function(parameters)
+        self.loss(parameters)
 
-        callback = Callback(self.loss_function)
+        callback = Callback(self.loss)
 
         # Print the value of the loss function.
         callback(parameters)
 
         # Update self.data based on the initialized parameters
-        self.loss_function.mtp_data.parameters = parameters
+        self.loss.mtp_data.parameters = parameters
 
         matrix = self._calc_matrix()
         vector = self._calc_vector()
 
         species_coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
 
-        self.loss_function.mtp_data["scaling"] = 1.0
-        self.loss_function.mtp_data["moment_coeffs"][...] = 0.0
-        self.loss_function.mtp_data["radial_coeffs"][...] = 0.0
-        self.loss_function.mtp_data["species_coeffs"] = species_coeffs
+        self.loss.mtp_data["scaling"] = 1.0
+        self.loss.mtp_data["moment_coeffs"][...] = 0.0
+        self.loss.mtp_data["radial_coeffs"][...] = 0.0
+        self.loss.mtp_data["species_coeffs"] = species_coeffs
 
-        parameters = self.loss_function.mtp_data.parameters
+        parameters = self.loss.mtp_data.parameters
 
         # Print the value of the loss function.
         callback(parameters)
@@ -68,7 +68,7 @@ class NoInteractionOptimizer(OptimizerBase):
 
     def _calc_matrix(self) -> np.ndarray:
         """Calculate the matrix for linear least squares (LLS)."""
-        loss = self.loss_function
+        loss = self.loss
         species = loss.mtp_data["species"]
         images = loss.images
         counts = np.full((len(images), len(species)), np.nan)
@@ -79,7 +79,7 @@ class NoInteractionOptimizer(OptimizerBase):
 
     def _calc_vector(self) -> np.ndarray:
         """Calculate the vector for linear least squares (LLS)."""
-        images = self.loss_function.images
+        images = self.loss.images
         return np.fromiter(
             (atoms.calc.targets["energy"] for atoms in images),
             dtype=float,

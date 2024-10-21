@@ -22,11 +22,11 @@ class Level2MTPOptimizer(LLSOptimizerBase):
 
     def __init__(
         self,
-        loss_function: LossFunctionBase,
+        loss: LossFunctionBase,
         **kwargs: dict[str, Any],
     ) -> None:
         """Initialize the optimizer."""
-        super().__init__(loss_function, **kwargs)
+        super().__init__(loss=loss, **kwargs)
         if self.optimized is None:
             self.optimized = ["species_coeffs", "radial_coeffs"]
 
@@ -52,16 +52,16 @@ class Level2MTPOptimizer(LLSOptimizerBase):
             Optimized parameters.
 
         """
-        # Calculate basis functions of `loss_function.images`
-        self.loss_function(parameters)
+        # Calculate basis functions of `loss.images`
+        self.loss(parameters)
 
-        callback = Callback(self.loss_function)
+        callback = Callback(self.loss)
 
         # Print the value of the loss function.
         callback(parameters)
 
         # Update self.data based on the initialized parameters
-        self.loss_function.mtp_data.parameters = parameters
+        self.loss.mtp_data.parameters = parameters
 
         matrix = self._calc_matrix()
         vector = self._calc_vector()
@@ -77,7 +77,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         return parameters
 
     def _update_parameters(self, coeffs: np.ndarray) -> np.ndarray:
-        mtp_data = self.loss_function.mtp_data
+        mtp_data = self.loss.mtp_data
         species_count = mtp_data["species_count"]
         rbs = mtp_data["radial_basis_size"]
         size = species_count * species_count * rbs
@@ -102,7 +102,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         return np.hstack(tmp)
 
     def _calc_matrix_radial_coeffs(self) -> np.ndarray:
-        loss = self.loss_function
+        loss = self.loss
         mtp_data = loss.mtp_data
         images = loss.images
         setting = loss.setting

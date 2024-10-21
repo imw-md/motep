@@ -14,13 +14,13 @@ class Randomizer(OptimizerBase):
 
     def __init__(
         self,
-        loss_function: LossFunctionBase,
+        loss: LossFunctionBase,
         *,
         optimized: list[str] | None = None,
         **kwargs: dict[str, Any],
     ) -> None:
         """Initialize `Randomizer`."""
-        super().__init__(loss_function, **kwargs)
+        super().__init__(loss=loss, **kwargs)
         if optimized is None:
             optimized = ["species_coeffs", "radial_coeffs", "moment_coeffs"]
         self.optimized = optimized
@@ -33,15 +33,15 @@ class Randomizer(OptimizerBase):
     ) -> np.ndarray:
         """Randomize parameters."""
         # Calculate basis functions of `fitness.images`
-        self.loss_function(parameters)
-        rng: np.random.Generator = self.loss_function.setting["rng"]
+        self.loss(parameters)
+        rng: np.random.Generator = self.loss.setting["rng"]
 
-        callback = Callback(self.loss_function)
+        callback = Callback(self.loss)
 
         # Print the value of the loss function.
         callback(parameters)
 
-        mtp_data = self.loss_function.mtp_data
+        mtp_data = self.loss.mtp_data
         for key in self.optimized:
             lb = -5.0
             ub = +5.0

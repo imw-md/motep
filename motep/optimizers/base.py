@@ -18,23 +18,19 @@ class OptimizerBase(ABC):
 
     """
 
-    def __init__(
-        self,
-        loss_function: LossFunctionBase,
-        **kwargs: dict[str, Any],
-    ) -> None:
+    def __init__(self, loss: LossFunctionBase, **kwargs: dict[str, Any]) -> None:
         """Initialize the `Optimizer` class.
 
         Parameters
         ----------
-        loss_function : :class:`motep.loss_function.LossFunction`
+        loss : :class:`motep.loss_function.LossFunction`
             :class:`motep.loss_function.LossFunction` object.
         **kwargs : dict[str, Any]
             Options passed to the `Optimizer` class.
 
         """
-        self.loss_function = loss_function
-        mtp_data = self.loss_function.mtp_data
+        self.loss = loss
+        mtp_data = self.loss.mtp_data
         if "species" not in mtp_data:
             species = {_: _ for _ in range(mtp_data["species_count"])}
             mtp_data["species"] = species

@@ -48,9 +48,9 @@ class ScipyDualAnnealingOptimizer(OptimizerBase):
         bounds: np.ndarray,
         **kwargs: dict[str, Any],
     ) -> np.ndarray:
-        callback = Callback(self.loss_function)
+        callback = Callback(self.loss)
         result = dual_annealing(
-            self.loss_function,
+            self.loss,
             bounds=bounds,
             callback=callback,
             seed=40,
@@ -67,9 +67,9 @@ class ScipyDifferentialEvolutionOptimizer(OptimizerBase):
         bounds: np.ndarray,
         **kwargs: dict[str, Any],
     ) -> np.ndarray:
-        callback = Callback(self.loss_function)
+        callback = Callback(self.loss)
         result = differential_evolution(
-            self.loss_function,
+            self.loss,
             bounds,
             popsize=30,
             callback=callback,
@@ -88,9 +88,9 @@ class ScipyMinimizeOptimizer(OptimizerBase):
         **kwargs: dict[str, Any],
     ) -> np.ndarray:
         """Optimizer using `scipy.optimize.minimize`."""
-        callback = Callback(self.loss_function)
+        callback = Callback(self.loss)
         result = minimize(
-            self.loss_function,
+            self.loss,
             initial_guess,
             bounds=bounds,
             callback=callback,
