@@ -11,7 +11,7 @@ from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
-from motep.loss_function import LossFunction
+from motep.loss import LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
 from motep.setting import make_default_setting, parse_setting
 from motep.utils import cd
@@ -53,7 +53,7 @@ def run(args: argparse.Namespace) -> None:
     mtp_data = read_mtp(untrained_mtp)
 
     if setting["engine"] == "mlippy":
-        from motep.mlippy_loss_function import MlippyLossFunction
+        from motep.mlippy_loss import MlippyLossFunction
 
         loss = MlippyLossFunction(images, mtp_data, setting, comm=comm)
     else:

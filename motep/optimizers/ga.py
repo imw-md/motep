@@ -269,7 +269,7 @@ class GeneticAlgorithmOptimizer(OptimizerBase):
         """Optimize parameters."""
         bounds = _limit_bounds(bounds)
         ga = GeneticAlgorithm(
-            self.loss_function,
+            self.loss,
             initial_guess,
             lower_bound=bounds[:, 0],
             upper_bound=bounds[:, 1],
@@ -281,7 +281,15 @@ class GeneticAlgorithmOptimizer(OptimizerBase):
         )
         ga.initialize_population()
         return ga.evolve_with_mix(
-            self.loss_function,
+            self.loss,
             generations=30,
             elite_callback=elite_callback,
         )
+
+    @property
+    def optimized_default(self) -> list[str]:
+        return ["species_coeffs", "moment_coeffs", "radial_coeffs"]
+
+    @property
+    def optimized_allowed(self) -> list[str]:
+        return ["scaling", "species_coeffs", "moment_coeffs", "radial_coeffs"]

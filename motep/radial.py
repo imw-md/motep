@@ -28,7 +28,7 @@ class RadialBasisBase(ABC):
         """
 
     @abstractmethod
-    def calculate(
+    def calc_radial_part(
         self,
         r_abs: npt.NDArray[np.float64],
         itype: int,
@@ -42,9 +42,17 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
 
     Attributes
     ----------
-    values0 : npt.NDArray[np.float64]
-        Values of the (pseudo) Vandermonde matrix multiplied with the smoothing
-        funciton with the shape of (neighbors, radial_basis_size).
+    basis_vs : npt.NDArray[np.float64]
+        Values of the basis functions multiplied by the smoothing funciton
+        with the shape of (neighbors, radial_basis_size).
+        This is T(r) * (R_cut - r)^2 in Eq. (4) in [Podryabinkin_JCP_2023_MLIP]_.
+    basis_ds : npt.NDArray[np.float64]
+        Derivatives of the basis functions multiplied by the smoothing funciton
+        with the shape of (neighbors, radial_basis_size).
+
+    .. [Podryabinkin_JCP_2023_MLIP]
+          E. Podryabinkin, K. Garifullin, A. Shapeev, and I. Novikov,
+          J. Chem. Phys. 159, (2023).
 
     """
 
@@ -52,8 +60,8 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
         """Initialize `ChebyshevRadialBasis`."""
         super().__init__(dict_mtp)
         self.coeffs = None
-        self.values0 = None
-        self.derivs0 = None
+        self.basis_vs = None
+        self.basis_ds = None
 
     def vander(
         self,
@@ -96,20 +104,26 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
         """Update radial basis coefficients."""
         self.coeffs = coeffs
 
-    def calculate(
+    def calc_radial_part(
         self,
         r_abs: npt.NDArray[np.float64],
         itype: int,
         jtypes: list[int],
     ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        """Calculate rabial basis values.
+        """Calculate the rabial part.
 
         Returns
         -------
-        rb_values : npt.NDArray[np.float64]
-            Values of radial basis functions (radial_funcs_count, neighbors).
-        rb_derivs : npt.NDArray[np.float64]
-            Derivatives of radial basis functions (radial_funcs_count, neighbors).
+        radial_part_vs : npt.NDArray[np.float64]
+            Values of the radial part (radial_funcs_count, neighbors).
+            This corresponds to f_mu in Eq. (4) in [Podryabinkin_JCP_2023_MLIP]_.
+        radial_part_ds : npt.NDArray[np.float64]
+            Derivatives of the radial part (radial_funcs_count, neighbors).
+            This corresponds to d f_mu / d r.
+
+        .. [Podryabinkin_JCP_2023_MLIP]
+          E. Podryabinkin, K. Garifullin, A. Shapeev, and I. Novikov,
+          J. Chem. Phys. 159, (2023).
 
         """
         scaling = self.dict_mtp["scaling"]
@@ -118,15 +132,22 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
         in_cutoff = r_abs < max_dist
         smooth_values = np.where(in_cutoff, scaling * (max_dist - r_abs) ** 2, 0.0)
         smooth_derivs = np.where(in_cutoff, -2.0 * scaling * (max_dist - r_abs), 0.0)
-        vs0, ds0 = self.vander(r_abs)
-        self.values0 = vs0 * smooth_values[:, None]
-        self.derivs0 = ds0 * smooth_values[:, None] + vs0 * smooth_derivs[:, None]
-        tmp0 = np.sum(vs0[:, None, :] * self.coeffs[itype, jtypes], axis=-1).T
-        tmp1 = np.sum(ds0[:, None, :] * self.coeffs[itype, jtypes], axis=-1).T
-        rb_values = tmp0 * smooth_values
-        rb_derivs = tmp1 * smooth_values + tmp0 * smooth_derivs
 
-        return rb_values, rb_derivs
+        vs0, ds0 = self.vander(r_abs)
+
+        self.basis_vs = vs0 * smooth_values[:, None]
+        self.basis_ds = ds0 * smooth_values[:, None] + vs0 * smooth_derivs[:, None]
+
+        radial_part_vs = np.sum(
+            self.basis_vs[:, None, :] * self.coeffs[itype, jtypes],
+            axis=-1,
+        ).T
+        radial_part_ds = np.sum(
+            self.basis_ds[:, None, :] * self.coeffs[itype, jtypes],
+            axis=-1,
+        ).T
+
+        return radial_part_vs, radial_part_ds
 
 
 class ChebyshevPolynomialRadialBasis(RadialBasisBase):
@@ -181,7 +202,7 @@ class ChebyshevPolynomialRadialBasis(RadialBasisBase):
                     p.coef = coeffs[i0, i1, i2]
                     self.dfdrs[i0, i1, i2] = p.deriv()
 
-    def calculate(
+    def calc_radial_part(
         self,
         r_abs: np.ndarray,
         itype: int,

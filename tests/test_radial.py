@@ -58,21 +58,21 @@ def test_radial_funcs(
         "radial_funcs_count": radial_coeffs.shape[2],
         "radial_basis_size": radial_coeffs.shape[3],
     }
-    rb = radial_basis_class(mtp_data)
+    rb: RadialBasisBase = radial_basis_class(mtp_data)
     rb.update_coeffs(radial_coeffs)
     r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=1))
-    _, radial_basis_derivs = rb.calculate(r_abs, 0, jtypes=jtypes)
+    _, radial_basis_derivs = rb.calc_radial_part(r_abs, 0, jtypes=jtypes)
     radial_basis_derivs = radial_basis_derivs[:, :, None] * r_ijs / r_abs[:, None]
 
     dx = 1e-6
 
     r_ijs_p = r_ijs + [[dx, 0.0, 0.0]]
     r_abs_p = np.sqrt(np.add.reduce(r_ijs_p**2, axis=1))
-    radial_basis_values_p, _ = rb.calculate(r_abs_p, 0, jtypes=jtypes)
+    radial_basis_values_p, _ = rb.calc_radial_part(r_abs_p, 0, jtypes=jtypes)
 
     r_ijs_m = r_ijs - [[dx, 0.0, 0.0]]
     r_abs_m = np.sqrt(np.add.reduce(r_ijs_m**2, axis=1))
-    radial_basis_values_m, _ = rb.calculate(r_abs_m, 0, jtypes=jtypes)
+    radial_basis_values_m, _ = rb.calc_radial_part(r_abs_m, 0, jtypes=jtypes)
 
     radial_basis_derivs_fd = radial_basis_values_p - radial_basis_values_m
     radial_basis_derivs_fd /= 2.0 * dx

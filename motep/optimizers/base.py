@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy as np
 
-from motep.loss_function import LossFunctionBase
+from motep.loss import LossFunctionBase
 
 
 class OptimizerBase(ABC):
@@ -18,26 +18,25 @@ class OptimizerBase(ABC):
 
     """
 
-    def __init__(
-        self,
-        loss_function: LossFunctionBase,
-        **kwargs: dict[str, Any],
-    ) -> None:
+    def __init__(self, loss: LossFunctionBase, **kwargs: dict[str, Any]) -> None:
         """Initialize the `Optimizer` class.
 
         Parameters
         ----------
-        loss_function : :class:`motep.loss_function.LossFunction`
-            :class:`motep.loss_function.LossFunction` object.
+        loss : :class:`motep.loss.LossFunction`
+            :class:`motep.loss.LossFunction` object.
         **kwargs : dict[str, Any]
             Options passed to the `Optimizer` class.
 
         """
-        self.loss_function = loss_function
-        mtp_data = self.loss_function.mtp_data
-        if "species" not in mtp_data:
-            species = {_: _ for _ in range(mtp_data["species_count"])}
-            mtp_data["species"] = species
+        self.loss = loss
+
+        if "optimized" not in kwargs:
+            self.optimized = self.optimized_default
+        elif all(_ in self.optimized_allowed for _ in kwargs["optimized"]):
+            self.optimized = kwargs["optimized"]
+        else:
+            raise ValueError(f"Some keywords cannot be optimized in {__name__}.")
 
     @abstractmethod
     def optimize(
@@ -63,3 +62,13 @@ class OptimizerBase(ABC):
             Optimized parameters.
 
         """
+
+    @property
+    @abstractmethod
+    def optimized_default(self) -> list[str]:
+        """Return default `optimized`."""
+
+    @property
+    @abstractmethod
+    def optimized_allowed(self) -> list[str]:
+        """Return allowed `optimized`."""

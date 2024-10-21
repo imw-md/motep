@@ -3,7 +3,7 @@
 import mlippy
 
 from motep.io.mlip.mtp import write_mtp
-from motep.loss_function import LossFunctionBase
+from motep.loss import LossFunctionBase
 from motep.potentials.mtp.data import MTPData
 
 
@@ -16,12 +16,8 @@ def init_mlip(file: str, species: list[int]):
     return mlip
 
 
-def init_calc(
-    file: str,
-    mtp_data: MTPData,
-    species: list[int],
-) -> mlippy.MLIP_Calculator:
-    """Initialize mlippy ASE calculator."""
+def init_calc(file: str, mtp_data: MTPData, species: list[int]):
+    """Initialize the mlippy `mtp` ojbect."""
     write_mtp(file, mtp_data)
     return init_mlip(file, species)
 
@@ -42,8 +38,6 @@ class MlippyLossFunction(LossFunctionBase):
         write_mtp(file, self.mtp_data)
         options = {"mtp-filename": file}
         for atoms in self.images:
-            targets = atoms.calc.targets
             atoms.calc.mlip.init_wrapper(options)
             atoms.calc.results = {}
-            atoms.calc.targets = targets
         return self.calc_loss_function()

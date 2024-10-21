@@ -29,18 +29,10 @@ def parse_setting(filename: str) -> dict:
         setting = tomllib.load(f)
 
     # convert the old style "steps" like {'steps`: ['L-BFGS-B']} to the new one
-    # {'steps`: {'method': 'L-BFGS-B', 'optimized': ['radial_coeffs', 'moment_coeffs']}
-    optimized_default = [
-        "scaling",
-        "species_coeffs",
-        "radial_coeffs",
-        "moment_coeffs",
-    ]
+    # {'steps`: {'method': 'L-BFGS-B'}
+    # Default 'optimized' is defined in each `Optimizer` class.
     for i, value in enumerate(setting["steps"]):
         if not isinstance(value, dict):
-            setting["steps"][i] = {
-                "method": value,
-                "optimized": optimized_default,
-            }
+            setting["steps"][i] = {"method": value}
 
     return setting
