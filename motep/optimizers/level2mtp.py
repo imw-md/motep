@@ -1,10 +1,7 @@
 """Optimizer for Level 2 MTP."""
 
-from typing import Any
-
 import numpy as np
 
-from motep.loss import LossFunctionBase
 from motep.optimizers.lls import LLSOptimizerBase
 from motep.optimizers.scipy import Callback
 
@@ -20,15 +17,13 @@ class Level2MTPOptimizer(LLSOptimizerBase):
 
     """
 
-    def __init__(
-        self,
-        loss: LossFunctionBase,
-        **kwargs: dict[str, Any],
-    ) -> None:
-        """Initialize the optimizer."""
-        super().__init__(loss=loss, **kwargs)
-        if self.optimized is None:
-            self.optimized = ["species_coeffs", "radial_coeffs"]
+    @property
+    def optimized_default(self) -> list[str]:
+        return ["species_coeffs", "radial_coeffs"]
+
+    @property
+    def optimized_allowed(self) -> list[str]:
+        return ["species_coeffs", "radial_coeffs"]
 
     def optimize(
         self,

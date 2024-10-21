@@ -4,7 +4,6 @@ from abc import abstractmethod
 from typing import Any
 
 import numpy as np
-from ase import Atoms
 from ase.stress import voigt_6_to_full_3x3_stress
 
 from motep.loss import LossFunctionBase
@@ -28,7 +27,6 @@ class LLSOptimizerBase(OptimizerBase):
         self,
         loss: LossFunctionBase,
         *,
-        optimized: list[str] | None = None,
         minimized: list[str] | None = None,
         **kwargs: dict[str, Any],
     ) -> None:
@@ -37,7 +35,6 @@ class LLSOptimizerBase(OptimizerBase):
         if minimized is None:
             minimized = ["energy", "forces"]
         self.minimized = minimized
-        self.optimized = optimized
 
     @abstractmethod
     def _calc_matrix(self) -> np.ndarray:
@@ -139,15 +136,13 @@ class LLSOptimizer(LLSOptimizerBase):
 
     """
 
-    def __init__(
-        self,
-        loss: LossFunctionBase,
-        **kwargs: dict[str, Any],
-    ) -> None:
-        """Initialize the optimizer."""
-        super().__init__(loss=loss, **kwargs)
-        if self.optimized is None:
-            self.optimized = ["species_coeffs", "moment_coeffs"]
+    @property
+    def optimized_default(self) -> list[str]:
+        return ["species_coeffs", "moment_coeffs"]
+
+    @property
+    def optimized_allowed(self) -> list[str]:
+        return ["species_coeffs", "moment_coeffs"]
 
     def optimize(
         self,

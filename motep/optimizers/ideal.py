@@ -66,6 +66,14 @@ class NoInteractionOptimizer(OptimizerBase):
 
         return parameters
 
+    @property
+    def optimized_default(self) -> list[str]:
+        return ["species_coeffs"]
+
+    @property
+    def optimized_allowed(self) -> list[str]:
+        return ["species_coeffs"]
+
     def _calc_matrix(self) -> np.ndarray:
         """Calculate the matrix for linear least squares (LLS)."""
         loss = self.loss

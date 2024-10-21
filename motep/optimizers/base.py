@@ -30,10 +30,13 @@ class OptimizerBase(ABC):
 
         """
         self.loss = loss
-        mtp_data = self.loss.mtp_data
-        if "species" not in mtp_data:
-            species = {_: _ for _ in range(mtp_data["species_count"])}
-            mtp_data["species"] = species
+
+        if "optimized" not in kwargs:
+            self.optimized = self.optimized_default
+        elif all(_ in self.optimized_allowed for _ in kwargs["optimized"]):
+            self.optimized = kwargs["optimized"]
+        else:
+            raise ValueError(f"Some keywords cannot be optimized in {__name__}.")
 
     @abstractmethod
     def optimize(
@@ -59,3 +62,13 @@ class OptimizerBase(ABC):
             Optimized parameters.
 
         """
+
+    @property
+    @abstractmethod
+    def optimized_default(self) -> list[str]:
+        """Return default `optimized`."""
+
+    @property
+    @abstractmethod
+    def optimized_allowed(self) -> list[str]:
+        """Return allowed `optimized`."""

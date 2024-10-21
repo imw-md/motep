@@ -41,7 +41,17 @@ def print_result(result: OptimizeResult) -> None:
     # print("  Final function value:", result.fun)
 
 
-class ScipyDualAnnealingOptimizer(OptimizerBase):
+class ScipyOptimizerBase(OptimizerBase):
+    @property
+    def optimized_default(self) -> list[str]:
+        return ["species_coeffs", "moment_coeffs", "radial_coeffs"]
+
+    @property
+    def optimized_allowed(self) -> list[str]:
+        return ["scaling", "species_coeffs", "moment_coeffs", "radial_coeffs"]
+
+
+class ScipyDualAnnealingOptimizer(ScipyOptimizerBase):
     def optimize(
         self,
         initial_guess: np.ndarray,
@@ -60,7 +70,7 @@ class ScipyDualAnnealingOptimizer(OptimizerBase):
         return result.x
 
 
-class ScipyDifferentialEvolutionOptimizer(OptimizerBase):
+class ScipyDifferentialEvolutionOptimizer(ScipyOptimizerBase):
     def optimize(
         self,
         initial_guess: np.ndarray,
@@ -78,7 +88,7 @@ class ScipyDifferentialEvolutionOptimizer(OptimizerBase):
         return result.x
 
 
-class ScipyMinimizeOptimizer(OptimizerBase):
+class ScipyMinimizeOptimizer(ScipyOptimizerBase):
     """`Optimizer` class using `scipy.minimize`."""
 
     def optimize(

@@ -285,3 +285,11 @@ class GeneticAlgorithmOptimizer(OptimizerBase):
             generations=30,
             elite_callback=elite_callback,
         )
+
+    @property
+    def optimized_default(self) -> list[str]:
+        return ["species_coeffs", "moment_coeffs", "radial_coeffs"]
+
+    @property
+    def optimized_allowed(self) -> list[str]:
+        return ["scaling", "species_coeffs", "moment_coeffs", "radial_coeffs"]
