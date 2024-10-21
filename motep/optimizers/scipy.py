@@ -99,6 +99,8 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
     ) -> np.ndarray:
         """Optimizer using `scipy.optimize.minimize`."""
         if kwargs.get("jac"):
+            if "scaling" in self.optimized:
+                raise ValueError("`jac` cannot (so far) be used to optimize `scaling`.")
             kwargs["jac"] = self.loss.jac
         callback = Callback(self.loss)
         result = minimize(
