@@ -36,7 +36,7 @@ def test_jac(engine: str, level: int, data_path: pathlib.Path) -> None:
         engine=engine,
     )
     loss(mtp_data_ref.parameters)
-    jac_anl = loss.jac()
+    jac_anl = loss.jac(mtp_data_ref.parameters)
 
     jac_nmr = np.full_like(jac_anl, np.nan)
 

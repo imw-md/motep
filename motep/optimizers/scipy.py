@@ -98,6 +98,8 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
         **kwargs: dict[str, Any],
     ) -> np.ndarray:
         """Optimizer using `scipy.optimize.minimize`."""
+        if kwargs.get("jac"):
+            kwargs["jac"] = self.loss.jac
         callback = Callback(self.loss)
         result = minimize(
             self.loss,
