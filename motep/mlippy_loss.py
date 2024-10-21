@@ -3,7 +3,7 @@
 import mlippy
 
 from motep.io.mlip.mtp import write_mtp
-from motep.loss_function import LossFunctionBase
+from motep.loss import LossFunctionBase
 from motep.potentials.mtp.data import MTPData
 
 

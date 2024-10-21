@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy as np
 
-from motep.loss_function import LossFunctionBase
+from motep.loss import LossFunctionBase
 
 
 class OptimizerBase(ABC):
@@ -23,8 +23,8 @@ class OptimizerBase(ABC):
 
         Parameters
         ----------
-        loss : :class:`motep.loss_function.LossFunction`
-            :class:`motep.loss_function.LossFunction` object.
+        loss : :class:`motep.loss.LossFunction`
+            :class:`motep.loss.LossFunction` object.
         **kwargs : dict[str, Any]
             Options passed to the `Optimizer` class.
 

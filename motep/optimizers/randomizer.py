@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 
-from motep.loss_function import LossFunctionBase
+from motep.loss import LossFunctionBase
 from motep.optimizers.base import OptimizerBase
 from motep.optimizers.scipy import Callback
 

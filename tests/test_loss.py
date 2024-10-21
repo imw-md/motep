@@ -9,7 +9,7 @@ from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.loss_function import LossFunction
+from motep.loss import LossFunction
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])

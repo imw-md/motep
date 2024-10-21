@@ -8,7 +8,7 @@ from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.loss_function import LossFunction
+from motep.loss import LossFunction
 from motep.optimizers.ideal import NoInteractionOptimizer
 from motep.optimizers.level2mtp import Level2MTPOptimizer
 from motep.potentials.mtp.data import MTPData
