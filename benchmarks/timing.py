@@ -71,10 +71,10 @@ def time_mtp(
     engine: str,
 ):
     parameters = read_mtp(pot_path)
-    parameters["species"] = {}
+    parameters["species"] = []
     for i, atomic_number in enumerate(images[0].get_atomic_numbers()):
         if not atomic_number in parameters["species"]:
-            parameters["species"][atomic_number] = i
+            parameters["species"].append(atomic_number)
     calc = MTP(parameters, engine=engine)
     calc.use_cache = False
 
