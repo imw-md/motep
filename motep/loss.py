@@ -119,16 +119,14 @@ class LossFunctionBase(ABC):
             (atoms.calc.results["energy"] - atoms.calc.targets["energy"]) ** 2
             for atoms in self.images
         ]  # squared errors
-        energy_mse = self.configuration_weight @ energy_ses  # mean squared error
-        return self.setting["energy-weight"] * energy_mse
+        return self.configuration_weight @ energy_ses
 
     def _calc_loss_forces(self) -> np.float64:
         force_ses = [
             np.sum((atoms.calc.results["forces"] - atoms.calc.targets["forces"]) ** 2)
             for atoms in self.images
         ]
-        force_mse = self.configuration_weight @ force_ses
-        return self.setting["force-weight"] * force_mse
+        return self.configuration_weight @ force_ses
 
     def _calc_loss_stress(self) -> np.float64:
         key = "stress"
@@ -139,8 +137,7 @@ class LossFunctionBase(ABC):
             np.sum((f(images[i].calc.results[key] - images[i].calc.targets[key])) ** 2)
             for i in indices
         ]
-        stress_mse = self.configuration_weight[indices] @ stress_ses
-        return self.setting["stress-weight"] * stress_mse
+        return self.configuration_weight[indices] @ stress_ses
 
     def calc_loss_function(self) -> float:
         """Calculate the value of the loss function."""
@@ -148,11 +145,11 @@ class LossFunctionBase(ABC):
         for atoms in self.images:
             atoms.get_potential_energy()
 
-        loss_energy = self._calc_loss_energy()
-        loss_forces = self._calc_loss_forces()
-        loss_stress = self._calc_loss_stress()
-
-        return loss_energy + loss_forces + loss_stress
+        return (
+            self.setting["energy-weight"] * self._calc_loss_energy()
+            + self.setting["force-weight"] * self._calc_loss_forces()
+            + self.setting["stress-weight"] * self._calc_loss_stress()
+        )
 
     def _jac_energy(self) -> npt.NDArray[np.float64]:
         def per_configuration(atoms: Atoms) -> np.float64:
@@ -163,8 +160,7 @@ class LossFunctionBase(ABC):
             )
 
         jacs = np.array([per_configuration(atoms) for atoms in self.images])
-        jac = self.configuration_weight @ jacs
-        return self.setting["energy-weight"] * jac
+        return self.configuration_weight @ jacs
 
     def _jac_forces(self) -> npt.NDArray[np.float64]:
         def per_configuration(atoms: Atoms) -> np.float64:
@@ -176,8 +172,7 @@ class LossFunctionBase(ABC):
             )
 
         jacs = np.array([per_configuration(atoms) for atoms in self.images])
-        jac = self.configuration_weight @ jacs
-        return self.setting["force-weight"] * jac
+        return self.configuration_weight @ jacs
 
     def _jac_stress(self) -> npt.NDArray[np.float64]:
         key = "stress"
@@ -195,15 +190,15 @@ class LossFunctionBase(ABC):
             )
 
         jacs = np.array([per_configuration(self.images[i]) for i in indices])
-        jac = self.configuration_weight[indices] @ jacs[indices]
-        return self.setting["stress-weight"] * jac
+        return self.configuration_weight[indices] @ jacs[indices]
 
     def jac(self, parameters: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         """Calculate the Jacobian of the loss function."""
-        jac_energy = self._jac_energy()
-        jac_forces = self._jac_forces()
-        jac_stress = self._jac_stress()
-        return jac_energy + jac_forces + jac_stress
+        return (
+            self.setting["energy-weight"] * self._jac_energy()
+            + self.setting["force-weight"] * self._jac_forces()
+            + self.setting["stress-weight"] * self._jac_stress()
+        )
 
     def _calc_errors_energy(self) -> dict[str, float]:
         iterable = (
