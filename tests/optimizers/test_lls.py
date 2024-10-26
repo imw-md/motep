@@ -14,15 +14,11 @@ from motep.potentials.mtp.data import MTPData
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize(
-    ("molecule", "species"),
-    [(762, [1]), (291, [6, 1]), (14214, [9, 1]), (23208, [8])],
-)
+@pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
 @pytest.mark.parametrize("engine", ["numpy"])
 def test_molecules(
     engine: str,
     molecule: int,
-    species: dict[int, int],
     level: int,
     data_path: pathlib.Path,
 ) -> None:
@@ -97,15 +93,11 @@ def test_molecules(
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize(
-    ("crystal", "species"),
-    [("cubic", [29]), ("noncubic", [29])],
-)
+@pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("engine", ["numpy"])
 def test_crystals(
     engine: str,
     crystal: int,
-    species: dict[int, int],
     level: int,
     data_path: pathlib.Path,
 ) -> None:
