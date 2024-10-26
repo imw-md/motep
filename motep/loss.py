@@ -221,7 +221,7 @@ class LossFunctionBase(ABC):
 
     def _calc_errors_forces(self) -> dict[str, float]:
         iterable = (
-            atoms.calc.results["forces"][j][k] - atoms.calc.targets["forces"][j][k]
+            atoms.calc.results["forces"][j, k] - atoms.calc.targets["forces"][j, k]
             for atoms in self.images
             for j in range(len(atoms))
             for k in range(3)
