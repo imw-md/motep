@@ -164,9 +164,8 @@ class LossFunctionBase(ABC):
 
     def _jac_energy(self) -> npt.NDArray[np.float64]:
         def per_configuration(atoms: Atoms) -> np.float64:
-            return (
-                2.0
-                * (atoms.calc.results["energy"] - atoms.calc.targets["energy"])
+            return 2.0 * (
+                (atoms.calc.results["energy"] - atoms.calc.targets["energy"])
                 * atoms.calc.engine.jac_energy(atoms).parameters
             )
 
@@ -175,9 +174,8 @@ class LossFunctionBase(ABC):
 
     def _jac_forces(self) -> npt.NDArray[np.float64]:
         def per_configuration(atoms: Atoms) -> np.float64:
-            return np.sum(
-                2.0
-                * (atoms.calc.results["forces"] - atoms.calc.targets["forces"])
+            return 2.0 * np.sum(
+                (atoms.calc.results["forces"] - atoms.calc.targets["forces"])
                 * atoms.calc.engine.jac_forces(atoms).parameters,
                 axis=(-2, -1),
             )
@@ -189,9 +187,8 @@ class LossFunctionBase(ABC):
         f = voigt_6_to_full_3x3_stress
 
         def per_configuration(atoms: Atoms) -> np.float64:
-            return np.sum(
-                2.0
-                * f(atoms.calc.results["stress"] - atoms.calc.targets["stress"])
+            return 2.0 * np.sum(
+                f(atoms.calc.results["stress"] - atoms.calc.targets["stress"])
                 * atoms.calc.engine.jac_stress(atoms).parameters,
                 axis=(-2, -1),
             )
