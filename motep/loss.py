@@ -79,7 +79,14 @@ def _calc_errors_from_diff(diff: np.ndarray) -> dict[str, float]:
 
 
 class LossFunctionBase(ABC):
-    """Loss function."""
+    """Loss function.
+
+    Attributes
+    ----------
+    idcs_str : npt.NDArray[np.int64]
+        Indices of images that have 3D cells.
+
+    """
 
     def __init__(
         self,
@@ -108,6 +115,11 @@ class LossFunctionBase(ABC):
         self.setting = setting
         self.comm = comm
 
+        self.idcs_str = np.fromiter(
+            (i for i, atoms in enumerate(images) if "stress" in atoms.calc.results),
+            dtype=int,
+        )
+
         self.configuration_weight = np.ones(len(self.images))
 
     @abstractmethod
@@ -129,15 +141,14 @@ class LossFunctionBase(ABC):
         return self.configuration_weight @ force_ses
 
     def _calc_loss_stress(self) -> np.float64:
-        key = "stress"
         images = self.images
-        indices = [i for i, atoms in enumerate(images) if key in atoms.calc.targets]
+        key = "stress"
         f = voigt_6_to_full_3x3_stress
         stress_ses = [
             np.sum((f(images[i].calc.results[key] - images[i].calc.targets[key])) ** 2)
-            for i in indices
+            for i in self.idcs_str
         ]
-        return self.configuration_weight[indices] @ stress_ses
+        return self.configuration_weight[self.idcs_str] @ stress_ses
 
     def calc_loss_function(self) -> float:
         """Calculate the value of the loss function."""
@@ -175,10 +186,6 @@ class LossFunctionBase(ABC):
         return self.configuration_weight @ jacs
 
     def _jac_stress(self) -> npt.NDArray[np.float64]:
-        key = "stress"
-        images = self.images
-        indices = [i for i, atoms in enumerate(images) if key in atoms.calc.targets]
-
         f = voigt_6_to_full_3x3_stress
 
         def per_configuration(atoms: Atoms) -> np.float64:
@@ -189,8 +196,9 @@ class LossFunctionBase(ABC):
                 axis=(-2, -1),
             )
 
-        jacs = np.array([per_configuration(self.images[i]) for i in indices])
-        return self.configuration_weight[indices] @ jacs[indices]
+        images = self.images
+        jacs = np.array([per_configuration(images[i]) for i in self.idcs_str])
+        return self.configuration_weight[self.idcs_str] @ jacs
 
     def jac(self, parameters: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         """Calculate the Jacobian of the loss function."""
@@ -226,10 +234,9 @@ class LossFunctionBase(ABC):
     def _calc_errors_stress(self) -> dict[str, float]:
         f = voigt_6_to_full_3x3_stress
         iterable = (
-            f(atoms.calc.results["stress"])[j, k]
-            - f(atoms.calc.targets["stress"])[j, k]
-            for atoms in self.images
-            if "stress" in atoms.calc.targets
+            f(self.images[i].calc.results["stress"])[j, k]
+            - f(self.images[i].calc.targets["stress"])[j, k]
+            for i in self.idcs_str
             for j in range(3)
             for k in range(3)
         )
