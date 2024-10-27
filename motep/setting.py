@@ -18,6 +18,7 @@ def make_default_setting() -> dict[str, Any]:
         "energy-weight": 1.0,
         "force-weight": 0.01,
         "stress-weight": 0.001,
+        "stress-times-volume": False,
     }
     setting["steps"] = [
         {"method": "L-BFGS-B", "optimized": ["radial_coeffs", "moment_coeffs"]},

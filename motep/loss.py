@@ -120,6 +120,12 @@ class LossFunctionBase(ABC):
             dtype=int,
         )
 
+        self.volumes = np.fromiter(
+            (images[i].cell.volume for i in self.idcs_str),
+            dtype=float,
+            count=self.idcs_str.size,
+        )
+
         self.configuration_weight = np.ones(len(self.images))
 
     @abstractmethod
@@ -144,10 +150,13 @@ class LossFunctionBase(ABC):
         images = self.images
         key = "stress"
         f = voigt_6_to_full_3x3_stress
-        stress_ses = [
+        iterable = (
             np.sum((f(images[i].calc.results[key] - images[i].calc.targets[key])) ** 2)
             for i in self.idcs_str
-        ]
+        )
+        stress_ses = np.fromiter(iterable, dtype=float, count=self.idcs_str.size)
+        if self.setting["stress-times-volume"]:
+            stress_ses *= self.volumes**2
         return self.configuration_weight[self.idcs_str] @ stress_ses
 
     def calc_loss_function(self) -> float:
@@ -195,6 +204,8 @@ class LossFunctionBase(ABC):
 
         images = self.images
         jacs = np.array([per_configuration(images[i]) for i in self.idcs_str])
+        if self.setting["stress-times-volume"]:
+            jacs *= self.volumes[self.idcs_str, None]
         return self.configuration_weight[self.idcs_str] @ jacs
 
     def jac(self, parameters: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:

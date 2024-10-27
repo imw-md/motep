@@ -12,9 +12,16 @@ from motep.io.mlip.mtp import read_mtp
 from motep.loss import LossFunction
 
 
+@pytest.mark.parametrize("stress_times_volume", [False, True])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("engine", ["numpy"])
-def test_jac(engine: str, level: int, data_path: pathlib.Path) -> None:
+def test_jac(
+    *,
+    engine: str,
+    level: int,
+    stress_times_volume: bool,
+    data_path: pathlib.Path,
+) -> None:
     """Test the Jacobian for the forces with respect to the parameters."""
     path = data_path / f"fitting/crystals/multi/{level:02d}"
     if not (path / "pot.mtp").exists():
@@ -26,6 +33,7 @@ def test_jac(engine: str, level: int, data_path: pathlib.Path) -> None:
         "energy-weight": 1.0,
         "force-weight": 0.01,
         "stress-weight": 0.001,
+        "stress-times-volume": stress_times_volume,
     }
 
     loss = LossFunction(
