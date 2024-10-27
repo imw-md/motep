@@ -2,14 +2,25 @@
 
 import copy
 import pathlib
-import sys
 
 import numpy as np
 import pytest
+from ase import Atoms
 
 from motep.calculator import MTP
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
+
+
+def make_atoms(engine: str, level: int, data_path: pathlib.Path) -> Atoms:
+    """Make the ASE `Atoms` object with the calculator."""
+    path = data_path / f"fitting/crystals/multi/{level:02d}"
+    if not (path / "pot.mtp").exists():
+        pytest.skip()
+    atoms = read_cfg(path / "out.cfg", index=-1)
+    mtp_data_ref = read_mtp(path / "pot.mtp")
+    atoms.calc = MTP(mtp_data=mtp_data_ref, engine=engine)
+    return atoms
 
 
 @pytest.mark.parametrize("coeffs", ["moment_coeffs", "species_coeffs", "radial_coeffs"])
@@ -22,12 +33,7 @@ def test_jac_energy(
     data_path: pathlib.Path,
 ) -> None:
     """Test the Jacobian for the energy with respect to the parameters."""
-    path = data_path / f"fitting/crystals/multi/{level:02d}"
-    if not (path / "pot.mtp").exists():
-        pytest.skip()
-    atoms = read_cfg(path / "out.cfg", index=-1)
-    mtp_data_ref = read_mtp(path / "pot.mtp")
-    atoms.calc = MTP(mtp_data=mtp_data_ref, engine=engine)
+    atoms = make_atoms(engine, level, data_path)
 
     atoms.get_potential_energy()
     jac_anl = atoms.calc.engine.jac_energy(atoms)
@@ -36,7 +42,7 @@ def test_jac_energy(
 
     jac_nmr = np.full_like(jac_anl[coeffs], np.nan)
 
-    mtp_data = copy.deepcopy(mtp_data_ref)
+    mtp_data = copy.deepcopy(atoms.calc.engine.dict_mtp)
 
     for i in range(jac_nmr.size):
         orig = mtp_data[coeffs].flat[i]
@@ -69,12 +75,7 @@ def test_jac_forces(
     data_path: pathlib.Path,
 ) -> None:
     """Test the Jacobian for the forces with respect to the parameters."""
-    path = data_path / f"fitting/crystals/multi/{level:02d}"
-    if not (path / "pot.mtp").exists():
-        pytest.skip()
-    atoms = read_cfg(path / "out.cfg", index=-1)
-    mtp_data_ref = read_mtp(path / "pot.mtp")
-    atoms.calc = MTP(mtp_data=mtp_data_ref, engine=engine)
+    atoms = make_atoms(engine, level, data_path)
 
     atoms.get_potential_energy()
     jac_anl = atoms.calc.engine.jac_forces(atoms)
@@ -83,7 +84,7 @@ def test_jac_forces(
 
     jac_nmr = np.full_like(jac_anl[coeffs], np.nan)
 
-    mtp_data = copy.deepcopy(mtp_data_ref)
+    mtp_data = copy.deepcopy(atoms.calc.engine.dict_mtp)
 
     for indices, orig in np.ndenumerate(mtp_data[coeffs]):
         mtp_data[coeffs][indices] = orig + dx
@@ -114,12 +115,7 @@ def test_jac_stress(
     data_path: pathlib.Path,
 ) -> None:
     """Test the Jacobian for the forces with respect to the parameters."""
-    path = data_path / f"fitting/crystals/multi/{level:02d}"
-    if not (path / "pot.mtp").exists():
-        pytest.skip()
-    atoms = read_cfg(path / "out.cfg", index=-1)
-    mtp_data_ref = read_mtp(path / "pot.mtp")
-    atoms.calc = MTP(mtp_data=mtp_data_ref, engine=engine)
+    atoms = make_atoms(engine, level, data_path)
 
     atoms.get_potential_energy()
     jac_anl = atoms.calc.engine.jac_stress(atoms)
@@ -128,7 +124,7 @@ def test_jac_stress(
 
     jac_nmr = np.full_like(jac_anl[coeffs], np.nan)
 
-    mtp_data = copy.deepcopy(mtp_data_ref)
+    mtp_data = copy.deepcopy(atoms.calc.engine.dict_mtp)
 
     for indices, orig in np.ndenumerate(mtp_data[coeffs]):
         mtp_data[coeffs][indices] = orig + dx
