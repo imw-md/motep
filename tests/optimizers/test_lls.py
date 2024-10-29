@@ -92,13 +92,16 @@ def test_molecules(
     assert errors0["forces"]["RMS"] > errors1["forces"]["RMS"]
 
 
+@pytest.mark.parametrize("stress_times_volume", [False, True])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("engine", ["numpy"])
 def test_crystals(
+    *,
     engine: str,
     crystal: int,
     level: int,
+    stress_times_volume: bool,
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
@@ -113,6 +116,7 @@ def test_crystals(
         "energy-weight": 1.0,
         "force-weight": 0.01,
         "stress-weight": 0.001,
+        "stress-times-volume": stress_times_volume,
     }
 
     rng = np.random.default_rng(42)
@@ -160,11 +164,6 @@ def test_crystals(
     f1 = loss(parameters)  # update parameters
     errors1 = loss.print_errors()
 
-    # Check loss functions
-    # The value should be smaller when considering both energies and forces than
-    # when considering only energies.
-    assert f0 > f1
-
     # Check RMSEs
     # When only the RMSE of the energies is minimized, it should be smaller than
     # the value when minimizing the errors of both the energies and the forces.
@@ -181,11 +180,14 @@ def test_crystals(
     f2 = loss(parameters)  # update parameters
     errors2 = loss.print_errors()
 
-    # Check loss functions
-    assert f1 > f2
-
     # Check RMSEs
     assert errors1["stress"]["RMS"] > errors2["stress"]["RMS"]
+
+    # Check loss functions
+    # The value should be smaller when all energies, forces, and stress are
+    # considered than the value when only part of them are considered.
+    assert f0 > f2
+    assert f1 > f2
 
 
 @pytest.mark.parametrize("minimized", [["energy"], ["energy", "forces"]])
