@@ -82,11 +82,7 @@ class LLSOptimizerBase(OptimizerBase):
             forces = np.hstack([atoms.calc.targets["forces"].flat for atoms in images])
             tmp.append(np.sqrt(setting["force-weight"]) * forces * -1.0)
         if "stress" in self.minimized:
-            f = voigt_6_to_full_3x3_stress
-            stresses = np.hstack(
-                [f(atoms.calc.targets["stress"]).flat for atoms in images],
-            )
-            tmp.append(np.sqrt(setting["stress-weight"]) * stresses)
+            tmp.append(np.sqrt(setting["stress-weight"]) * self._calc_vector_stress())
         return np.hstack(tmp)
 
     def _calc_energies(self) -> np.ndarray:
@@ -123,6 +119,16 @@ class LLSOptimizerBase(OptimizerBase):
             dtype=float,
             count=len(images),
         )
+
+    def _calc_vector_stress(self) -> np.ndarray:
+        key = "stress"
+        images = self.loss.images
+        idcs_str = self.loss.idcs_str
+        f = voigt_6_to_full_3x3_stress
+        stresses = np.array([f(images[i].calc.targets[key]) for i in idcs_str])
+        if self.loss.setting["stress-times-volume"]:
+            stresses = (stresses.T * self.loss.volumes[idcs_str]).T
+        return stresses.flat
 
 
 class LLSOptimizer(LLSOptimizerBase):
@@ -209,14 +215,20 @@ class LLSOptimizer(LLSOptimizerBase):
         setting = loss.setting
         basis_values = np.array([atoms.calc.engine.basis_values for atoms in images])
         basis_dbdris = np.vstack([atoms.calc.engine.basis_dbdris.T for atoms in images])
-        basis_dbdeps = np.vstack([atoms.calc.engine.basis_dbdeps.T for atoms in images])
         basis_dbdris = basis_dbdris.reshape((-1, mtp_data["alpha_scalar_moments"]))
-        basis_dbdeps = basis_dbdeps.reshape((-1, mtp_data["alpha_scalar_moments"]))
         tmp = []
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting["energy-weight"]) * basis_values)
         if "forces" in self.minimized:
             tmp.append(np.sqrt(setting["force-weight"]) * basis_dbdris)
         if "stress" in self.minimized:
-            tmp.append(np.sqrt(setting["stress-weight"]) * basis_dbdeps)
+            tmp.append(np.sqrt(setting["stress-weight"]) * self._calc_matrix_stress())
         return np.vstack(tmp)
+
+    def _calc_matrix_stress(self) -> np.ndarray:
+        images = self.loss.images
+        idcs_str = self.loss.idcs_str
+        matrix = np.array([images[i].calc.engine.basis_dbdeps.T for i in idcs_str])
+        if self.loss.setting["stress-times-volume"]:
+            matrix = (matrix.T * self.loss.volumes[idcs_str]).T
+        return matrix.reshape((-1, self.loss.mtp_data["alpha_scalar_moments"]))

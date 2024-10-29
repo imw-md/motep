@@ -89,13 +89,16 @@ def test_molecules(
         ["radial_coeffs", "species_coeffs"],
     ],
 )
+@pytest.mark.parametrize("stress_times_volume", [False, True])
 @pytest.mark.parametrize("level", [2, 4])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("engine", ["numpy"])
 def test_crystals(
+    *,
     engine: str,
     crystal: int,
     level: int,
+    stress_times_volume: bool,
     optimized: list[str],
     data_path: pathlib.Path,
 ) -> None:
@@ -111,6 +114,7 @@ def test_crystals(
         "energy-weight": 1.0,
         "force-weight": 0.01,
         "stress-weight": 0.001,
+        "stress-times-volume": stress_times_volume,
     }
 
     rng = np.random.default_rng(42)

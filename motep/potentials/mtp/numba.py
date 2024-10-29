@@ -46,7 +46,7 @@ def numba_calc_energy_and_forces(
         (_, number_of_js) = r_ijs.shape
         itype = engine.dict_mtp["species"][atoms.numbers[i]]
         jtypes = np.array([engine.dict_mtp["species"][atoms.numbers[j]] for j in js])
-        r_abs = np.linalg.norm(r_ijs, axis=0)
+        r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
         rb_values, rb_derivs = _nb_calc_radial_basis(
             r_abs, itype, jtypes, radial_coeffs, scaling, min_dist, max_dist
         )
@@ -129,7 +129,7 @@ def numba_calc_energy_and_forces(
 #     all_jtypes = np.zeros(shape, dtype=int)
 #     for i in range(number_of_atoms):
 #         js, r_ijs = engine._get_distances(atoms, i)
-#         r_abs = np.linalg.norm(r_ijs, axis=0)
+#         r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
 #         itype = engine.parameters["species"][atoms.numbers[i]]
 #         jtypes = np.array([engine.parameters["species"][atoms.numbers[j]] for j in js])
 #         (number_of_js,) = js.shape
@@ -464,7 +464,7 @@ def numba_calc_energy(
         (_, number_of_js) = r_ijs.shape
         itype = engine.dict_mtp["species"][atoms.numbers[i]]
         jtypes = np.array([engine.dict_mtp["species"][atoms.numbers[j]] for j in js])
-        r_abs = np.linalg.norm(r_ijs, axis=0)
+        r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
         rb_values = _nb_calc_radial_basis_ene_only(
             r_abs, itype, jtypes, radial_coeffs, scaling, min_dist, max_dist
         )

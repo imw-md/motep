@@ -107,15 +107,26 @@ class Level2MTPOptimizer(LLSOptimizerBase):
 
         values = np.stack([atoms.calc.engine.radial_basis_values for atoms in images])
         dqdris = np.stack([atoms.calc.engine.radial_basis_dqdris.T for atoms in images])
-        dqdeps = np.stack([atoms.calc.engine.radial_basis_dqdeps.T for atoms in images])
         values = values.reshape(-1, size)
         dqdris = dqdris.reshape(-1, size)
-        dqdeps = dqdeps.reshape(-1, size)
         tmp = []
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting["energy-weight"]) * values)
         if "forces" in self.minimized:
             tmp.append(np.sqrt(setting["force-weight"]) * dqdris)
         if "stress" in self.minimized:
-            tmp.append(np.sqrt(setting["stress-weight"]) * dqdeps)
+            tmp.append(np.sqrt(setting["stress-weight"]) * self._calc_matrix_stress())
         return np.vstack(tmp)
+
+    def _calc_matrix_stress(self) -> np.ndarray:
+        images = self.loss.images
+        idcs = self.loss.idcs_str
+
+        species_count = self.loss.mtp_data["species_count"]
+        radial_basis_size = self.loss.mtp_data["radial_basis_size"]
+        size = species_count * species_count * radial_basis_size
+
+        matrix = np.array([images[i].calc.engine.radial_basis_dqdeps.T for i in idcs])
+        if self.loss.setting["stress-times-volume"]:
+            matrix = (matrix.T * self.loss.volumes[idcs]).T
+        return matrix.reshape((-1, size))

@@ -14,9 +14,12 @@ def make_default_setting() -> dict[str, Any]:
     setting["potential_final"] = "final.mtp"
     setting["seed"] = None
     setting["engine"] = "numpy"
-    setting["energy-weight"] = 1.0
-    setting["force-weight"] = 0.01
-    setting["stress-weight"] = 0.0
+    setting["loss"] = {
+        "energy-weight": 1.0,
+        "force-weight": 0.01,
+        "stress-weight": 0.001,
+        "stress-times-volume": False,
+    }
     setting["steps"] = [
         {"method": "L-BFGS-B", "optimized": ["radial_coeffs", "moment_coeffs"]},
     ]
