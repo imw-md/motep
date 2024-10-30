@@ -77,12 +77,7 @@ class NumpyMTPEngine(EngineBase):
         itypes = get_types(atoms, self.dict_mtp["species"])
         self.energies = self.dict_mtp["species_coeffs"][itypes]
 
-        self.basis_values[:] = 0.0
-        self.basis_dbdris[:, :, :] = 0.0
-        self.basis_dbdeps[:, :, :] = 0.0
-        self.basis_de_dcs[...] = 0.0
-        self.basis_ddedcs[...] = 0.0
-        self.basis_ds_dcs[...] = 0.0
+        self.mbd.clean()
 
         self.radial_basis_values[...] = 0.0
         self.radial_basis_dqdris[...] = 0.0
@@ -101,7 +96,7 @@ class NumpyMTPEngine(EngineBase):
                 r_ijs,
             )
 
-            self.basis_values += basis_values
+            self.mbd.values += basis_values
 
             self.energies[i] += moment_coeffs @ basis_values
             # Calculate forces
@@ -114,20 +109,20 @@ class NumpyMTPEngine(EngineBase):
             #    with respect to the i-th atom.
             # Thus, the negative signs of the two contributions are cancelled out below.
             for k, j in enumerate(js):
-                self.basis_dbdris[:, :, i] -= basis_jac_rs[:, :, k]
-                self.basis_dbdris[:, :, j] += basis_jac_rs[:, :, k]
-            self.basis_dbdeps += basis_jac_rs @ r_ijs.T
+                self.mbd.dbdris[:, :, i] -= basis_jac_rs[:, :, k]
+                self.mbd.dbdris[:, :, j] += basis_jac_rs[:, :, k]
+            self.mbd.dbdeps += basis_jac_rs @ r_ijs.T
 
-            self.basis_de_dcs[itype] += (moment_coeffs * basis_jac_cs.T).sum(axis=-1).T
+            self.mbd.de_dcs[itype] += (moment_coeffs * basis_jac_cs.T).sum(axis=-1).T
 
             tmp = (moment_coeffs * basis_jac_rc.T).sum(axis=-1).T
             for k, j in enumerate(js):
-                self.basis_ddedcs[itype, :, :, :, :, i] -= tmp[:, :, :, :, k]
-                self.basis_ddedcs[itype, :, :, :, :, j] += tmp[:, :, :, :, k]
-            self.basis_ds_dcs[itype] += tmp @ r_ijs.T
+                self.mbd.ddedcs[itype, :, :, :, :, i] -= tmp[:, :, :, :, k]
+                self.mbd.ddedcs[itype, :, :, :, :, j] += tmp[:, :, :, :, k]
+            self.mbd.ds_dcs[itype] += tmp @ r_ijs.T
 
-        self.forces = np.sum(moment_coeffs * self.basis_dbdris.T, axis=-1) * -1.0
-        self.stress = np.sum(moment_coeffs * self.basis_dbdeps.T, axis=-1).T
+        self.forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1) * -1.0
+        self.stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T
 
         self.results["energies"] = self.energies
         self.results["energy"] = self.results["energies"].sum()
@@ -137,16 +132,16 @@ class NumpyMTPEngine(EngineBase):
             volume = atoms.get_volume()
             self.stress = (self.stress + self.stress.T) * 0.5  # symmetrize
             self.stress /= volume
-            self.basis_dbdeps += self.basis_dbdeps.transpose(0, 2, 1)
-            self.basis_dbdeps *= 0.5 / volume
-            self.basis_ds_dcs += self.basis_ds_dcs.swapaxes(-2, -1)
-            self.basis_ds_dcs *= 0.5 / volume
+            self.mbd.dbdeps += self.mbd.dbdeps.transpose(0, 2, 1)
+            self.mbd.dbdeps *= 0.5 / volume
+            self.mbd.ds_dcs += self.mbd.ds_dcs.swapaxes(-2, -1)
+            self.mbd.ds_dcs *= 0.5 / volume
             axes = 0, 1, 2, 4, 3
             self.radial_basis_dqdeps += self.radial_basis_dqdeps.transpose(axes)
             self.radial_basis_dqdeps *= 0.5 / volume
         else:
             self.stress[:, :] = np.nan
-            self.basis_dbdeps[:, :, :] = np.nan
+            self.mbd.dbdeps[:, :, :] = np.nan
             self.radial_basis_dqdeps[:, :, :] = np.nan
 
         self.results["stress"] = self.stress.flat[[0, 4, 8, 5, 2, 1]]
@@ -160,9 +155,9 @@ class NumpyMTPEngine(EngineBase):
 
         jac = MTPData()  # placeholder of the Jacobian with respect to the parameters
         jac["scaling"] = 0.0
-        jac["moment_coeffs"] = self.basis_values.copy()
+        jac["moment_coeffs"] = self.mbd.values.copy()
         jac["species_coeffs"] = np.fromiter((nbs.count(s) for s in sps), dtype=float)
-        jac["radial_coeffs"] = self.basis_de_dcs.copy()
+        jac["radial_coeffs"] = self.mbd.de_dcs.copy()
 
         return jac
 
@@ -177,9 +172,9 @@ class NumpyMTPEngine(EngineBase):
 
         jac = Jac()  # placeholder of the Jacobian with respect to the parameters
         jac["scaling"] = np.zeros((1, number_of_atoms, 3))
-        jac["moment_coeffs"] = self.basis_dbdris.transpose(0, 2, 1) * -1.0
+        jac["moment_coeffs"] = self.mbd.dbdris.transpose(0, 2, 1) * -1.0
         jac["species_coeffs"] = np.zeros((spc, number_of_atoms, 3))
-        jac["radial_coeffs"] = self.basis_ddedcs.transpose(0, 1, 2, 3, 5, 4) * -1.0
+        jac["radial_coeffs"] = self.mbd.ddedcs.transpose(0, 1, 2, 3, 5, 4) * -1.0
 
         return jac
 
@@ -193,9 +188,9 @@ class NumpyMTPEngine(EngineBase):
 
         jac = Jac()  # placeholder of the Jacobian with respect to the parameters
         jac["scaling"] = np.zeros((1, 3, 3))
-        jac["moment_coeffs"] = self.basis_dbdeps.copy()
+        jac["moment_coeffs"] = self.mbd.dbdeps.copy()
         jac["species_coeffs"] = np.zeros((spc, 3, 3))
-        jac["radial_coeffs"] = self.basis_ds_dcs.copy()
+        jac["radial_coeffs"] = self.mbd.ds_dcs.copy()
 
         return jac
 

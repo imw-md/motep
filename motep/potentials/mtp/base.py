@@ -1,8 +1,60 @@
+from dataclasses import dataclass
+
 import numpy as np
+import numpy.typing as npt
 from ase import Atoms
 from ase.neighborlist import PrimitiveNeighborList
 
 from motep.potentials.mtp.data import MTPData
+
+
+@dataclass
+class MomentBasisData:
+    """Data related to the moment basis.
+
+    Attributes
+    ----------
+    values : np.ndarray (alpha_moments_count)
+        Basis values summed over atoms.
+        This corresponds to b_j in Eq. (5) in [Podryabinkin_CMS_2017_Active]_.
+    dbdris : np.ndarray (alpha_moments_count, 3, number_of_atoms)
+        Derivatives of basis functions with respect to Cartesian coordinates of atoms
+        summed over atoms.
+        This corresponds to nabla b_j in Eq. (7a) in [Podryabinkin_CMS_2017_Active]_.
+    dbdeps : np.ndarray (alpha_moments_count, 3, 3)
+        Derivatives of cumulated basis functions with respect to the strain tensor.
+
+    """
+
+    values: npt.NDArray[np.float64] | None = None
+    dbdris: npt.NDArray[np.float64] | None = None
+    dbdeps: npt.NDArray[np.float64] | None = None
+    de_dcs: npt.NDArray[np.float64] | None = None
+    ddedcs: npt.NDArray[np.float64] | None = None
+    ds_dcs: npt.NDArray[np.float64] | None = None
+
+    def initialize(self, natoms: int, mtp_data: MTPData) -> None:
+        """Initialize moment basis properties."""
+        spc = mtp_data["species_count"]
+        rfc = mtp_data["radial_funcs_count"]
+        rbs = mtp_data["radial_basis_size"]
+        asm = mtp_data["alpha_scalar_moments"]
+
+        self.values = np.full((asm), np.nan)
+        self.dbdris = np.full((asm, 3, natoms), np.nan)
+        self.dbdeps = np.full((asm, 3, 3), np.nan)
+        self.de_dcs = np.full((spc, spc, rfc, rbs), np.nan)
+        self.ddedcs = np.full((spc, spc, rfc, rbs, 3, natoms), np.nan)
+        self.ds_dcs = np.full((spc, spc, rfc, rbs, 3, 3), np.nan)
+
+    def clean(self) -> None:
+        """Clean up moment basis properties."""
+        self.values[...] = 0.0
+        self.dbdris[...] = 0.0
+        self.dbdeps[...] = 0.0
+        self.de_dcs[...] = 0.0
+        self.ddedcs[...] = 0.0
+        self.ds_dcs[...] = 0.0
 
 
 class EngineBase:
@@ -10,15 +62,6 @@ class EngineBase:
 
     Attributes
     ----------
-    basis_values : np.ndarray (alpha_moments_count)
-        Basis values summed over atoms.
-        This corresponds to b_j in Eq. (5) in [Podryabinkin_CMS_2017_Active]_.
-    basis_dbdris : np.ndarray (alpha_moments_count, 3, number_of_atoms)
-        Derivatives of basis functions with respect to Cartesian coordinates of atoms
-        summed over atoms.
-        This corresponds to nabla b_j in Eq. (7a) in [Podryabinkin_CMS_2017_Active]_.
-    basis_dbdeps : np.ndarray (alpha_moments_count, 3, 3)
-        Derivatives of cumulated basis functions with respect to the strain tensor.
     radial_basis_values : np.ndarray (species_count, species_count, radial_basis_size)
         Radial basis values summed over atoms.
     radial_basis_derivs : (species_count, species_count, radial_basis_size, 3, natoms)
@@ -48,12 +91,8 @@ class EngineBase:
         self.forces = None
         self.stress = None
 
-        self.basis_values = None
-        self.basis_dbdris = None
-        self.basis_dbdeps = None
-        self.basis_de_dcs = None
-        self.basis_ddedcs = None
-        self.basis_ds_dcs = None
+        # moment basis data
+        self.mbd = MomentBasisData()
 
         # used for `Level2MTPOptimizer`
         self.radial_basis_values = None
@@ -86,16 +125,9 @@ class EngineBase:
 
         natoms = len(atoms)
         spc = self.dict_mtp["species_count"]
-        rfc = self.dict_mtp["radial_funcs_count"]
         rbs = self.dict_mtp["radial_basis_size"]
-        asm = self.dict_mtp["alpha_scalar_moments"]
 
-        self.basis_values = np.full((asm), np.nan)
-        self.basis_dbdris = np.full((asm, 3, natoms), np.nan)
-        self.basis_dbdeps = np.full((asm, 3, 3), np.nan)
-        self.basis_de_dcs = np.full((spc, spc, rfc, rbs), np.nan)
-        self.basis_ddedcs = np.full((spc, spc, rfc, rbs, 3, natoms), np.nan)
-        self.basis_ds_dcs = np.full((spc, spc, rfc, rbs, 3, 3), np.nan)
+        self.mbd.initialize(natoms, self.dict_mtp)
 
         self.radial_basis_values = np.full((spc, spc, rbs), np.nan)
         self.radial_basis_dqdris = np.full((spc, spc, rbs, 3, natoms), np.nan)
