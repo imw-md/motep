@@ -24,6 +24,9 @@ class MomentBasisData:
     dbdeps : np.ndarray (alpha_moments_count, 3, 3)
         Derivatives of cumulated basis functions with respect to the strain tensor.
 
+    .. [Podryabinkin_CMS_2017_Active]
+       E. V. Podryabinkin and A. V. Shapeev, Comput. Mater. Sci. 140, 171 (2017).
+
     """
 
     values: npt.NDArray[np.float64] | None = None
@@ -57,20 +60,41 @@ class MomentBasisData:
         self.ds_dcs[...] = 0.0
 
 
-class EngineBase:
-    """Engine to compute an MTP.
+@dataclass
+class RadialBasisData:
+    """Data related to the radial basis.
 
     Attributes
     ----------
-    radial_basis_values : np.ndarray (species_count, species_count, radial_basis_size)
+    values : np.ndarray (species_count, species_count, radial_basis_size)
         Radial basis values summed over atoms.
-    radial_basis_derivs : (species_count, species_count, radial_basis_size, 3, natoms)
+    dqdris : (species_count, species_count, radial_basis_size, 3, natoms)
         Derivaties of radial basis functions summed over atoms.
 
-    .. [Podryabinkin_CMS_2017_Active]
-       E. V. Podryabinkin and A. V. Shapeev, Comput. Mater. Sci. 140, 171 (2017).
-
     """
+
+    values: npt.NDArray[np.float64] | None = None
+    dqdris: npt.NDArray[np.float64] | None = None
+    dqdeps: npt.NDArray[np.float64] | None = None
+
+    def initialize(self, natoms: int, mtp_data: MTPData) -> None:
+        """Initialize radial basis properties."""
+        spc = mtp_data["species_count"]
+        rbs = mtp_data["radial_basis_size"]
+
+        self.values = np.full((spc, spc, rbs), np.nan)
+        self.dqdris = np.full((spc, spc, rbs, 3, natoms), np.nan)
+        self.dqdeps = np.full((spc, spc, rbs, 3, 3), np.nan)
+
+    def clean(self) -> None:
+        """Clean up radial basis properties."""
+        self.values[...] = 0.0
+        self.dqdris[...] = 0.0
+        self.dqdeps[...] = 0.0
+
+
+class EngineBase:
+    """Engine to compute an MTP."""
 
     def __init__(self, dict_mtp: MTPData | None = None) -> None:
         """MLIP-2 MTP.
@@ -95,9 +119,7 @@ class EngineBase:
         self.mbd = MomentBasisData()
 
         # used for `Level2MTPOptimizer`
-        self.radial_basis_values = None
-        self.radial_basis_dqdris = None
-        self.radial_basis_dqdeps = None
+        self.rbd = RadialBasisData()
 
     def update(self, dict_mtp: MTPData) -> None:
         """Update MTP parameters."""
@@ -124,14 +146,9 @@ class EngineBase:
         self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
 
         natoms = len(atoms)
-        spc = self.dict_mtp["species_count"]
-        rbs = self.dict_mtp["radial_basis_size"]
 
         self.mbd.initialize(natoms, self.dict_mtp)
-
-        self.radial_basis_values = np.full((spc, spc, rbs), np.nan)
-        self.radial_basis_dqdris = np.full((spc, spc, rbs, 3, natoms), np.nan)
-        self.radial_basis_dqdeps = np.full((spc, spc, rbs, 3, 3), np.nan)
+        self.rbd.initialize(natoms, self.dict_mtp)
 
     def _get_distances(
         self,

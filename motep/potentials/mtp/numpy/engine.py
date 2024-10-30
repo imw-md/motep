@@ -62,12 +62,12 @@ class NumpyMTPEngine(EngineBase):
         r_ijs_unit = r_ijs / r_abs
 
         self.rb.calc_radial_part(r_abs, itype, jtypes)
-        np.add.at(self.radial_basis_values[itype], jtypes, self.rb.basis_vs[:, :])
+        np.add.at(self.rbd.values[itype], jtypes, self.rb.basis_vs[:, :])
         for k, (j, jtype) in enumerate(zip(js, jtypes, strict=True)):
             tmp = self.rb.basis_ds[k, :, None] * r_ijs_unit[:, k]
-            self.radial_basis_dqdris[itype, jtype, :, :, i] -= tmp
-            self.radial_basis_dqdris[itype, jtype, :, :, j] += tmp
-            self.radial_basis_dqdeps[itype, jtype] += tmp[:, :, None] * r_ijs[:, k]
+            self.rbd.dqdris[itype, jtype, :, :, i] -= tmp
+            self.rbd.dqdris[itype, jtype, :, :, j] += tmp
+            self.rbd.dqdeps[itype, jtype] += tmp[:, :, None] * r_ijs[:, k]
         moment_basis = MomentBasis(self.dict_mtp)
         return moment_basis.calculate(itype, jtypes, r_ijs, r_abs, self.rb)
 
@@ -78,10 +78,7 @@ class NumpyMTPEngine(EngineBase):
         self.energies = self.dict_mtp["species_coeffs"][itypes]
 
         self.mbd.clean()
-
-        self.radial_basis_values[...] = 0.0
-        self.radial_basis_dqdris[...] = 0.0
-        self.radial_basis_dqdeps[...] = 0.0
+        self.rbd.clean()
 
         moment_coeffs = self.dict_mtp["moment_coeffs"]
 
@@ -137,12 +134,12 @@ class NumpyMTPEngine(EngineBase):
             self.mbd.ds_dcs += self.mbd.ds_dcs.swapaxes(-2, -1)
             self.mbd.ds_dcs *= 0.5 / volume
             axes = 0, 1, 2, 4, 3
-            self.radial_basis_dqdeps += self.radial_basis_dqdeps.transpose(axes)
-            self.radial_basis_dqdeps *= 0.5 / volume
+            self.rbd.dqdeps += self.rbd.dqdeps.transpose(axes)
+            self.rbd.dqdeps *= 0.5 / volume
         else:
             self.stress[:, :] = np.nan
             self.mbd.dbdeps[:, :, :] = np.nan
-            self.radial_basis_dqdeps[:, :, :] = np.nan
+            self.rbd.dqdeps[:, :, :] = np.nan
 
         self.results["stress"] = self.stress.flat[[0, 4, 8, 5, 2, 1]]
 
