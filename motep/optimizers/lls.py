@@ -9,7 +9,7 @@ from ase.stress import voigt_6_to_full_3x3_stress
 from motep.loss import LossFunctionBase
 from motep.optimizers.base import OptimizerBase
 from motep.optimizers.scipy import Callback
-from motep.potentials.mtp.numpy import get_types
+from motep.potentials.mtp import get_types
 
 
 class LLSOptimizerBase(OptimizerBase):

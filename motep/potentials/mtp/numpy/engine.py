@@ -7,8 +7,8 @@ Modified version: Yuji Ikeda
 import numpy as np
 import numpy.typing as npt
 from ase import Atoms
-from ase.neighborlist import PrimitiveNeighborList
 
+from motep.potentials.mtp import get_types
 from motep.potentials.mtp.base import EngineBase
 from motep.potentials.mtp.data import MTPData
 from motep.potentials.mtp.moment import MomentBasis
@@ -27,10 +27,6 @@ class Jac(dict):
                 self["radial_coeffs"].reshape(-1, *shape[4::]),
             ),
         )
-
-
-def get_types(atoms: Atoms, species: list[int]) -> npt.NDArray[np.int64]:
-    return np.fromiter((species.index(_) for _ in atoms.numbers), dtype=int)
 
 
 class NumpyMTPEngine(EngineBase):
@@ -215,7 +211,7 @@ class NumbaMTPEngine(EngineBase):
         return self.numba_calc_energy_and_forces(atoms)
 
     def numba_calc_energy_and_forces(self, atoms):
-        from .numba import numba_calc_energy_and_forces
+        from motep.potentials.mtp.numba import numba_calc_energy_and_forces
 
         mlip_params = self.dict_mtp
         energy, forces, stress = numba_calc_energy_and_forces(

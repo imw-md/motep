@@ -8,7 +8,7 @@ import pytest
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.potentials.mtp.numpy import NumbaMTPEngine, NumpyMTPEngine
+from motep.potentials.mtp.numpy.engine import NumbaMTPEngine, NumpyMTPEngine
 
 
 def get_scale(component: str, d: float) -> np.ndarray:
