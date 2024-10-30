@@ -105,8 +105,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         radial_basis_size = mtp_data["radial_basis_size"]
         size = species_count * species_count * radial_basis_size
 
-        values = np.stack([atoms.calc.engine.radial_basis_values for atoms in images])
-        dqdris = np.stack([atoms.calc.engine.radial_basis_dqdris.T for atoms in images])
+        values = np.stack([atoms.calc.engine.rbd.values for atoms in images])
+        dqdris = np.stack([atoms.calc.engine.rbd.dqdris.T for atoms in images])
         values = values.reshape(-1, size)
         dqdris = dqdris.reshape(-1, size)
         tmp = []
@@ -126,7 +126,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         radial_basis_size = self.loss.mtp_data["radial_basis_size"]
         size = species_count * species_count * radial_basis_size
 
-        matrix = np.array([images[i].calc.engine.radial_basis_dqdeps.T for i in idcs])
+        matrix = np.array([images[i].calc.engine.rbd.dqdeps.T for i in idcs])
         if self.loss.setting.get("stress-times-volume"):
             matrix = (matrix.T * self.loss.volumes[idcs]).T
         return matrix.reshape((-1, size))

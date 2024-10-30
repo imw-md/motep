@@ -1,6 +1,5 @@
 """Optimizers based on SciPy."""
 
-from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -11,34 +10,26 @@ from scipy.optimize import (
     minimize,
 )
 
+from motep.loss import LossFunctionBase
 from motep.optimizers.base import OptimizerBase
 
 
 class Callback:
     """Callback after each iteration."""
 
-    def __init__(self, fun: Callable):
-        self.fun = fun
+    def __init__(self, loss: LossFunctionBase):
+        self.loss = loss
+        self.iter = 0
 
     def __call__(self, intermediate_result: OptimizeResult | np.ndarray):
         fun = (
             intermediate_result.fun
             if isinstance(intermediate_result, OptimizeResult)
-            else self.fun(intermediate_result)
+            else self.loss(intermediate_result)
         )
-        print("Function value:", fun)
-
-
-def print_result(result: OptimizeResult) -> None:
-    """Print `result`."""
-    print("Optimization result:")
-    print("  Message:", result.message)
-    print("  Success:", result.success)
-    print("  Status code:", result.status)
-    print("  Number of function evaluations:", result.nfev)
-    print("  Number of iterations:", result.nit)
-    # print("  Final parameters:", result.x)
-    # print("  Final function value:", result.fun)
+        if self.loss.comm.Get_rank() == 0:
+            print(f"loss {self.iter:4d}:", fun)
+        self.iter += 1
 
 
 class ScipyOptimizerBase(OptimizerBase):
@@ -49,6 +40,18 @@ class ScipyOptimizerBase(OptimizerBase):
     @property
     def optimized_allowed(self) -> list[str]:
         return ["scaling", "species_coeffs", "moment_coeffs", "radial_coeffs"]
+
+    def print_result(self, result: OptimizeResult) -> None:
+        """Print `result`."""
+        if self.loss.comm.Get_rank() == 0:
+            print("Optimization result:")
+            print("  Message:", result.message)
+            print("  Success:", result.success)
+            print("  Status code:", result.status)
+            print("  Number of function evaluations:", result.nfev)
+            print("  Number of iterations:", result.nit)
+            # print("  Final parameters:", result.x)
+            # print("  Final function value:", result.fun)
 
 
 class ScipyDualAnnealingOptimizer(ScipyOptimizerBase):
@@ -66,7 +69,7 @@ class ScipyDualAnnealingOptimizer(ScipyOptimizerBase):
             seed=40,
             x0=initial_guess,
         )
-        print_result(result)
+        self.print_result(result)
         return result.x
 
 
@@ -84,7 +87,7 @@ class ScipyDifferentialEvolutionOptimizer(ScipyOptimizerBase):
             popsize=30,
             callback=callback,
         )
-        print_result(result)
+        self.print_result(result)
         return result.x
 
 
@@ -110,7 +113,7 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
             callback=callback,
             **kwargs,
         )
-        print_result(result)
+        self.print_result(result)
         return result.x
 
 

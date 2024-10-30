@@ -9,7 +9,7 @@ from ase.stress import voigt_6_to_full_3x3_stress
 from motep.loss import LossFunctionBase
 from motep.optimizers.base import OptimizerBase
 from motep.optimizers.scipy import Callback
-from motep.potentials.mtp.numpy import get_types
+from motep.potentials.mtp import get_types
 
 
 class LLSOptimizerBase(OptimizerBase):
@@ -213,8 +213,8 @@ class LLSOptimizer(LLSOptimizerBase):
         mtp_data = loss.mtp_data
         images = loss.images
         setting = loss.setting
-        basis_values = np.array([atoms.calc.engine.basis_values for atoms in images])
-        basis_dbdris = np.vstack([atoms.calc.engine.basis_dbdris.T for atoms in images])
+        basis_values = np.array([atoms.calc.engine.mbd.values for atoms in images])
+        basis_dbdris = np.vstack([atoms.calc.engine.mbd.dbdris.T for atoms in images])
         basis_dbdris = basis_dbdris.reshape((-1, mtp_data["alpha_scalar_moments"]))
         tmp = []
         if "energy" in self.minimized:
@@ -228,7 +228,7 @@ class LLSOptimizer(LLSOptimizerBase):
     def _calc_matrix_stress(self) -> np.ndarray:
         images = self.loss.images
         idcs_str = self.loss.idcs_str
-        matrix = np.array([images[i].calc.engine.basis_dbdeps.T for i in idcs_str])
+        matrix = np.array([images[i].calc.engine.mbd.dbdeps.T for i in idcs_str])
         if self.loss.setting["stress-times-volume"]:
             matrix = (matrix.T * self.loss.volumes[idcs_str]).T
         return matrix.reshape((-1, self.loss.mtp_data["alpha_scalar_moments"]))

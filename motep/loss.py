@@ -159,12 +159,25 @@ class LossFunctionBase(ABC):
             stress_ses *= self.volumes**2
         return self.configuration_weight[self.idcs_str] @ stress_ses
 
+    def _run_calculations(self) -> None:
+        """Run calculations of the properties."""
+        rank = self.comm.Get_rank()
+        size = self.comm.Get_size()
+        ncnf = len(self.images)
+        for i in range(rank, ncnf, size):
+            self.images[i].get_potential_energy()
+        for i in range(ncnf):
+            results = self.images[i].calc.results
+            results.update(self.comm.bcast(results, root=i % size))
+            if hasattr(self.images[i].calc, "engine"):
+                mbd = self.images[i].calc.engine.mbd
+                self.images[i].calc.engine.mbd = self.comm.bcast(mbd, root=i % size)
+                rbd = self.images[i].calc.engine.rbd
+                self.images[i].calc.engine.rbd = self.comm.bcast(rbd, root=i % size)
+
     def calc_loss_function(self) -> float:
         """Calculate the value of the loss function."""
-        # trigger calculations of the properties
-        for atoms in self.images:
-            atoms.get_potential_energy()
-
+        self._run_calculations()
         return (
             self.setting["energy-weight"] * self._calc_loss_energy()
             + self.setting["force-weight"] * self._calc_loss_forces()
