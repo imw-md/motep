@@ -2,6 +2,7 @@
 
 import argparse
 import pathlib
+import sys
 import time
 from pprint import pprint
 
@@ -33,15 +34,17 @@ def run(args: argparse.Namespace) -> None:
     """Run."""
     start_time = time.time()
 
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+
     setting = make_default_setting()
     setting.update(parse_setting(args.setting))
-    pprint(setting, sort_dicts=False)
-    print()
+    if rank == 0:
+        pprint(setting, sort_dicts=False)
+        print()
 
     setting["rng"] = np.random.default_rng(setting["seed"])
 
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
     cfg_file = str(pathlib.Path(setting["configurations"]).resolve())
     untrained_mtp = str(pathlib.Path(setting["potential_initial"]).resolve())
 
@@ -67,33 +70,39 @@ def run(args: argparse.Namespace) -> None:
     # Change working directory to the created folder
     with cd(folder_name):
         for i, step in enumerate(setting["steps"]):
-            print(step["method"])
-            print()
+            if rank == 0:
+                print(step["method"])
+                print()
 
             # Print parameters before optimization.
             parameters, bounds = mtp_data.initialize(step["optimized"], setting["rng"])
             mtp_data.parameters = parameters
-            mtp_data.print()
+            if rank == 0:
+                mtp_data.print()
 
             # Instantiate an `Optimizer` class
             optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
 
             kwargs = step.get("kwargs", {})
             parameters = optimizer.optimize(parameters, bounds, **kwargs)
-            print()
+            if rank == 0:
+                print()
 
             # Print parameters after optimization.
             mtp_data.parameters = parameters
-            mtp_data.print()
+            if rank == 0:
+                mtp_data.print()
 
             write_mtp(f"intermediate_{i}.mtp", mtp_data)
-            loss.print_errors()
+            if rank == 0:
+                loss.print_errors()
 
     mtp_data.parameters = parameters
     write_mtp(setting["potential_final"], mtp_data)
 
     end_time = time.time()
-    print("Total time taken:", end_time - start_time, "seconds")
+    if rank == 0:
+        print("Total time taken:", end_time - start_time, "seconds")
 
     comm.Barrier()
     MPI.Finalize()
