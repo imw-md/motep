@@ -16,7 +16,7 @@ def make_mtp_engine(engine: str = "numpy") -> type:
 
         return NumpyMTPEngine
     elif engine == "numba":
-        from motep.potentials.mtp.numpy.engine import NumbaMTPEngine
+        from motep.potentials.mtp.numba.engine import NumbaMTPEngine
 
         return NumbaMTPEngine
     else:
