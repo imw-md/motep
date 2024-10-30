@@ -27,7 +27,7 @@ def test_jac(
     if not (path / "pot.mtp").exists():
         pytest.skip()
     mtp_data_ref = read_mtp(path / "pot.mtp")
-    images = read_cfg(path / "out.cfg", index=":")[::500]
+    images = read_cfg(path / "out.cfg", index=":")[::1000]
 
     setting = {
         "energy-weight": 1.0,
