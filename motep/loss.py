@@ -172,6 +172,8 @@ class LossFunctionBase(ABC):
             if hasattr(self.images[i].calc, "engine"):
                 mbd = self.images[i].calc.engine.mbd
                 self.images[i].calc.engine.mbd = self.comm.bcast(mbd, root=i % size)
+                rbd = self.images[i].calc.engine.rbd
+                self.images[i].calc.engine.rbd = self.comm.bcast(rbd, root=i % size)
 
     def calc_loss_function(self) -> float:
         """Calculate the value of the loss function."""
