@@ -286,6 +286,17 @@ def _nb_calc_radial_basis(
     return values, derivs
 
 
+@nb.njit
+def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
+    number_of_js = r_unit.shape[0]
+    r_unit_pows = np.ones((max_pow + 1, number_of_js, 3))
+    for pow in range(1, max_pow + 1):
+        for j in range(number_of_js):
+            for k in range(3):
+                r_unit_pows[pow, j, k] = r_unit_pows[pow - 1, j, k] * r_unit[j, k]
+    return r_unit_pows
+
+
 @nb.njit(
     nb.types.Tuple((nb.float64, nb.float64[:, :]))(
         nb.float64[:, :],
@@ -315,19 +326,19 @@ def _nb_calc_local_energy_and_gradient(
     moment_coeffs,
 ):
     (number_of_js,) = r_abs.shape
-    max_pow = int(np.max(alpha_index_basic))
     moment_components = np.zeros(alpha_moments_count)
     moment_jacobian = np.empty((3, number_of_js, alpha_moments_count))
-    # Precompute unit vectors and its powers
+
+    # Precompute unit vectors
     r_unit = np.empty((number_of_js, 3))
     for j in range(number_of_js):
         for k in range(3):
             r_unit[j, k] = r_ijs[j, k] / r_abs[j]
-    r_unit_pows = np.ones((max_pow + 1, number_of_js, 3))
-    for pow in range(1, max_pow + 1):
-        for j in range(number_of_js):
-            for k in range(3):
-                r_unit_pows[pow, j, k] = r_unit_pows[pow - 1, j, k] * r_unit[j, k]
+
+    # Precompute powers
+    max_pow = int(np.max(alpha_index_basic))
+    r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
+
     # Compute basic moment components and its jacobian wrt r_ijs
     for j in range(number_of_js):
         for aib_i, aib in enumerate(alpha_index_basic):
