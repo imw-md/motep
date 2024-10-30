@@ -19,6 +19,7 @@ class Callback:
 
     def __init__(self, loss: LossFunctionBase):
         self.loss = loss
+        self.iter = 0
 
     def __call__(self, intermediate_result: OptimizeResult | np.ndarray):
         fun = (
@@ -27,7 +28,8 @@ class Callback:
             else self.loss(intermediate_result)
         )
         if self.loss.comm.Get_rank() == 0:
-            print("Function value:", fun)
+            print(f"loss {self.iter:4d}:", fun)
+        self.iter += 1
 
 
 class ScipyOptimizerBase(OptimizerBase):
