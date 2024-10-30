@@ -126,7 +126,7 @@ class LLSOptimizerBase(OptimizerBase):
         idcs_str = self.loss.idcs_str
         f = voigt_6_to_full_3x3_stress
         stresses = np.array([f(images[i].calc.targets[key]) for i in idcs_str])
-        if self.loss.setting["stress-times-volume"]:
+        if self.loss.setting.get("stress-times-volume"):
             stresses = (stresses.T * self.loss.volumes[idcs_str]).T
         return stresses.flat
 
