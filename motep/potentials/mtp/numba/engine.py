@@ -44,8 +44,7 @@ class NumbaMTPEngine(EngineBase):
             all_js_list.append(js)
             all_r_ijs.append(r_ijs)
             (number_of_js,) = js.shape
-            if number_of_js > max_number_of_js:
-                max_number_of_js = number_of_js
+            max_number_of_js = max(number_of_js, max_number_of_js)
         shape = (max_number_of_js, number_of_atoms)
         all_js = np.zeros(shape, dtype=int)
         for i in range(number_of_atoms):
