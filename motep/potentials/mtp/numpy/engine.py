@@ -75,7 +75,7 @@ class NumpyMTPEngine(EngineBase):
         """Calculate properties of the given system."""
         self.update_neighbor_list(atoms)
         itypes = get_types(atoms, self.dict_mtp["species"])
-        self.energies = self.dict_mtp["species_coeffs"][itypes]
+        energies = self.dict_mtp["species_coeffs"][itypes]
 
         self.mbd.clean()
         self.rbd.clean()
@@ -95,7 +95,7 @@ class NumpyMTPEngine(EngineBase):
 
             self.mbd.values += basis_values
 
-            self.energies[i] += moment_coeffs @ basis_values
+            energies[i] += moment_coeffs @ basis_values
             # Calculate forces
             # Be careful that the derivative of the site energy of the j-th atom also
             # contributes to the forces on the i-th atom.
@@ -118,17 +118,17 @@ class NumpyMTPEngine(EngineBase):
                 self.mbd.ddedcs[itype, :, :, :, :, j] += tmp[:, :, :, :, k]
             self.mbd.ds_dcs[itype] += tmp @ r_ijs
 
-        self.forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1) * -1.0
-        self.stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T
+        forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1) * -1.0
+        stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T
 
-        self.results["energies"] = self.energies
+        self.results["energies"] = energies
         self.results["energy"] = self.results["energies"].sum()
-        self.results["forces"] = self.forces
+        self.results["forces"] = forces
 
         if atoms.cell.rank == 3:
             volume = atoms.get_volume()
-            self.stress = (self.stress + self.stress.T) * 0.5  # symmetrize
-            self.stress /= volume
+            stress = (stress + stress.T) * 0.5  # symmetrize
+            stress /= volume
             self.mbd.dbdeps += self.mbd.dbdeps.transpose(0, 2, 1)
             self.mbd.dbdeps *= 0.5 / volume
             self.mbd.ds_dcs += self.mbd.ds_dcs.swapaxes(-2, -1)
@@ -137,11 +137,11 @@ class NumpyMTPEngine(EngineBase):
             self.rbd.dqdeps += self.rbd.dqdeps.transpose(axes)
             self.rbd.dqdeps *= 0.5 / volume
         else:
-            self.stress[:, :] = np.nan
+            stress[:, :] = np.nan
             self.mbd.dbdeps[:, :, :] = np.nan
             self.rbd.dqdeps[:, :, :] = np.nan
 
-        self.results["stress"] = self.stress.flat[[0, 4, 8, 5, 2, 1]]
+        self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return self.results["energy"], self.results["forces"], self.results["stress"]
 

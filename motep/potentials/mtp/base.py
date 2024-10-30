@@ -111,10 +111,6 @@ class EngineBase:
         self.results = {}
         self._neighbor_list = None
 
-        self.energies = None
-        self.forces = None
-        self.stress = None
-
         # moment basis data
         self.mbd = MomentBasisData()
 
