@@ -26,7 +26,7 @@ class MomentBasis:
 
         Parameters
         ----------
-        r_ijs : np.ndarray
+        r_ijs : np.ndarray (number_of_neighbors, 3)
             :math:`\mathbf{r}_j - \mathbf{r}_i`,
             where i is the center atom, and j are the neighboring atoms.
 
@@ -46,11 +46,11 @@ class MomentBasis:
         alpha_index_times = self.mtp_data["alpha_index_times"]
         alpha_moment_mapping = self.mtp_data["alpha_moment_mapping"]
 
-        r_ijs_unit = r_ijs / r_abs
+        r_ijs_unit = (r_ijs.T / r_abs).T
         moment_values = np.zeros(amc)
-        moment_jac_rs = np.zeros((amc, *r_ijs.shape))  # dEi/dxj
+        moment_jac_rs = np.zeros((amc, *r_ijs.T.shape))  # dEi/dxj
         moment_jac_cs = np.zeros((amc, species_count, rfs, rbs))
-        moment_jac_rc = np.zeros((amc, species_count, rfs, rbs, *r_ijs.shape))
+        moment_jac_rc = np.zeros((amc, species_count, rfs, rbs, *r_ijs.T.shape))
 
         # Precompute powers
         max_pow = np.max(alpha_index_basic)
@@ -61,7 +61,9 @@ class MomentBasis:
         k = xpow + ypow + zpow
 
         # `mult0.shape == (alpha_index_basic_count, neighbors)`
-        mult0 = r_unit_pows[xpow, 0] * r_unit_pows[ypow, 1] * r_unit_pows[zpow, 2]
+        mult0 = (
+            r_unit_pows[xpow, :, 0] * r_unit_pows[ypow, :, 1] * r_unit_pows[zpow, :, 2]
+        )
 
         # f * tensor = dMb/dc (before summation over neighbors)
         # `val.shape == (alpha_index_basis_count, radial_basis_size, neighbors)`
@@ -69,29 +71,29 @@ class MomentBasis:
 
         # d(d(f * tensor)/dr)/dc = d(dMb/dr)/dc (before summation over neighbors)
         # `der.shape == (alpha_index_basis_count, radial_basis_size, 3, neighbors)`
-        der = (rb.basis_ds.T * mult0[:, None, :])[..., None, :] * r_ijs_unit
+        der = (rb.basis_ds.T * mult0[:, None, :])[..., None, :] * r_ijs_unit.T
 
-        der -= (val.T * k).T[:, :, None, :] * r_ijs_unit / r_abs
+        der -= (val.T * k).T[:, :, None, :] * r_ijs_unit.T / r_abs
         der[:, :, 0, :] += (
             rb.basis_vs.T[None, :, :]
             * xpow[:, None, None]
-            * r_unit_pows[xpow - 1, None, 0, :]
-            * r_unit_pows[ypow, None, 1, :]
-            * r_unit_pows[zpow, None, 2, :]
+            * r_unit_pows[xpow - 1, None, :, 0]
+            * r_unit_pows[ypow, None, :, 1]
+            * r_unit_pows[zpow, None, :, 2]
         ) / r_abs
         der[:, :, 1, :] += (
             rb.basis_vs.T[None, :, :]
             * ypow[:, None, None]
-            * r_unit_pows[xpow, None, 0, :]
-            * r_unit_pows[ypow - 1, None, 1, :]
-            * r_unit_pows[zpow, None, 2, :]
+            * r_unit_pows[xpow, None, :, 0]
+            * r_unit_pows[ypow - 1, None, :, 1]
+            * r_unit_pows[zpow, None, :, 2]
         ) / r_abs
         der[:, :, 2, :] += (
             rb.basis_vs.T[None, :, :]
             * zpow[:, None, None]
-            * r_unit_pows[xpow, None, 0, :]
-            * r_unit_pows[ypow, None, 1, :]
-            * r_unit_pows[zpow - 1, None, 2, :]
+            * r_unit_pows[xpow, None, :, 0]
+            * r_unit_pows[ypow, None, :, 1]
+            * r_unit_pows[zpow - 1, None, :, 2]
         ) / r_abs
 
         # `(alpha_index_basis_count, radial_basis_size, neighbors)`

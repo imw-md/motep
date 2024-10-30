@@ -58,16 +58,16 @@ class NumpyMTPEngine(EngineBase):
         jtypes: list[int],
         r_ijs: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
-        r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
-        r_ijs_unit = r_ijs / r_abs
+        r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=1))
+        r_ijs_unit = (r_ijs.T / r_abs).T
 
         self.rb.calc_radial_part(r_abs, itype, jtypes)
         np.add.at(self.rbd.values[itype], jtypes, self.rb.basis_vs[:, :])
         for k, (j, jtype) in enumerate(zip(js, jtypes, strict=True)):
-            tmp = self.rb.basis_ds[k, :, None] * r_ijs_unit[:, k]
+            tmp = self.rb.basis_ds[k, :, None] * r_ijs_unit[k]
             self.rbd.dqdris[itype, jtype, :, :, i] -= tmp
             self.rbd.dqdris[itype, jtype, :, :, j] += tmp
-            self.rbd.dqdeps[itype, jtype] += tmp[:, :, None] * r_ijs[:, k]
+            self.rbd.dqdeps[itype, jtype] += tmp[:, :, None] * r_ijs[k]
         moment_basis = MomentBasis(self.dict_mtp)
         return moment_basis.calculate(itype, jtypes, r_ijs, r_abs, self.rb)
 
@@ -108,7 +108,7 @@ class NumpyMTPEngine(EngineBase):
             for k, j in enumerate(js):
                 self.mbd.dbdris[:, :, i] -= basis_jac_rs[:, :, k]
                 self.mbd.dbdris[:, :, j] += basis_jac_rs[:, :, k]
-            self.mbd.dbdeps += basis_jac_rs @ r_ijs.T
+            self.mbd.dbdeps += basis_jac_rs @ r_ijs
 
             self.mbd.de_dcs[itype] += (moment_coeffs * basis_jac_cs.T).sum(axis=-1).T
 
@@ -116,7 +116,7 @@ class NumpyMTPEngine(EngineBase):
             for k, j in enumerate(js):
                 self.mbd.ddedcs[itype, :, :, :, :, i] -= tmp[:, :, :, :, k]
                 self.mbd.ddedcs[itype, :, :, :, :, j] += tmp[:, :, :, :, k]
-            self.mbd.ds_dcs[itype] += tmp @ r_ijs.T
+            self.mbd.ds_dcs[itype] += tmp @ r_ijs
 
         self.forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1) * -1.0
         self.stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T

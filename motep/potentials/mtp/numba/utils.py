@@ -43,10 +43,10 @@ def numba_calc_energy_and_forces(
     for i in range(number_of_atoms):
         js = all_js[:, i]
         r_ijs = all_r_ijs[i]
-        (_, number_of_js) = r_ijs.shape
+        (number_of_js, _) = r_ijs.shape
         itype = engine.dict_mtp["species"][atoms.numbers[i]]
         jtypes = np.array([engine.dict_mtp["species"][atoms.numbers[j]] for j in js])
-        r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
+        r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=1))
         rb_values, rb_derivs = _nb_calc_radial_basis(
             r_abs, itype, jtypes, radial_coeffs, scaling, min_dist, max_dist
         )
@@ -64,7 +64,7 @@ def numba_calc_energy_and_forces(
             moment_coeffs,
         )
         energy += local_energy
-        stress += r_ijs @ local_gradient.T
+        stress += r_ijs.T @ local_gradient.T
         gradient[i, :number_of_js, :] = local_gradient.T
 
     forces = _nb_forces_from_gradient(
@@ -319,15 +319,15 @@ def _nb_calc_local_energy_and_gradient(
     moment_components = np.zeros(alpha_moments_count)
     moment_jacobian = np.empty((3, number_of_js, alpha_moments_count))
     # Precompute unit vectors and its powers
-    r_unit = np.empty((3, number_of_js))
+    r_unit = np.empty((number_of_js, 3))
     for j in range(number_of_js):
         for k in range(3):
-            r_unit[k, j] = r_ijs[k, j] / r_abs[j]
-    r_unit_pows = np.ones((3, number_of_js, max_pow + 1))
+            r_unit[j, k] = r_ijs[j, k] / r_abs[j]
+    r_unit_pows = np.ones((max_pow + 1, number_of_js, 3))
     for pow in range(1, max_pow + 1):
         for j in range(number_of_js):
             for k in range(3):
-                r_unit_pows[k, j, pow] = r_unit_pows[k, j, pow - 1] * r_unit[k, j]
+                r_unit_pows[pow, j, k] = r_unit_pows[pow - 1, j, k] * r_unit[j, k]
     # Compute basic moment components and its jacobian wrt r_ijs
     for j in range(number_of_js):
         for aib_i, aib in enumerate(alpha_index_basic):
@@ -335,42 +335,42 @@ def _nb_calc_local_energy_and_gradient(
             pow = xpow + ypow + zpow
             val = (
                 rb_values[mu, j]
-                * r_unit_pows[0, j, xpow]
-                * r_unit_pows[1, j, ypow]
-                * r_unit_pows[2, j, zpow]
+                * r_unit_pows[xpow, j, 0]
+                * r_unit_pows[ypow, j, 1]
+                * r_unit_pows[zpow, j, 2]
             )
             moment_components[aib_i] += val
 
             for k in range(3):
                 moment_jacobian[k, j, aib_i] = (
-                    r_unit[k, j]
-                    * r_unit_pows[0, j, xpow]
-                    * r_unit_pows[1, j, ypow]
-                    * r_unit_pows[2, j, zpow]
+                    r_unit[j, k]
+                    * r_unit_pows[xpow, j, 0]
+                    * r_unit_pows[ypow, j, 1]
+                    * r_unit_pows[zpow, j, 2]
                     * (rb_derivs[mu, j] - pow * rb_values[mu, j] / r_abs[j])
                 )
                 if k == 0:
                     moment_jacobian[k, j, aib_i] += (
                         rb_values[mu, j]
-                        * (xpow * r_unit_pows[0, j, xpow - 1])
-                        * r_unit_pows[1, j, ypow]
-                        * r_unit_pows[2, j, zpow]
+                        * (xpow * r_unit_pows[xpow - 1, j, 0])
+                        * r_unit_pows[ypow, j, 1]
+                        * r_unit_pows[zpow, j, 2]
                         / r_abs[j]
                     )
                 elif k == 1:
                     moment_jacobian[k, j, aib_i] += (
                         rb_values[mu, j]
-                        * r_unit_pows[0, j, xpow]
-                        * (ypow * r_unit_pows[1, j, ypow - 1])
-                        * r_unit_pows[2, j, zpow]
+                        * r_unit_pows[xpow, j, 0]
+                        * (ypow * r_unit_pows[ypow - 1, j, 1])
+                        * r_unit_pows[zpow, j, 2]
                         / r_abs[j]
                     )
                 elif k == 2:
                     moment_jacobian[k, j, aib_i] += (
                         rb_values[mu, j]
-                        * r_unit_pows[0, j, xpow]
-                        * r_unit_pows[1, j, ypow]
-                        * (zpow * r_unit_pows[2, j, zpow - 1])
+                        * r_unit_pows[xpow, j, 0]
+                        * r_unit_pows[ypow, j, 1]
+                        * (zpow * r_unit_pows[zpow - 1, j, 2])
                         / r_abs[j]
                     )
 
