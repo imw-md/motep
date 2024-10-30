@@ -11,7 +11,7 @@ from ase import Atoms
 from motep.potentials.mtp import get_types
 from motep.potentials.mtp.base import EngineBase
 from motep.potentials.mtp.data import MTPData
-from motep.potentials.mtp.moment import MomentBasis
+from motep.potentials.mtp.numpy.moment import MomentBasis
 from motep.radial import ChebyshevArrayRadialBasis
 
 
