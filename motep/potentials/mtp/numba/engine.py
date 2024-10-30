@@ -52,14 +52,15 @@ class NumbaMTPEngine(EngineBase):
             (number_of_js,) = js.shape
             all_js[:number_of_js, i] = js
 
+        itypes = [mtp_data["species"][atoms.numbers[i]] for i in range(number_of_atoms)]
+
         energy = 0
         stress = np.zeros((3, 3))
         gradient = np.zeros((number_of_atoms, max_number_of_js, 3))
-        for i in range(number_of_atoms):
+        for i, itype in enumerate(itypes):
             js = all_js[:, i]
             r_ijs = all_r_ijs[i]
             (number_of_js, _) = r_ijs.shape
-            itype = self.dict_mtp["species"][atoms.numbers[i]]
             jtypes = np.array([self.dict_mtp["species"][atoms.numbers[j]] for j in js])
             r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=1))
             rb_values, rb_derivs = _nb_calc_radial_basis(
