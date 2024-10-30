@@ -127,6 +127,6 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         size = species_count * species_count * radial_basis_size
 
         matrix = np.array([images[i].calc.engine.radial_basis_dqdeps.T for i in idcs])
-        if self.loss.setting["stress-times-volume"]:
+        if self.loss.setting.get("stress-times-volume"):
             matrix = (matrix.T * self.loss.volumes[idcs]).T
         return matrix.reshape((-1, size))

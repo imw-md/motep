@@ -155,7 +155,7 @@ class LossFunctionBase(ABC):
             for i in self.idcs_str
         )
         stress_ses = np.fromiter(iterable, dtype=float, count=self.idcs_str.size)
-        if self.setting["stress-times-volume"]:
+        if self.setting.get("stress-times-volume"):
             stress_ses *= self.volumes**2
         return self.configuration_weight[self.idcs_str] @ stress_ses
 
@@ -204,7 +204,7 @@ class LossFunctionBase(ABC):
 
         images = self.images
         jacs = np.array([per_configuration(images[i]) for i in self.idcs_str])
-        if self.setting["stress-times-volume"]:
+        if self.setting.get("stress-times-volume"):
             jacs *= self.volumes[self.idcs_str, None]
         return self.configuration_weight[self.idcs_str] @ jacs
 
