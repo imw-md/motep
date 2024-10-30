@@ -169,6 +169,9 @@ class LossFunctionBase(ABC):
         for i in range(ncnf):
             results = self.images[i].calc.results
             results.update(self.comm.bcast(results, root=i % size))
+            if hasattr(self.images[i].calc, "engine"):
+                mbd = self.images[i].calc.engine.mbd
+                self.images[i].calc.engine.mbd = self.comm.bcast(mbd, root=i % size)
 
     def calc_loss_function(self) -> float:
         """Calculate the value of the loss function."""
