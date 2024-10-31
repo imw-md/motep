@@ -142,17 +142,19 @@ def _contract_moments(
         i1, i2, mult, i3 = ait
         moment_values[i3] += mult * moment_values[i1] * moment_values[i2]
 
-        moment_jac_rs[i3] += mult * moment_jac_rs[i1] * moment_values[i2]
-        moment_jac_rs[i3] += mult * moment_values[i1] * moment_jac_rs[i2]
-
-        moment_jac_cs[i3] += mult * moment_jac_cs[i1] * moment_values[i2]
-        moment_jac_cs[i3] += mult * moment_values[i1] * moment_jac_cs[i2]
-
-        moment_jac_rc[i3] += mult * moment_jac_rc[i1] * moment_values[i2]
-        moment_jac_rc[i3] += (
-            mult * moment_jac_rs[i1] * moment_jac_cs[i2][..., None, None]
+        moment_jac_rs[i3] += mult * (
+            moment_jac_rs[i1] * moment_values[i2]
+            + moment_values[i1] * moment_jac_rs[i2]
         )
-        moment_jac_rc[i3] += (
-            mult * moment_jac_cs[i1][..., None, None] * moment_jac_rs[i2]
+
+        moment_jac_cs[i3] += mult * (
+            moment_jac_cs[i1] * moment_values[i2]
+            + moment_values[i1] * moment_jac_cs[i2]
         )
-        moment_jac_rc[i3] += mult * moment_values[i1] * moment_jac_rc[i2]
+
+        moment_jac_rc[i3] += mult * (
+            moment_jac_rc[i1] * moment_values[i2]
+            + moment_jac_rs[i1] * moment_jac_cs[i2][..., None, None]
+            + moment_jac_cs[i1][..., None, None] * moment_jac_rs[i2]
+            + moment_values[i1] * moment_jac_rc[i2]
+        )
