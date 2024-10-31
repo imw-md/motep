@@ -239,17 +239,19 @@ def _propagate_backward(
     # alternatively with backpropagation: (saves in the order of 20% for higher levels)
     _, number_of_js, alpha_moments_count = moment_jacobian.shape
     tmp_moment_ders = np.zeros((alpha_moments_count))
-    gradient = np.zeros((3, number_of_js))
     for basis_i, moment_i in enumerate(alpha_moment_mapping):
         tmp_moment_ders[moment_i] = moment_coeffs[basis_i]
     for ait in alpha_index_times[::-1]:
         i1, i2, mult, i3 = ait
         tmp_moment_ders[i2] += tmp_moment_ders[i3] * mult * moment_components[i1]
         tmp_moment_ders[i1] += tmp_moment_ders[i3] * mult * moment_components[i2]
+
+    gradient = np.zeros((number_of_js, 3))
     for aib_i in range(alpha_index_basic.shape[0]):
         for j in range(number_of_js):
             for k in range(3):
-                gradient[k, j] += tmp_moment_ders[aib_i] * moment_jacobian[k, j, aib_i]
+                gradient[j, k] += tmp_moment_ders[aib_i] * moment_jacobian[k, j, aib_i]
+
     return gradient
 
 

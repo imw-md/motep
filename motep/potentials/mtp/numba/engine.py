@@ -80,8 +80,8 @@ class NumbaMTPEngine(EngineBase):
                 moment_coeffs,
             )
             energy += local_energy
-            stress += r_ijs.T @ local_gradient.T
-            gradient[i, :number_of_js, :] = local_gradient.T
+            stress += r_ijs.T @ local_gradient
+            gradient[i, :number_of_js, :] = local_gradient
 
         forces = _nb_forces_from_gradient(
             gradient, all_js, number_of_atoms, max_number_of_js
