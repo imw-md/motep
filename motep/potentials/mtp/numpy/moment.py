@@ -101,10 +101,14 @@ class MomentBasis:
 
         moment_values[: mu.size] = (coeffs * val).sum(axis=(1, 2))
         moment_jac_rs[: mu.size] = (coeffs[:, :, :, None] * der).sum(axis=1)
+        ijs = np.arange(len(jtypes))
         for imu, _ in enumerate(mu):
             np.add.at(moment_jac_cs[imu, :, _], jtypes, val.T[:, :, imu])
-            for ij, jtype in enumerate(jtypes):
-                moment_jac_rc[imu, jtype, _, :, ij] = der[imu, :, ij]
+            np.add.at(
+                moment_jac_rc.transpose(0, 2, 1, 4, 3, 5)[imu, _],
+                (jtypes, ijs),
+                der.transpose(0, 2, 1, 3)[imu],
+            )
 
         _contract_moments(
             moment_values,
