@@ -219,6 +219,41 @@ def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
 
 
 @nb.njit(
+    nb.float64[:, :](
+        nb.int64[:, :],
+        nb.int64[:, :],
+        nb.int64[:],
+        nb.float64[:],
+        nb.float64[:],
+        nb.float64[:, :, :],
+    ),
+)
+def _propagate_backward(
+    alpha_index_basic,
+    alpha_index_times,
+    alpha_moment_mapping,
+    moment_coeffs,
+    moment_components,
+    moment_jacobian,
+):
+    # alternatively with backpropagation: (saves in the order of 20% for higher levels)
+    _, number_of_js, alpha_moments_count = moment_jacobian.shape
+    tmp_moment_ders = np.zeros((alpha_moments_count))
+    gradient = np.zeros((3, number_of_js))
+    for basis_i, moment_i in enumerate(alpha_moment_mapping):
+        tmp_moment_ders[moment_i] = moment_coeffs[basis_i]
+    for ait in alpha_index_times[::-1]:
+        i1, i2, mult, i3 = ait
+        tmp_moment_ders[i2] += tmp_moment_ders[i3] * mult * moment_components[i1]
+        tmp_moment_ders[i1] += tmp_moment_ders[i3] * mult * moment_components[i2]
+    for aib_i in range(alpha_index_basic.shape[0]):
+        for j in range(number_of_js):
+            for k in range(3):
+                gradient[k, j] += tmp_moment_ders[aib_i] * moment_jacobian[k, j, aib_i]
+    return gradient
+
+
+@nb.njit(
     nb.types.Tuple((nb.float64, nb.float64[:, :]))(
         nb.float64[:, :],
         nb.float64[:],
@@ -338,19 +373,14 @@ def _nb_calc_local_energy_and_gradient(
     #     for j in range(nrs):
     #         ene_derivs[j, k] += moment_coeffs[moment_i] * deriv[k, moment_i, j]
 
-    # alternatively with backpropagation: (saves in the order of 20% for higher levels)
-    tmp_moment_ders = np.zeros((alpha_moments_count))
-    gradient = np.zeros((3, number_of_js))
-    for basis_i, moment_i in enumerate(alpha_moment_mapping):
-        tmp_moment_ders[moment_i] = moment_coeffs[basis_i]
-    for ait in alpha_index_times[::-1]:
-        i1, i2, mult, i3 = ait
-        tmp_moment_ders[i2] += tmp_moment_ders[i3] * mult * moment_components[i1]
-        tmp_moment_ders[i1] += tmp_moment_ders[i3] * mult * moment_components[i2]
-    for aib_i in range(alpha_index_basic.shape[0]):
-        for j in range(number_of_js):
-            for k in range(3):
-                gradient[k, j] += tmp_moment_ders[aib_i] * moment_jacobian[k, j, aib_i]
+    gradient = _propagate_backward(
+        alpha_index_basic,
+        alpha_index_times,
+        alpha_moment_mapping,
+        moment_coeffs,
+        moment_components,
+        moment_jacobian,
+    )
 
     return energy, gradient
 
