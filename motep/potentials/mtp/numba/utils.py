@@ -241,9 +241,9 @@ def _propagate_forward(
         i1, i2, mult, i3 = ait
         for j in range(number_of_js):
             for k in range(3):
-                moment_jacobian[k, j, i3] += mult * (
-                    moment_jacobian[k, j, i1] * moment_components[i2]
-                    + moment_components[i1] * moment_jacobian[k, j, i2]
+                moment_jacobian[i3, j, k] += mult * (
+                    moment_jacobian[i1, j, k] * moment_components[i2]
+                    + moment_components[i1] * moment_jacobian[i2, j, k]
                 )
 
     gradient = np.zeros((number_of_js, 3))
@@ -251,7 +251,7 @@ def _propagate_forward(
         for j in range(number_of_js):
             for k in range(3):
                 gradient[j, k] += (
-                    moment_coeffs[basis_i] * moment_jacobian[k, j, moment_i]
+                    moment_coeffs[basis_i] * moment_jacobian[moment_i, j, k]
                 )
 
     return gradient
@@ -276,7 +276,7 @@ def _propagate_backward(
     moment_jacobian,
 ):
     # alternatively with backpropagation: (saves in the order of 20% for higher levels)
-    _, number_of_js, alpha_moments_count = moment_jacobian.shape
+    alpha_moments_count, number_of_js, _ = moment_jacobian.shape
     tmp_moment_ders = np.zeros((alpha_moments_count))
     for basis_i, moment_i in enumerate(alpha_moment_mapping):
         tmp_moment_ders[moment_i] = moment_coeffs[basis_i]
@@ -289,7 +289,7 @@ def _propagate_backward(
     for aib_i in range(alpha_index_basic.shape[0]):
         for j in range(number_of_js):
             for k in range(3):
-                gradient[j, k] += tmp_moment_ders[aib_i] * moment_jacobian[k, j, aib_i]
+                gradient[j, k] += tmp_moment_ders[aib_i] * moment_jacobian[aib_i, j, k]
 
     return gradient
 
@@ -324,7 +324,7 @@ def _nb_calc_local_energy_and_gradient(
 ):
     (number_of_js,) = r_abs.shape
     moment_components = np.zeros(alpha_moments_count)
-    moment_jacobian = np.zeros((3, number_of_js, alpha_moments_count))
+    moment_jacobian = np.zeros((alpha_moments_count, number_of_js, 3))
 
     # Precompute unit vectors
     r_unit = np.empty((number_of_js, 3))
@@ -350,7 +350,7 @@ def _nb_calc_local_energy_and_gradient(
             moment_components[aib_i] += val
 
             for k in range(3):
-                moment_jacobian[k, j, aib_i] = (
+                moment_jacobian[aib_i, j, k] = (
                     r_unit[j, k]
                     * r_unit_pows[xpow, j, 0]
                     * r_unit_pows[ypow, j, 1]
@@ -358,7 +358,7 @@ def _nb_calc_local_energy_and_gradient(
                     * (rb_derivs[mu, j] - pow * rb_values[mu, j] / r_abs[j])
                 )
                 if k == 0:
-                    moment_jacobian[k, j, aib_i] += (
+                    moment_jacobian[aib_i, j, k] += (
                         rb_values[mu, j]
                         * (xpow * r_unit_pows[xpow - 1, j, 0])
                         * r_unit_pows[ypow, j, 1]
@@ -366,7 +366,7 @@ def _nb_calc_local_energy_and_gradient(
                         / r_abs[j]
                     )
                 elif k == 1:
-                    moment_jacobian[k, j, aib_i] += (
+                    moment_jacobian[aib_i, j, k] += (
                         rb_values[mu, j]
                         * r_unit_pows[xpow, j, 0]
                         * (ypow * r_unit_pows[ypow - 1, j, 1])
@@ -374,7 +374,7 @@ def _nb_calc_local_energy_and_gradient(
                         / r_abs[j]
                     )
                 elif k == 2:
-                    moment_jacobian[k, j, aib_i] += (
+                    moment_jacobian[aib_i, j, k] += (
                         rb_values[mu, j]
                         * r_unit_pows[xpow, j, 0]
                         * r_unit_pows[ypow, j, 1]
