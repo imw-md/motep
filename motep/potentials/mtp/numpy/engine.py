@@ -106,17 +106,17 @@ class NumpyMTPEngine(EngineBase):
             #    with respect to the i-th atom.
             # Thus, the negative signs of the two contributions are cancelled out below.
             for k, j in enumerate(js):
-                self.mbd.dbdris[:, :, i] -= basis_jac_rs[:, :, k]
-                self.mbd.dbdris[:, :, j] += basis_jac_rs[:, :, k]
-            self.mbd.dbdeps += basis_jac_rs @ r_ijs
+                self.mbd.dbdris[:, :, i] -= basis_jac_rs[:, k, :]
+                self.mbd.dbdris[:, :, j] += basis_jac_rs[:, k, :]
+            self.mbd.dbdeps += r_ijs.T @ basis_jac_rs
 
             self.mbd.de_dcs[itype] += (moment_coeffs * basis_jac_cs.T).sum(axis=-1).T
 
             tmp = (moment_coeffs * basis_jac_rc.T).sum(axis=-1).T
             for k, j in enumerate(js):
-                self.mbd.ddedcs[itype, :, :, :, :, i] -= tmp[:, :, :, :, k]
-                self.mbd.ddedcs[itype, :, :, :, :, j] += tmp[:, :, :, :, k]
-            self.mbd.ds_dcs[itype] += tmp @ r_ijs
+                self.mbd.ddedcs[itype, :, :, :, :, i] -= tmp[:, :, :, k, :]
+                self.mbd.ddedcs[itype, :, :, :, :, j] += tmp[:, :, :, k, :]
+            self.mbd.ds_dcs[itype] += r_ijs.T @ tmp
 
         forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1) * -1.0
         stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T

@@ -48,9 +48,9 @@ class MomentBasis:
 
         r_ijs_unit = (r_ijs.T / r_abs).T
         moment_values = np.zeros(amc)
-        moment_jac_rs = np.zeros((amc, *r_ijs.T.shape))  # dEi/dxj
+        moment_jac_rs = np.zeros((amc, *r_ijs.shape))  # dEi/dxj
         moment_jac_cs = np.zeros((amc, species_count, rfs, rbs))
-        moment_jac_rc = np.zeros((amc, species_count, rfs, rbs, *r_ijs.T.shape))
+        moment_jac_rc = np.zeros((amc, species_count, rfs, rbs, *r_ijs.shape))
 
         # Precompute powers
         max_pow = np.max(alpha_index_basic)
@@ -99,14 +99,12 @@ class MomentBasis:
         # `(alpha_index_basis_count, radial_basis_size, neighbors)`
         coeffs = rb.coeffs[itype, jtypes][:, mu].transpose(1, 2, 0)
 
-        der = der.swapaxes(-2, -1)
-
         moment_values[: mu.size] = (coeffs * val).sum(axis=(1, 2))
-        moment_jac_rs[: mu.size] = (coeffs[:, :, None, :] * der).sum(axis=1)
+        moment_jac_rs[: mu.size] = (coeffs[:, :, :, None] * der).sum(axis=1)
         for imu, _ in enumerate(mu):
             np.add.at(moment_jac_cs[imu, :, _], jtypes, val.T[:, :, imu])
             for ij, jtype in enumerate(jtypes):
-                moment_jac_rc[imu, jtype, _, :, :, ij] = der[imu, :, :, ij]
+                moment_jac_rc[imu, jtype, _, :, ij] = der[imu, :, ij]
 
         _contract_moments(
             moment_values,
