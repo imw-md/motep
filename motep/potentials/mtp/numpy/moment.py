@@ -70,25 +70,25 @@ class MomentBasis:
         val = rb.basis_vs.T * mult0[:, None, :]
 
         # d(d(f * tensor)/dr)/dc = d(dMb/dr)/dc (before summation over neighbors)
-        # `der.shape == (alpha_index_basis_count, radial_basis_size, 3, neighbors)`
-        der = (rb.basis_ds.T * mult0[:, None, :])[..., None, :] * r_ijs_unit.T
+        # `der.shape == (alpha_index_basis_count, radial_basis_size, neighbors, 3)`
+        der = (rb.basis_ds.T * mult0[:, None, :])[..., None] * r_ijs_unit
 
-        der -= (val.T * k).T[:, :, None, :] * r_ijs_unit.T / r_abs
-        der[:, :, 0, :] += (
+        der -= (val.T * k).T[..., None] * r_ijs_unit / r_abs[:, None]
+        der[..., 0] += (
             rb.basis_vs.T[None, :, :]
             * xpow[:, None, None]
             * r_unit_pows[xpow - 1, None, :, 0]
             * r_unit_pows[ypow, None, :, 1]
             * r_unit_pows[zpow, None, :, 2]
         ) / r_abs
-        der[:, :, 1, :] += (
+        der[..., 1] += (
             rb.basis_vs.T[None, :, :]
             * ypow[:, None, None]
             * r_unit_pows[xpow, None, :, 0]
             * r_unit_pows[ypow - 1, None, :, 1]
             * r_unit_pows[zpow, None, :, 2]
         ) / r_abs
-        der[:, :, 2, :] += (
+        der[..., 2] += (
             rb.basis_vs.T[None, :, :]
             * zpow[:, None, None]
             * r_unit_pows[xpow, None, :, 0]
@@ -98,6 +98,8 @@ class MomentBasis:
 
         # `(alpha_index_basis_count, radial_basis_size, neighbors)`
         coeffs = rb.coeffs[itype, jtypes][:, mu].transpose(1, 2, 0)
+
+        der = der.swapaxes(-2, -1)
 
         moment_values[: mu.size] = (coeffs * val).sum(axis=(1, 2))
         moment_jac_rs[: mu.size] = (coeffs[:, :, None, :] * der).sum(axis=1)
