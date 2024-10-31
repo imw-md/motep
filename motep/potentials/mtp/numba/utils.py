@@ -221,6 +221,45 @@ def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
 @nb.njit(
     nb.float64[:, :](
         nb.int64[:, :],
+        nb.int64[:],
+        nb.float64[:],
+        nb.float64[:],
+        nb.float64[:, :, :],
+    ),
+)
+def _propagate_forward(
+    alpha_index_times,
+    alpha_moment_mapping,
+    moment_coeffs,
+    moment_components,
+    moment_jacobian,
+):
+    """Calculate gradients using the forward propagation."""
+    _, number_of_js, _ = moment_jacobian.shape
+    # contraction
+    for ait in alpha_index_times:
+        i1, i2, mult, i3 = ait
+        for j in range(number_of_js):
+            for k in range(3):
+                moment_jacobian[k, j, i3] += mult * (
+                    moment_jacobian[k, j, i1] * moment_components[i2]
+                    + moment_components[i1] * moment_jacobian[k, j, i2]
+                )
+
+    gradient = np.zeros((number_of_js, 3))
+    for basis_i, moment_i in enumerate(alpha_moment_mapping):
+        for j in range(number_of_js):
+            for k in range(3):
+                gradient[j, k] += (
+                    moment_coeffs[basis_i] * moment_jacobian[k, j, moment_i]
+                )
+
+    return gradient
+
+
+@nb.njit(
+    nb.float64[:, :](
+        nb.int64[:, :],
         nb.int64[:, :],
         nb.int64[:],
         nb.float64[:],
@@ -285,7 +324,7 @@ def _nb_calc_local_energy_and_gradient(
 ):
     (number_of_js,) = r_abs.shape
     moment_components = np.zeros(alpha_moments_count)
-    moment_jacobian = np.empty((3, number_of_js, alpha_moments_count))
+    moment_jacobian = np.zeros((3, number_of_js, alpha_moments_count))
 
     # Precompute unit vectors
     r_unit = np.empty((number_of_js, 3))
@@ -353,27 +392,13 @@ def _nb_calc_local_energy_and_gradient(
     for basis_i, moment_i in enumerate(alpha_moment_mapping):
         energy += moment_coeffs[basis_i] * moment_components[moment_i]
 
-    # Same for moment jacobian and gradient:
-    # # contraction
-    # deriv = np.empty((3, nmoments, nrs))
-    # for ait in alpha_index_times:
-    #     i1, i2, mult, i3 = ait
-    #     for j in range(nrs):
-    #         for k in range(3):
-    #             moment_jacobian[k, j, i3] += mult * (
-    #                 moment_jacobian[k, j, i1] * moment_components[i2]
-    #                 + moment_components[i1] * moment_jacobian[k, j, i2]
-    #             )
-    # # basis deriv
-    # for basis_i, moment_i in enumerate(alpha_moment_mapping):
-    #     for j in range(nrs):
-    #         for k in range(3):
-    #             deriv[k, basis_i, j] = moment_jacobian[k, j, moment_i]
-
-    # ene_derivs = np.zeros((nrs, 3))
-    # for k in range(3):
-    #     for j in range(nrs):
-    #         ene_derivs[j, k] += moment_coeffs[moment_i] * deriv[k, moment_i, j]
+    # gradient = _propagate_forward(
+    #     alpha_index_times,
+    #     alpha_moment_mapping,
+    #     moment_coeffs,
+    #     moment_components,
+    #     moment_jacobian,
+    # )
 
     gradient = _propagate_backward(
         alpha_index_basic,
