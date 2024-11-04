@@ -7,10 +7,11 @@ from ase.calculators.calculator import (
     all_changes,
 )
 
+from motep.potentials.mtp.base import EngineBase
 from motep.potentials.mtp.data import MTPData
 
 
-def make_mtp_engine(engine: str = "numpy") -> type:
+def make_mtp_engine(engine: str = "numpy") -> EngineBase:
     if engine == "numpy":
         from motep.potentials.mtp.numpy.engine import NumpyMTPEngine
 
@@ -39,10 +40,11 @@ class MTP(Calculator):
         mtp_data: MTPData,
         *args,
         engine: str = "numpy",
+        is_trained: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.engine = make_mtp_engine(engine)(mtp_data)
+        self.engine = make_mtp_engine(engine)(mtp_data, is_trained=is_trained)
         self.engine.update(mtp_data)
 
     def update_parameters(self, mtp_data: MTPData) -> None:
