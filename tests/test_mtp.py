@@ -45,8 +45,6 @@ def test_molecules(
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
-    if engine == NumbaMTPEngine and level == 2:
-        pytest.skip()
     path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
@@ -81,8 +79,6 @@ def test_crystals(
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
-    if engine == NumbaMTPEngine and level == 2:
-        pytest.skip()
     path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
@@ -119,8 +115,6 @@ def test_forces(
     data_path: pathlib.Path,
 ) -> None:
     """Test if forces are consistent with finite-difference values."""
-    if engine == NumbaMTPEngine and level == 2:
-        pytest.skip()
     path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
@@ -168,8 +162,6 @@ def test_stress(
     atomic positions). The reason is not yet clear and to be fixed later.
 
     """
-    if engine == NumbaMTPEngine and level == 2:
-        pytest.skip()
     path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()

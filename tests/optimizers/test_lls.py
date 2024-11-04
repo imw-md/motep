@@ -23,8 +23,6 @@ def test_molecules(
     data_path: pathlib.Path,
 ) -> None:
     """Test `LLSOptimizer` for molecules."""
-    if engine == "numba" and level == 2:
-        pytest.skip()
     original_path = data_path / f"original/molecules/{molecule}"
     fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (fitting_path / "initial.mtp").exists():
@@ -107,8 +105,6 @@ def test_crystals(
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
-    if engine == "numba" and level == 2:
-        pytest.skip()
     original_path = data_path / f"original/crystals/{crystal}"
     fitting_path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (fitting_path / "initial.mtp").exists():
