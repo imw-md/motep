@@ -109,7 +109,7 @@ def test_crystals(
     fitting_path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (fitting_path / "initial.mtp").exists():
         pytest.skip()
-    dict_mtp = read_mtp(fitting_path / "initial.mtp")
+    mtp_data = read_mtp(fitting_path / "initial.mtp")
     images = read_cfg(original_path / "training.cfg", index=":")[::100]
 
     setting = {
@@ -123,7 +123,7 @@ def test_crystals(
 
     optimized = ["moment_coeffs"]
 
-    mtp_data = MTPData(dict_mtp)
+    mtp_data = MTPData(mtp_data)
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters
 
@@ -204,7 +204,7 @@ def test_species_coeffs(
     fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (fitting_path / "initial.mtp").exists():
         pytest.skip()
-    dict_mtp = read_mtp(fitting_path / "initial.mtp")
+    mtp_data = read_mtp(fitting_path / "initial.mtp")
     images = read_cfg(original_path / "training.cfg", index=":")
 
     setting = {
@@ -216,7 +216,7 @@ def test_species_coeffs(
     rng = np.random.default_rng(42)
 
     optimized = ["moment_coeffs", "species_coeffs"]
-    mtp_data = MTPData(dict_mtp)
+    mtp_data = MTPData(mtp_data)
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters
 

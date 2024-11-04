@@ -45,8 +45,8 @@ class MTP(Calculator):
         self.engine = make_mtp_engine(engine)(mtp_data)
         self.engine.update(mtp_data)
 
-    def update_parameters(self, dict_mtp: MTPData) -> None:
-        self.engine.update(dict_mtp)
+    def update_parameters(self, mtp_data: MTPData) -> None:
+        self.engine.update(mtp_data)
         self.results = {}  # trigger new calculation
 
     def calculate(

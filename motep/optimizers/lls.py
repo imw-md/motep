@@ -188,7 +188,7 @@ class LLSOptimizer(LLSOptimizerBase):
 
         coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
 
-        # Update `dict_mtp` and `parameters`.
+        # Update `mtp_data` and `parameters`.
         asm = self.loss.mtp_data["alpha_scalar_moments"]
         self.loss.mtp_data["moment_coeffs"] = coeffs[:asm]
         if "species_coeffs" in self.optimized:

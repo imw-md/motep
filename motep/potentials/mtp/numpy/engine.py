@@ -32,23 +32,23 @@ class Jac(dict):
 class NumpyMTPEngine(EngineBase):
     """MTP engine based on NumPy."""
 
-    def __init__(self, dict_mtp: MTPData | None = None) -> None:
+    def __init__(self, mtp_data: MTPData | None = None) -> None:
         """Intialize the engine.
 
         Parameters
         ----------
-        dict_mtp : :class:`motep.potentials.mtp.data.MTPData`
+        mtp_data : :class:`motep.potentials.mtp.data.MTPData`
             Parameters in the MLIP .mtp file.
 
         """
-        self.rb = ChebyshevArrayRadialBasis(dict_mtp)
-        super().__init__(dict_mtp)
+        self.rb = ChebyshevArrayRadialBasis(mtp_data)
+        super().__init__(mtp_data)
 
-    def update(self, dict_mtp: MTPData) -> None:
+    def update(self, mtp_data: MTPData) -> None:
         """Update MTP parameters."""
-        super().update(dict_mtp)
-        if "radial_coeffs" in self.dict_mtp:
-            self.rb.update_coeffs(self.dict_mtp["radial_coeffs"])
+        super().update(mtp_data)
+        if "radial_coeffs" in self.mtp_data:
+            self.rb.update_coeffs(self.mtp_data["radial_coeffs"])
 
     def _calc_basis(
         self,
@@ -68,23 +68,23 @@ class NumpyMTPEngine(EngineBase):
             self.rbd.dqdris[itype, jtype, :, :, i] -= tmp
             self.rbd.dqdris[itype, jtype, :, :, j] += tmp
             self.rbd.dqdeps[itype, jtype] += tmp[:, :, None] * r_ijs[k]
-        moment_basis = MomentBasis(self.dict_mtp)
+        moment_basis = MomentBasis(self.mtp_data)
         return moment_basis.calculate(itype, jtypes, r_ijs, r_abs, self.rb)
 
     def calculate(self, atoms: Atoms) -> tuple:
         """Calculate properties of the given system."""
         self.update_neighbor_list(atoms)
-        itypes = get_types(atoms, self.dict_mtp["species"])
-        energies = self.dict_mtp["species_coeffs"][itypes]
+        itypes = get_types(atoms, self.mtp_data["species"])
+        energies = self.mtp_data["species_coeffs"][itypes]
 
         self.mbd.clean()
         self.rbd.clean()
 
-        moment_coeffs = self.dict_mtp["moment_coeffs"]
+        moment_coeffs = self.mtp_data["moment_coeffs"]
 
         for i, itype in enumerate(itypes):
             js, r_ijs = self._get_distances(atoms, i)
-            jtypes = [self.dict_mtp["species"].index(atoms.numbers[j]) for j in js]
+            jtypes = [self.mtp_data["species"].index(atoms.numbers[j]) for j in js]
             basis_values, basis_jac_rs, basis_jac_cs, basis_jac_rc = self._calc_basis(
                 i,
                 itype,
@@ -147,7 +147,7 @@ class NumpyMTPEngine(EngineBase):
 
     def jac_energy(self, atoms: Atoms) -> MTPData:
         """Calculate the Jacobian of the energy with respect to the MTP parameters."""
-        sps = self.dict_mtp["species"]
+        sps = self.mtp_data["species"]
         nbs = list(atoms.numbers)
 
         jac = MTPData()  # placeholder of the Jacobian with respect to the parameters
@@ -164,7 +164,7 @@ class NumpyMTPEngine(EngineBase):
         `jac.parameters` have the shape of `(nparams, natoms, 3)`.
 
         """
-        spc = self.dict_mtp["species_count"]
+        spc = self.mtp_data["species_count"]
         number_of_atoms = len(atoms)
 
         jac = Jac()  # placeholder of the Jacobian with respect to the parameters
@@ -181,7 +181,7 @@ class NumpyMTPEngine(EngineBase):
         `jac.parameters` have the shape of `(nparams, natoms, 3)`.
 
         """
-        spc = self.dict_mtp["species_count"]
+        spc = self.mtp_data["species_count"]
 
         jac = Jac()  # placeholder of the Jacobian with respect to the parameters
         jac["scaling"] = np.zeros((1, 3, 3))

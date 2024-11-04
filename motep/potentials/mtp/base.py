@@ -96,18 +96,18 @@ class RadialBasisData:
 class EngineBase:
     """Engine to compute an MTP."""
 
-    def __init__(self, dict_mtp: MTPData | None = None) -> None:
+    def __init__(self, mtp_data: MTPData | None = None) -> None:
         """MLIP-2 MTP.
 
         Parameters
         ----------
-        dict_mtp : :class:`motep.potentials.mtp.data.MTPData`
+        mtp_data : :class:`motep.potentials.mtp.data.MTPData`
             Parameters in the MLIP .mtp file.
 
         """
-        self.dict_mtp = MTPData()
-        if dict_mtp is not None:
-            self.update(dict_mtp)
+        self.mtp_data = MTPData()
+        if mtp_data is not None:
+            self.update(mtp_data)
         self.results = {}
         self._neighbor_list = None
 
@@ -117,11 +117,11 @@ class EngineBase:
         # used for `Level2MTPOptimizer`
         self.rbd = RadialBasisData()
 
-    def update(self, dict_mtp: MTPData) -> None:
+    def update(self, mtp_data: MTPData) -> None:
         """Update MTP parameters."""
-        self.dict_mtp = dict_mtp
-        if "species" not in self.dict_mtp:
-            self.dict_mtp["species"] = list(range(self.dict_mtp["species_count"]))
+        self.mtp_data = mtp_data
+        if "species" not in self.mtp_data:
+            self.mtp_data["species"] = list(range(self.mtp_data["species_count"]))
 
     def update_neighbor_list(self, atoms: Atoms) -> None:
         """Update the ASE `PrimitiveNeighborList` object."""
@@ -133,7 +133,7 @@ class EngineBase:
     def _initiate_neighbor_list(self, atoms: Atoms) -> None:
         """Initialize the ASE `PrimitiveNeighborList` object."""
         self._neighbor_list = PrimitiveNeighborList(
-            cutoffs=[0.5 * self.dict_mtp["max_dist"]] * len(atoms),
+            cutoffs=[0.5 * self.mtp_data["max_dist"]] * len(atoms),
             skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
             self_interaction=False,  # Exclude [0, 0, 0]
             bothways=True,  # return both ij and ji
@@ -143,8 +143,8 @@ class EngineBase:
 
         natoms = len(atoms)
 
-        self.mbd.initialize(natoms, self.dict_mtp)
-        self.rbd.initialize(natoms, self.dict_mtp)
+        self.mbd.initialize(natoms, self.mtp_data)
+        self.rbd.initialize(natoms, self.mtp_data)
 
     def _get_distances(
         self,

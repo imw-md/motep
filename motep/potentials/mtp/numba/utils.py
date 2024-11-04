@@ -451,8 +451,8 @@ def numba_calc_energy(
         js = all_js[:, i]
         r_ijs = all_r_ijs[i]
         (_, number_of_js) = r_ijs.shape
-        itype = engine.dict_mtp["species"][atoms.numbers[i]]
-        jtypes = np.array([engine.dict_mtp["species"][atoms.numbers[j]] for j in js])
+        itype = engine.mtp_data["species"][atoms.numbers[i]]
+        jtypes = np.array([engine.mtp_data["species"][atoms.numbers[j]] for j in js])
         r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
         rb_values = _nb_calc_radial_basis_ene_only(
             r_abs, itype, jtypes, radial_coeffs, scaling, min_dist, max_dist

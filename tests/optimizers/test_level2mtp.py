@@ -11,7 +11,6 @@ from motep.io.mlip.mtp import read_mtp
 from motep.loss import LossFunction
 from motep.optimizers.ideal import NoInteractionOptimizer
 from motep.optimizers.level2mtp import Level2MTPOptimizer
-from motep.potentials.mtp.data import MTPData
 
 
 @pytest.mark.parametrize("level", [2, 4, 6])
@@ -28,9 +27,9 @@ def test_molecules(
     fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (fitting_path / "initial.mtp").exists():
         pytest.skip()
-    dict_mtp = read_mtp(fitting_path / "initial.mtp")
+    mtp_data = read_mtp(fitting_path / "initial.mtp")
     species = {762: [1], 291: [6, 1], 14214: [9, 1], 23208: [8]}[molecule]
-    dict_mtp["species"] = species
+    mtp_data["species"] = species
     images = read_cfg(original_path / "training.cfg", index=":", species=species)
 
     setting = {
@@ -40,8 +39,6 @@ def test_molecules(
     }
 
     rng = np.random.default_rng(42)
-
-    mtp_data = MTPData(dict_mtp)
 
     loss = LossFunction(
         images,
@@ -107,7 +104,7 @@ def test_crystals(
     fitting_path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (fitting_path / "initial.mtp").exists():
         pytest.skip()
-    dict_mtp = read_mtp(fitting_path / "initial.mtp")
+    mtp_data = read_mtp(fitting_path / "initial.mtp")
     images = read_cfg(original_path / "training.cfg", index=":")[::100]
 
     setting = {
@@ -119,7 +116,6 @@ def test_crystals(
 
     rng = np.random.default_rng(42)
 
-    mtp_data = MTPData(dict_mtp)
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters
 
@@ -208,9 +204,9 @@ def test_species_coeffs(
     fitting_path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (fitting_path / "initial.mtp").exists():
         pytest.skip()
-    dict_mtp = read_mtp(fitting_path / "initial.mtp")
+    mtp_data = read_mtp(fitting_path / "initial.mtp")
     species = [29]
-    dict_mtp["species"] = species
+    mtp_data["species"] = species
     images = read_cfg(original_path / "training.cfg", index=":", species=species)[::100]
 
     setting = {
@@ -221,7 +217,6 @@ def test_species_coeffs(
 
     rng = np.random.default_rng(42)
 
-    mtp_data = MTPData(dict_mtp)
     optimized = ["radial_coeffs", "species_coeffs"]
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters

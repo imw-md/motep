@@ -19,7 +19,7 @@ class NumbaMTPEngine(EngineBase):
 
         self.update_neighbor_list(atoms)
 
-        mtp_data = self.dict_mtp
+        mtp_data = self.mtp_data
 
         alpha_moments_count = mtp_data["alpha_moments_count"]
         alpha_moment_mapping = mtp_data["alpha_moment_mapping"]
@@ -61,7 +61,7 @@ class NumbaMTPEngine(EngineBase):
             js = all_js[:, i]
             r_ijs = all_r_ijs[i]
             (number_of_js, _) = r_ijs.shape
-            jtypes = np.array([self.dict_mtp["species"][atoms.numbers[j]] for j in js])
+            jtypes = np.array([self.mtp_data["species"][atoms.numbers[j]] for j in js])
             r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=1))
             rb_values, rb_derivs = _nb_calc_radial_basis(
                 r_abs, itype, jtypes, radial_coeffs, scaling, min_dist, max_dist
