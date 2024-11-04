@@ -75,8 +75,6 @@ class NumbaMTPEngine(EngineBase):
         species_coeffs = mtp_data["species_coeffs"]
         moment_coeffs = mtp_data["moment_coeffs"]
 
-        assert len(alpha_index_times.shape) == 2
-
         number_of_atoms = len(atoms)
         max_number_of_js, all_js, all_r_ijs = self._calc_max_ijs(atoms)
         itypes = [mtp_data["species"][atoms.numbers[i]] for i in range(number_of_atoms)]
@@ -136,8 +134,6 @@ class NumbaMTPEngine(EngineBase):
         alpha_index_basic = mtp_data["alpha_index_basic"]
         alpha_index_times = mtp_data["alpha_index_times"]
         moment_coeffs = mtp_data["moment_coeffs"]
-
-        assert len(alpha_index_times.shape) == 2
 
         stress = np.zeros((3, 3))
         for i, itype in enumerate(itypes):

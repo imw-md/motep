@@ -57,6 +57,9 @@ def read_mtp(file: os.PathLike) -> MTPData:
                         if _ != ""
                     ]
                     data[key] = np.array(data[key])
+                    # force to be two-dimensional even if empty (for Level 2)
+                    if data[key].size == 0:
+                        data[key] = np.zeros((0, 4), dtype=int)
                 else:
                     data[key] = value.strip()
             elif line.strip() == "radial_coeffs":
