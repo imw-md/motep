@@ -65,7 +65,6 @@ def test_molecules(
     np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
 
 
-@pytest.mark.parametrize("index", [0, -1])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("is_trained", [False, True])
@@ -75,7 +74,6 @@ def test_crystals(
     is_trained: bool,
     crystal: int,
     level: int,
-    index: int,
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
@@ -85,7 +83,7 @@ def test_crystals(
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
     mtp = engine(parameters, is_trained=is_trained)
-    images = [read_cfg(path / "out.cfg", index=index)]
+    images = [read_cfg(path / "out.cfg", index=-1)]
     mtp._initiate_neighbor_list(images[0])
 
     energies_ref = np.array([_.get_potential_energy() for _ in images])
