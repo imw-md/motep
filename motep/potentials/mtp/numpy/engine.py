@@ -32,17 +32,10 @@ class Jac(dict):
 class NumpyMTPEngine(EngineBase):
     """MTP engine based on NumPy."""
 
-    def __init__(self, mtp_data: MTPData | None = None) -> None:
-        """Intialize the engine.
-
-        Parameters
-        ----------
-        mtp_data : :class:`motep.potentials.mtp.data.MTPData`
-            Parameters in the MLIP .mtp file.
-
-        """
+    def __init__(self, mtp_data: MTPData, **kwargs: dict) -> None:
+        """Intialize the engine."""
         self.rb = ChebyshevArrayRadialBasis(mtp_data)
-        super().__init__(mtp_data)
+        super().__init__(mtp_data, **kwargs)
 
     def update(self, mtp_data: MTPData) -> None:
         """Update MTP parameters."""
@@ -125,21 +118,7 @@ class NumpyMTPEngine(EngineBase):
         self.results["energy"] = self.results["energies"].sum()
         self.results["forces"] = forces
 
-        if atoms.cell.rank == 3:
-            volume = atoms.get_volume()
-            stress = (stress + stress.T) * 0.5  # symmetrize
-            stress /= volume
-            self.mbd.dbdeps += self.mbd.dbdeps.transpose(0, 2, 1)
-            self.mbd.dbdeps *= 0.5 / volume
-            self.mbd.ds_dcs += self.mbd.ds_dcs.swapaxes(-2, -1)
-            self.mbd.ds_dcs *= 0.5 / volume
-            axes = 0, 1, 2, 4, 3
-            self.rbd.dqdeps += self.rbd.dqdeps.transpose(axes)
-            self.rbd.dqdeps *= 0.5 / volume
-        else:
-            stress[:, :] = np.nan
-            self.mbd.dbdeps[:, :, :] = np.nan
-            self.rbd.dqdeps[:, :, :] = np.nan
+        self._symmetrize_stress(atoms, stress)
 
         self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
 

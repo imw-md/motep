@@ -151,8 +151,19 @@ import numpy as np
 #     return energy, gradient
 
 
-@nb.njit
-def _nb_forces_from_gradient(gradient, all_js, number_of_atoms, max_number_of_js):
+@nb.njit(
+    nb.float64[:, :](
+        nb.float64[:, :, :],
+        nb.int64[:, :],
+        nb.int64,
+    ),
+)
+def _nb_forces_from_gradient(
+    gradient: np.ndarray,
+    all_js: np.ndarray,
+    max_number_of_js: int,
+) -> np.ndarray:
+    number_of_atoms = gradient.shape[0]
     forces = np.zeros((number_of_atoms, 3))
     for i in range(number_of_atoms):
         for i_j in range(max_number_of_js):
@@ -207,6 +218,11 @@ def _nb_calc_radial_basis(
     return values, derivs
 
 
+@nb.njit(nb.float64[:, :](nb.float64[:, :], nb.float64[:]))
+def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
+    return r_ijs[:, :] / r_abs[:, None]
+
+
 @nb.njit
 def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
     number_of_js = r_unit.shape[0]
@@ -219,26 +235,91 @@ def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
 
 
 @nb.njit(
-    nb.float64[:, :](
-        nb.int64[:, :],
-        nb.int64[:],
+    (
         nb.float64[:],
+        nb.float64[:, :],
+        nb.float64[:, :, :],
+        nb.int64[:, :],
+        nb.float64[:, :],
+        nb.float64[:, :],
         nb.float64[:],
         nb.float64[:, :, :],
     ),
 )
-def _propagate_forward(
+def _calc_moment_basic(
+    r_abs,
+    r_unit,
+    r_unit_pows,
+    alpha_index_basic,
+    rb_values,
+    rb_derivs,
+    moment_components,
+    moment_jacobian,
+) -> None:
+    """Compute basic moment components and its jacobian wrt `r_ijs`."""
+    number_of_js = moment_jacobian.shape[1]
+    for j in range(number_of_js):
+        for aib_i, aib in enumerate(alpha_index_basic):
+            mu, xpow, ypow, zpow = aib
+            xyzpow = xpow + ypow + zpow
+            val = (
+                rb_values[mu, j]
+                * r_unit_pows[xpow, j, 0]
+                * r_unit_pows[ypow, j, 1]
+                * r_unit_pows[zpow, j, 2]
+            )
+            moment_components[aib_i] += val
+
+            for k in range(3):
+                moment_jacobian[aib_i, j, k] = (
+                    r_unit[j, k]
+                    * r_unit_pows[xpow, j, 0]
+                    * r_unit_pows[ypow, j, 1]
+                    * r_unit_pows[zpow, j, 2]
+                    * (rb_derivs[mu, j] - xyzpow * rb_values[mu, j] / r_abs[j])
+                )
+                if k == 0:
+                    moment_jacobian[aib_i, j, k] += (
+                        rb_values[mu, j]
+                        * (xpow * r_unit_pows[xpow - 1, j, 0])
+                        * r_unit_pows[ypow, j, 1]
+                        * r_unit_pows[zpow, j, 2]
+                        / r_abs[j]
+                    )
+                elif k == 1:
+                    moment_jacobian[aib_i, j, k] += (
+                        rb_values[mu, j]
+                        * r_unit_pows[xpow, j, 0]
+                        * (ypow * r_unit_pows[ypow - 1, j, 1])
+                        * r_unit_pows[zpow, j, 2]
+                        / r_abs[j]
+                    )
+                elif k == 2:
+                    moment_jacobian[aib_i, j, k] += (
+                        rb_values[mu, j]
+                        * r_unit_pows[xpow, j, 0]
+                        * r_unit_pows[ypow, j, 1]
+                        * (zpow * r_unit_pows[zpow - 1, j, 2])
+                        / r_abs[j]
+                    )
+
+
+@nb.njit(
+    (
+        nb.int64[:, :],
+        nb.float64[:],
+        nb.float64[:, :, :],
+    ),
+)
+def _calc_moment_times(
     alpha_index_times,
-    alpha_moment_mapping,
-    moment_coeffs,
     moment_components,
     moment_jacobian,
 ):
-    """Calculate gradients using the forward propagation."""
-    _, number_of_js, _ = moment_jacobian.shape
-    # contraction
+    number_of_js = moment_jacobian.shape[1]
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
+        moment_components[i3] += mult * moment_components[i1] * moment_components[i2]
         for j in range(number_of_js):
             for k in range(3):
                 moment_jacobian[i3, j, k] += mult * (
@@ -246,15 +327,35 @@ def _propagate_forward(
                     + moment_components[i1] * moment_jacobian[i2, j, k]
                 )
 
-    gradient = np.zeros((number_of_js, 3))
-    for basis_i, moment_i in enumerate(alpha_moment_mapping):
-        for j in range(number_of_js):
-            for k in range(3):
-                gradient[j, k] += (
-                    moment_coeffs[basis_i] * moment_jacobian[moment_i, j, k]
-                )
 
-    return gradient
+# @nb.njit(
+#     nb.float64[:, :](
+#         nb.int64[:, :],
+#         nb.int64[:],
+#         nb.float64[:],
+#         nb.float64[:],
+#         nb.float64[:, :, :],
+#     ),
+# )
+# def _propagate_forward(
+#     alpha_index_times,
+#     alpha_moment_mapping,
+#     moment_coeffs,
+#     moment_components,
+#     moment_jacobian,
+# ):
+#     """Calculate gradients using the forward propagation."""
+#     _calc_moment_times(alpha_index_times, moment_components, moment_jacobian)
+#     _, number_of_js, _ = moment_jacobian.shape
+#     gradient = np.zeros((number_of_js, 3))
+#     for basis_i, moment_i in enumerate(alpha_moment_mapping):
+#         for j in range(number_of_js):
+#             for k in range(3):
+#                 gradient[j, k] += (
+#                     moment_coeffs[basis_i] * moment_jacobian[moment_i, j, k]
+#                 )
+
+#     return gradient
 
 
 @nb.njit(
@@ -327,60 +428,22 @@ def _nb_calc_local_energy_and_gradient(
     moment_jacobian = np.zeros((alpha_moments_count, number_of_js, 3))
 
     # Precompute unit vectors
-    r_unit = np.empty((number_of_js, 3))
-    for j in range(number_of_js):
-        for k in range(3):
-            r_unit[j, k] = r_ijs[j, k] / r_abs[j]
+    r_unit = _calc_r_unit(r_ijs, r_abs)
 
     # Precompute powers
     max_pow = int(np.max(alpha_index_basic))
     r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
 
-    # Compute basic moment components and its jacobian wrt r_ijs
-    for j in range(number_of_js):
-        for aib_i, aib in enumerate(alpha_index_basic):
-            mu, xpow, ypow, zpow = aib
-            pow = xpow + ypow + zpow
-            val = (
-                rb_values[mu, j]
-                * r_unit_pows[xpow, j, 0]
-                * r_unit_pows[ypow, j, 1]
-                * r_unit_pows[zpow, j, 2]
-            )
-            moment_components[aib_i] += val
-
-            for k in range(3):
-                moment_jacobian[aib_i, j, k] = (
-                    r_unit[j, k]
-                    * r_unit_pows[xpow, j, 0]
-                    * r_unit_pows[ypow, j, 1]
-                    * r_unit_pows[zpow, j, 2]
-                    * (rb_derivs[mu, j] - pow * rb_values[mu, j] / r_abs[j])
-                )
-                if k == 0:
-                    moment_jacobian[aib_i, j, k] += (
-                        rb_values[mu, j]
-                        * (xpow * r_unit_pows[xpow - 1, j, 0])
-                        * r_unit_pows[ypow, j, 1]
-                        * r_unit_pows[zpow, j, 2]
-                        / r_abs[j]
-                    )
-                elif k == 1:
-                    moment_jacobian[aib_i, j, k] += (
-                        rb_values[mu, j]
-                        * r_unit_pows[xpow, j, 0]
-                        * (ypow * r_unit_pows[ypow - 1, j, 1])
-                        * r_unit_pows[zpow, j, 2]
-                        / r_abs[j]
-                    )
-                elif k == 2:
-                    moment_jacobian[aib_i, j, k] += (
-                        rb_values[mu, j]
-                        * r_unit_pows[xpow, j, 0]
-                        * r_unit_pows[ypow, j, 1]
-                        * (zpow * r_unit_pows[zpow - 1, j, 2])
-                        / r_abs[j]
-                    )
+    _calc_moment_basic(
+        r_abs,
+        r_unit,
+        r_unit_pows,
+        alpha_index_basic,
+        rb_values,
+        rb_derivs,
+        moment_components,
+        moment_jacobian,
+    )
 
     # For moments and energy:
     # Compute moment contraction components
@@ -392,14 +455,6 @@ def _nb_calc_local_energy_and_gradient(
     for basis_i, moment_i in enumerate(alpha_moment_mapping):
         energy += moment_coeffs[basis_i] * moment_components[moment_i]
 
-    # gradient = _propagate_forward(
-    #     alpha_index_times,
-    #     alpha_moment_mapping,
-    #     moment_coeffs,
-    #     moment_components,
-    #     moment_jacobian,
-    # )
-
     gradient = _propagate_backward(
         alpha_index_basic,
         alpha_index_times,
@@ -410,6 +465,62 @@ def _nb_calc_local_energy_and_gradient(
     )
 
     return energy, gradient
+
+
+@nb.njit(
+    nb.types.Tuple((nb.float64[:], nb.float64[:, :, :]))(
+        nb.float64[:],
+        nb.float64[:, :],
+        nb.float64[:, :],
+        nb.float64[:, :],
+        nb.int64,
+        nb.int64[:],
+        nb.int64[:, :],
+        nb.int64[:, :],
+    ),
+)
+def _nb_calc_moment(
+    r_abs: np.ndarray,
+    r_ijs: np.ndarray,
+    rb_values: np.ndarray,
+    rb_derivs: np.ndarray,
+    alpha_moments_count: np.int64,
+    alpha_moment_mapping: np.ndarray,
+    alpha_index_basic: np.ndarray,
+    alpha_index_times: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    (number_of_js,) = r_abs.shape
+    moment_components = np.zeros(alpha_moments_count)
+    moment_jacobian = np.zeros((alpha_moments_count, number_of_js, 3))
+
+    # Precompute unit vectors
+    r_unit = _calc_r_unit(r_ijs, r_abs)
+
+    # Precompute powers
+    max_pow = int(np.max(alpha_index_basic))
+    r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
+
+    _calc_moment_basic(
+        r_abs,
+        r_unit,
+        r_unit_pows,
+        alpha_index_basic,
+        rb_values,
+        rb_derivs,
+        moment_components,
+        moment_jacobian,
+    )
+
+    _calc_moment_times(
+        alpha_index_times,
+        moment_components,
+        moment_jacobian,
+    )
+
+    return (
+        moment_components[alpha_moment_mapping],
+        moment_jacobian[alpha_moment_mapping],
+    )
 
 
 #

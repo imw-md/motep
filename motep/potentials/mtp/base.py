@@ -96,20 +96,26 @@ class RadialBasisData:
 class EngineBase:
     """Engine to compute an MTP."""
 
-    def __init__(self, mtp_data: MTPData | None = None) -> None:
+    def __init__(
+        self,
+        mtp_data: MTPData,
+        *,
+        is_trained: bool = False,
+    ) -> None:
         """MLIP-2 MTP.
 
         Parameters
         ----------
         mtp_data : :class:`motep.potentials.mtp.data.MTPData`
             Parameters in the MLIP .mtp file.
+        is_trained : bool, default False
+            If True, basis data for training is computed and stored.
 
         """
-        self.mtp_data = MTPData()
-        if mtp_data is not None:
-            self.update(mtp_data)
+        self.update(mtp_data)
         self.results = {}
         self._neighbor_list = None
+        self._is_trained = is_trained
 
         # moment basis data
         self.mbd = MomentBasisData()
@@ -156,6 +162,23 @@ class EngineBase:
         pos_js = atoms.positions[indices_js] + offsets
         dist_vectors = pos_js - atoms.positions[index]
         return indices_js, dist_vectors
+
+    def _symmetrize_stress(self, atoms: Atoms, stress: np.ndarray) -> None:
+        if atoms.cell.rank == 3:
+            volume = atoms.get_volume()
+            stress += stress.T
+            stress *= 0.5 / volume
+            self.mbd.dbdeps += self.mbd.dbdeps.transpose(0, 2, 1)
+            self.mbd.dbdeps *= 0.5 / volume
+            self.mbd.ds_dcs += self.mbd.ds_dcs.swapaxes(-2, -1)
+            self.mbd.ds_dcs *= 0.5 / volume
+            axes = 0, 1, 2, 4, 3
+            self.rbd.dqdeps += self.rbd.dqdeps.transpose(axes)
+            self.rbd.dqdeps *= 0.5 / volume
+        else:
+            stress[:, :] = np.nan
+            self.mbd.dbdeps[:, :, :] = np.nan
+            self.rbd.dqdeps[:, :, :] = np.nan
 
 
 def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
