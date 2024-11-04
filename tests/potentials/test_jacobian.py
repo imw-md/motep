@@ -42,7 +42,7 @@ def test_jac_energy(
 
     jac_nmr = np.full_like(jac_anl[coeffs], np.nan)
 
-    mtp_data = copy.deepcopy(atoms.calc.engine.dict_mtp)
+    mtp_data = copy.deepcopy(atoms.calc.engine.mtp_data)
 
     for i in range(jac_nmr.size):
         orig = mtp_data[coeffs].flat[i]
@@ -84,7 +84,7 @@ def test_jac_forces(
 
     jac_nmr = np.full_like(jac_anl[coeffs], np.nan)
 
-    mtp_data = copy.deepcopy(atoms.calc.engine.dict_mtp)
+    mtp_data = copy.deepcopy(atoms.calc.engine.mtp_data)
 
     for indices, orig in np.ndenumerate(mtp_data[coeffs]):
         mtp_data[coeffs][indices] = orig + dx
@@ -124,7 +124,7 @@ def test_jac_stress(
 
     jac_nmr = np.full_like(jac_anl[coeffs], np.nan)
 
-    mtp_data = copy.deepcopy(atoms.calc.engine.dict_mtp)
+    mtp_data = copy.deepcopy(atoms.calc.engine.mtp_data)
 
     for indices, orig in np.ndenumerate(mtp_data[coeffs]):
         mtp_data[coeffs][indices] = orig + dx

@@ -15,7 +15,7 @@ from motep.potentials.mtp.data import MTPData
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
-@pytest.mark.parametrize("engine", ["numpy"])
+@pytest.mark.parametrize("engine", ["numpy", "numba"])
 def test_molecules(
     engine: str,
     molecule: int,
@@ -23,6 +23,8 @@ def test_molecules(
     data_path: pathlib.Path,
 ) -> None:
     """Test `LLSOptimizer` for molecules."""
+    if engine == "numba" and level == 2:
+        pytest.skip()
     original_path = data_path / f"original/molecules/{molecule}"
     fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (fitting_path / "initial.mtp").exists():
@@ -95,7 +97,7 @@ def test_molecules(
 @pytest.mark.parametrize("stress_times_volume", [False, True])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
-@pytest.mark.parametrize("engine", ["numpy"])
+@pytest.mark.parametrize("engine", ["numpy", "numba"])
 def test_crystals(
     *,
     engine: str,
@@ -105,11 +107,13 @@ def test_crystals(
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
+    if engine == "numba" and level == 2:
+        pytest.skip()
     original_path = data_path / f"original/crystals/{crystal}"
     fitting_path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (fitting_path / "initial.mtp").exists():
         pytest.skip()
-    dict_mtp = read_mtp(fitting_path / "initial.mtp")
+    mtp_data = read_mtp(fitting_path / "initial.mtp")
     images = read_cfg(original_path / "training.cfg", index=":")[::100]
 
     setting = {
@@ -123,7 +127,7 @@ def test_crystals(
 
     optimized = ["moment_coeffs"]
 
-    mtp_data = MTPData(dict_mtp)
+    mtp_data = MTPData(mtp_data)
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters
 
@@ -204,7 +208,7 @@ def test_species_coeffs(
     fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (fitting_path / "initial.mtp").exists():
         pytest.skip()
-    dict_mtp = read_mtp(fitting_path / "initial.mtp")
+    mtp_data = read_mtp(fitting_path / "initial.mtp")
     images = read_cfg(original_path / "training.cfg", index=":")
 
     setting = {
@@ -216,7 +220,7 @@ def test_species_coeffs(
     rng = np.random.default_rng(42)
 
     optimized = ["moment_coeffs", "species_coeffs"]
-    mtp_data = MTPData(dict_mtp)
+    mtp_data = MTPData(mtp_data)
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters
 

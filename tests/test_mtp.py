@@ -33,17 +33,15 @@ def get_scale(component: str, d: float) -> np.ndarray:
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize(
-    ("molecule", "species"),
-    [(762, {1: 0}), (291, {6: 0, 1: 1}), (14214, {9: 0, 1: 1}), (23208, {8: 0})],
-)
+@pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
+@pytest.mark.parametrize("is_trained", [False, True])
 @pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
 # @pytest.mark.parametrize("molecule", [762])
 def test_molecules(
-    molecule: int,
-    species: dict[int, int],
-    level: int,
     engine: Any,
+    is_trained: bool,
+    molecule: int,
+    level: int,
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
@@ -54,7 +52,7 @@ def test_molecules(
         pytest.skip()
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
-    mtp = engine(parameters)
+    mtp = engine(parameters, is_trained=is_trained)
     images = [read_cfg(path / "out.cfg", index=0)]
     mtp._initiate_neighbor_list(images[0])
 
@@ -71,17 +69,15 @@ def test_molecules(
 
 @pytest.mark.parametrize("index", [0, -1])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize(
-    ("crystal", "species"),
-    [("cubic", {29: 0}), ("noncubic", {29: 0})],
-)
+@pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
+@pytest.mark.parametrize("is_trained", [False, True])
 @pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
 def test_crystals(
+    engine: Any,
+    is_trained: bool,
     crystal: int,
-    species: dict[int, int],
     level: int,
     index: int,
-    engine: Any,
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
@@ -92,7 +88,7 @@ def test_crystals(
         pytest.skip()
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
-    mtp = engine(parameters)
+    mtp = engine(parameters, is_trained=is_trained)
     images = [read_cfg(path / "out.cfg", index=index)]
     mtp._initiate_neighbor_list(images[0])
 
@@ -114,16 +110,12 @@ def test_crystals(
 
 # @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize(
-    "molecule, species",
-    [(762, {1: 0}), (291, {6: 0, 1: 1}), (14214, {9: 0, 1: 1}), (23208, {8: 0})],
-)
+@pytest.mark.parametrize("molecule", [762, 291, 14214, 23028])
 @pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
 def test_forces(
-    molecule: int,
-    species: dict[int, int],
-    level: int,
     engine: Any,
+    molecule: int,
+    level: int,
     data_path: pathlib.Path,
 ) -> None:
     """Test if forces are consistent with finite-difference values."""
@@ -158,19 +150,13 @@ def test_forces(
 
 
 @pytest.mark.parametrize("component", ["xx", "yy", "zz", "yz", "zx", "xy"])
-@pytest.mark.parametrize("index", [0, -1])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize(
-    ("crystal", "species"),
-    [("cubic", {29: 0}), ("noncubic", {29: 0})],
-)
+@pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
 def test_stress(
-    crystal: int,
-    species: dict[int, int],
-    level: int,
     engine: Any,
-    index: int,
+    crystal: int,
+    level: int,
     component: str,
     data_path: pathlib.Path,
 ) -> None:
@@ -190,7 +176,7 @@ def test_stress(
     parameters = read_mtp(path / "pot.mtp")
     # parameters["species"] = species
     mtp = engine(parameters)
-    atoms_ref = read_cfg(path / "out.cfg", index=index)
+    atoms_ref = read_cfg(path / "out.cfg", index=-1)
     mtp._initiate_neighbor_list(atoms_ref)
 
     stress_ref = mtp.calculate(atoms_ref)[2]

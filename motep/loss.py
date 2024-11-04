@@ -324,7 +324,7 @@ class LossFunction(LossFunctionBase):
         self.engine = engine
         for atoms in self.images:
             targets = atoms.calc.results
-            atoms.calc = MTP(engine=self.engine, mtp_data=self.mtp_data)
+            atoms.calc = MTP(self.mtp_data, engine=self.engine, is_trained=True)
             atoms.calc.targets = targets
 
     def __call__(self, parameters: list[float]) -> float:

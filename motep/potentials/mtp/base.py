@@ -96,20 +96,26 @@ class RadialBasisData:
 class EngineBase:
     """Engine to compute an MTP."""
 
-    def __init__(self, dict_mtp: MTPData | None = None) -> None:
+    def __init__(
+        self,
+        mtp_data: MTPData,
+        *,
+        is_trained: bool = False,
+    ) -> None:
         """MLIP-2 MTP.
 
         Parameters
         ----------
-        dict_mtp : :class:`motep.potentials.mtp.data.MTPData`
+        mtp_data : :class:`motep.potentials.mtp.data.MTPData`
             Parameters in the MLIP .mtp file.
+        is_trained : bool, default False
+            If True, basis data for training is computed and stored.
 
         """
-        self.dict_mtp = MTPData()
-        if dict_mtp is not None:
-            self.update(dict_mtp)
+        self.update(mtp_data)
         self.results = {}
         self._neighbor_list = None
+        self._is_trained = is_trained
 
         # moment basis data
         self.mbd = MomentBasisData()
@@ -117,11 +123,11 @@ class EngineBase:
         # used for `Level2MTPOptimizer`
         self.rbd = RadialBasisData()
 
-    def update(self, dict_mtp: MTPData) -> None:
+    def update(self, mtp_data: MTPData) -> None:
         """Update MTP parameters."""
-        self.dict_mtp = dict_mtp
-        if "species" not in self.dict_mtp:
-            self.dict_mtp["species"] = list(range(self.dict_mtp["species_count"]))
+        self.mtp_data = mtp_data
+        if "species" not in self.mtp_data:
+            self.mtp_data["species"] = list(range(self.mtp_data["species_count"]))
 
     def update_neighbor_list(self, atoms: Atoms) -> None:
         """Update the ASE `PrimitiveNeighborList` object."""
@@ -133,7 +139,7 @@ class EngineBase:
     def _initiate_neighbor_list(self, atoms: Atoms) -> None:
         """Initialize the ASE `PrimitiveNeighborList` object."""
         self._neighbor_list = PrimitiveNeighborList(
-            cutoffs=[0.5 * self.dict_mtp["max_dist"]] * len(atoms),
+            cutoffs=[0.5 * self.mtp_data["max_dist"]] * len(atoms),
             skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
             self_interaction=False,  # Exclude [0, 0, 0]
             bothways=True,  # return both ij and ji
@@ -143,8 +149,8 @@ class EngineBase:
 
         natoms = len(atoms)
 
-        self.mbd.initialize(natoms, self.dict_mtp)
-        self.rbd.initialize(natoms, self.dict_mtp)
+        self.mbd.initialize(natoms, self.mtp_data)
+        self.rbd.initialize(natoms, self.mtp_data)
 
     def _get_distances(
         self,
@@ -156,6 +162,23 @@ class EngineBase:
         pos_js = atoms.positions[indices_js] + offsets
         dist_vectors = pos_js - atoms.positions[index]
         return indices_js, dist_vectors
+
+    def _symmetrize_stress(self, atoms: Atoms, stress: np.ndarray) -> None:
+        if atoms.cell.rank == 3:
+            volume = atoms.get_volume()
+            stress += stress.T
+            stress *= 0.5 / volume
+            self.mbd.dbdeps += self.mbd.dbdeps.transpose(0, 2, 1)
+            self.mbd.dbdeps *= 0.5 / volume
+            self.mbd.ds_dcs += self.mbd.ds_dcs.swapaxes(-2, -1)
+            self.mbd.ds_dcs *= 0.5 / volume
+            axes = 0, 1, 2, 4, 3
+            self.rbd.dqdeps += self.rbd.dqdeps.transpose(axes)
+            self.rbd.dqdeps *= 0.5 / volume
+        else:
+            stress[:, :] = np.nan
+            self.mbd.dbdeps[:, :, :] = np.nan
+            self.rbd.dqdeps[:, :, :] = np.nan
 
 
 def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):

@@ -63,7 +63,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
 
         coeffs, *_ = np.linalg.lstsq(matrix, vector, rcond=None)
 
-        # Update `dict_mtp` and `parameters`.
+        # Update `mtp_data` and `parameters`.
         parameters = self._update_parameters(coeffs)
 
         # Print the value of the loss function.
