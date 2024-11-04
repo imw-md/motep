@@ -111,10 +111,6 @@ class EngineBase:
         self.results = {}
         self._neighbor_list = None
 
-        self.energies = None
-        self.forces = None
-        self.stress = None
-
         # moment basis data
         self.mbd = MomentBasisData()
 
@@ -159,7 +155,7 @@ class EngineBase:
         offsets = self.precomputed_offsets[index]
         pos_js = atoms.positions[indices_js] + offsets
         dist_vectors = pos_js - atoms.positions[index]
-        return indices_js, dist_vectors.T
+        return indices_js, dist_vectors
 
 
 def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):

@@ -11,7 +11,7 @@ from ase import Atoms
 from motep.potentials.mtp import get_types
 from motep.potentials.mtp.base import EngineBase
 from motep.potentials.mtp.data import MTPData
-from motep.potentials.mtp.moment import MomentBasis
+from motep.potentials.mtp.numpy.moment import MomentBasis
 from motep.radial import ChebyshevArrayRadialBasis
 
 
@@ -58,16 +58,16 @@ class NumpyMTPEngine(EngineBase):
         jtypes: list[int],
         r_ijs: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
-        r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=0))
-        r_ijs_unit = r_ijs / r_abs
+        r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=1))
+        r_ijs_unit = (r_ijs.T / r_abs).T
 
         self.rb.calc_radial_part(r_abs, itype, jtypes)
         np.add.at(self.rbd.values[itype], jtypes, self.rb.basis_vs[:, :])
         for k, (j, jtype) in enumerate(zip(js, jtypes, strict=True)):
-            tmp = self.rb.basis_ds[k, :, None] * r_ijs_unit[:, k]
+            tmp = self.rb.basis_ds[k, :, None] * r_ijs_unit[k]
             self.rbd.dqdris[itype, jtype, :, :, i] -= tmp
             self.rbd.dqdris[itype, jtype, :, :, j] += tmp
-            self.rbd.dqdeps[itype, jtype] += tmp[:, :, None] * r_ijs[:, k]
+            self.rbd.dqdeps[itype, jtype] += tmp[:, :, None] * r_ijs[k]
         moment_basis = MomentBasis(self.dict_mtp)
         return moment_basis.calculate(itype, jtypes, r_ijs, r_abs, self.rb)
 
@@ -75,7 +75,7 @@ class NumpyMTPEngine(EngineBase):
         """Calculate properties of the given system."""
         self.update_neighbor_list(atoms)
         itypes = get_types(atoms, self.dict_mtp["species"])
-        self.energies = self.dict_mtp["species_coeffs"][itypes]
+        energies = self.dict_mtp["species_coeffs"][itypes]
 
         self.mbd.clean()
         self.rbd.clean()
@@ -95,7 +95,7 @@ class NumpyMTPEngine(EngineBase):
 
             self.mbd.values += basis_values
 
-            self.energies[i] += moment_coeffs @ basis_values
+            energies[i] += moment_coeffs @ basis_values
             # Calculate forces
             # Be careful that the derivative of the site energy of the j-th atom also
             # contributes to the forces on the i-th atom.
@@ -108,7 +108,7 @@ class NumpyMTPEngine(EngineBase):
             for k, j in enumerate(js):
                 self.mbd.dbdris[:, :, i] -= basis_jac_rs[:, :, k]
                 self.mbd.dbdris[:, :, j] += basis_jac_rs[:, :, k]
-            self.mbd.dbdeps += basis_jac_rs @ r_ijs.T
+            self.mbd.dbdeps += basis_jac_rs @ r_ijs
 
             self.mbd.de_dcs[itype] += (moment_coeffs * basis_jac_cs.T).sum(axis=-1).T
 
@@ -116,19 +116,19 @@ class NumpyMTPEngine(EngineBase):
             for k, j in enumerate(js):
                 self.mbd.ddedcs[itype, :, :, :, :, i] -= tmp[:, :, :, :, k]
                 self.mbd.ddedcs[itype, :, :, :, :, j] += tmp[:, :, :, :, k]
-            self.mbd.ds_dcs[itype] += tmp @ r_ijs.T
+            self.mbd.ds_dcs[itype] += tmp @ r_ijs
 
-        self.forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1) * -1.0
-        self.stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T
+        forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1) * -1.0
+        stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T
 
-        self.results["energies"] = self.energies
+        self.results["energies"] = energies
         self.results["energy"] = self.results["energies"].sum()
-        self.results["forces"] = self.forces
+        self.results["forces"] = forces
 
         if atoms.cell.rank == 3:
             volume = atoms.get_volume()
-            self.stress = (self.stress + self.stress.T) * 0.5  # symmetrize
-            self.stress /= volume
+            stress = (stress + stress.T) * 0.5  # symmetrize
+            stress /= volume
             self.mbd.dbdeps += self.mbd.dbdeps.transpose(0, 2, 1)
             self.mbd.dbdeps *= 0.5 / volume
             self.mbd.ds_dcs += self.mbd.ds_dcs.swapaxes(-2, -1)
@@ -137,11 +137,11 @@ class NumpyMTPEngine(EngineBase):
             self.rbd.dqdeps += self.rbd.dqdeps.transpose(axes)
             self.rbd.dqdeps *= 0.5 / volume
         else:
-            self.stress[:, :] = np.nan
+            stress[:, :] = np.nan
             self.mbd.dbdeps[:, :, :] = np.nan
             self.rbd.dqdeps[:, :, :] = np.nan
 
-        self.results["stress"] = self.stress.flat[[0, 4, 8, 5, 2, 1]]
+        self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return self.results["energy"], self.results["forces"], self.results["stress"]
 
@@ -190,34 +190,3 @@ class NumpyMTPEngine(EngineBase):
         jac["radial_coeffs"] = self.mbd.ds_dcs.copy()
 
         return jac
-
-
-#
-# Class for Numba implementation
-#
-class NumbaMTPEngine(EngineBase):
-    """MTP Engine based on Numba."""
-
-    def calculate(self, atoms: Atoms):
-        self.update_neighbor_list(atoms)
-        return self.numba_calc_energy_and_forces(atoms)
-
-    def numba_calc_energy_and_forces(self, atoms):
-        from motep.potentials.mtp.numba import numba_calc_energy_and_forces
-
-        mlip_params = self.dict_mtp
-        energy, forces, stress = numba_calc_energy_and_forces(
-            self,
-            atoms,
-            mlip_params["alpha_moments_count"],
-            mlip_params["alpha_moment_mapping"],
-            mlip_params["alpha_index_basic"],
-            mlip_params["alpha_index_times"],
-            mlip_params["scaling"],
-            mlip_params["min_dist"],
-            mlip_params["max_dist"],
-            mlip_params["species_coeffs"],
-            mlip_params["moment_coeffs"],
-            mlip_params["radial_coeffs"],
-        )
-        return energy, forces, stress
