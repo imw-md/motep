@@ -44,10 +44,10 @@ class MomentBasisData:
         asm = mtp_data["alpha_scalar_moments"]
 
         self.values = np.full((asm), np.nan)
-        self.dbdris = np.full((asm, 3, natoms), np.nan)
+        self.dbdris = np.full((asm, natoms, 3), np.nan)
         self.dbdeps = np.full((asm, 3, 3), np.nan)
         self.de_dcs = np.full((spc, spc, rfc, rbs), np.nan)
-        self.ddedcs = np.full((spc, spc, rfc, rbs, 3, natoms), np.nan)
+        self.ddedcs = np.full((spc, spc, rfc, rbs, natoms, 3), np.nan)
         self.ds_dcs = np.full((spc, spc, rfc, rbs, 3, 3), np.nan)
 
     def clean(self) -> None:

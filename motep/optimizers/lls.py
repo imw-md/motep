@@ -214,7 +214,9 @@ class LLSOptimizer(LLSOptimizerBase):
         images = loss.images
         setting = loss.setting
         basis_values = np.array([atoms.calc.engine.mbd.values for atoms in images])
-        basis_dbdris = np.vstack([atoms.calc.engine.mbd.dbdris.T for atoms in images])
+        basis_dbdris = np.vstack(
+            [atoms.calc.engine.mbd.dbdris.transpose(1, 2, 0) for atoms in images],
+        )
         basis_dbdris = basis_dbdris.reshape((-1, mtp_data["alpha_scalar_moments"]))
         tmp = []
         if "energy" in self.minimized:
