@@ -93,7 +93,7 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
         values[0] = 1.0
         values[1] = s
         derivs[0] = 0.0
-        derivs[1] = 2.0 / (max_dist - min_dist)
+        derivs[1] = d
         for i in range(2, radial_basis_size):
             values[i] = 2.0 * s * values[i - 1] - values[i - 2]
             derivs[i] = 2.0 * (d * values[i - 1] + s * derivs[i - 1]) - derivs[i - 2]
