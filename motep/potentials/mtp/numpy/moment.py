@@ -114,15 +114,27 @@ class MomentBasis:
             moment_values,
             moment_jac_rs,
             moment_jac_cs,
-            moment_jac_rc,
             alpha_index_times,
+        )
+
+        moment_coeffs = self.mtp_data["moment_coeffs"]
+        dedcs = (moment_jac_cs[alpha_moment_mapping].T @ moment_coeffs).T
+
+        dgdcs = _calc_site_energy_jacobian(
+            alpha_index_times,
+            alpha_moment_mapping,
+            moment_coeffs,
+            moment_values,
+            moment_jac_rs,
+            moment_jac_cs,
+            moment_jac_rc,
         )
 
         return (
             moment_values[alpha_moment_mapping],
             moment_jac_rs[alpha_moment_mapping],
-            moment_jac_cs[alpha_moment_mapping],
-            moment_jac_rc[alpha_moment_mapping],
+            dedcs,
+            dgdcs,
         )
 
 
@@ -138,7 +150,6 @@ def _contract_moments(
     moment_values: npt.NDArray[np.float64],
     moment_jac_rs: npt.NDArray[np.float64],
     moment_jac_cs: npt.NDArray[np.float64],
-    moment_jac_rc: npt.NDArray[np.float64],
     alpha_index_times: npt.NDArray[np.int64],
 ) -> None:
     """Compute contractions of moments."""
@@ -156,9 +167,35 @@ def _contract_moments(
             + moment_values[i1] * moment_jac_cs[i2]
         )
 
-        moment_jac_rc[i3] += mult * (
-            moment_jac_rc[i1] * moment_values[i2]
-            + moment_jac_rs[i1] * moment_jac_cs[i2][..., None, None]
-            + moment_jac_cs[i1][..., None, None] * moment_jac_rs[i2]
-            + moment_values[i1] * moment_jac_rc[i2]
-        )
+
+def _calc_site_energy_jacobian(
+    alpha_index_times: np.ndarray,
+    alpha_moment_mapping: np.ndarray,
+    moment_coeffs: np.ndarray,
+    moment_values: np.ndarray,
+    moment_jac_rs: np.ndarray,
+    moment_jac_cs: np.ndarray,
+    moment_jac_rc: np.ndarray,
+) -> np.ndarray:
+    """Calculate Jacobian of site energy gradients to radial basis coefficients.
+
+    Returns
+    -------
+    dgdcs : np.ndarray
+        d(dV/dr)/dc.
+
+    """
+    tmp0 = np.zeros_like(moment_values)
+    tmp1 = np.zeros_like(moment_jac_rs)
+    tmp0[alpha_moment_mapping] = moment_coeffs  # dV/dB
+    for ait in alpha_index_times[::-1]:
+        i1, i2, mult, i3 = ait
+        tmp0[i1] += mult * tmp0[i3] * moment_values[i2]
+        tmp0[i2] += mult * tmp0[i3] * moment_values[i1]
+    for ait in alpha_index_times:
+        i1, i2, mult, i3 = ait
+        tmp1[i1] += mult * tmp0[i3] * moment_jac_rs[i2]
+        tmp1[i2] += mult * tmp0[i3] * moment_jac_rs[i1]
+    dgdcs = (moment_jac_rc.T @ tmp0).T
+    dgdcs += (moment_jac_cs[:, ..., None, None] * tmp1[:, None, None, None]).sum(axis=0)
+    return dgdcs

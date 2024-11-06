@@ -78,7 +78,7 @@ class NumpyMTPEngine(EngineBase):
         for i, itype in enumerate(itypes):
             js, r_ijs = self._get_distances(atoms, i)
             jtypes = [self.mtp_data["species"].index(atoms.numbers[j]) for j in js]
-            basis_values, basis_jac_rs, basis_jac_cs, basis_jac_rc = self._calc_basis(
+            basis_values, basis_jac_rs, dedcs, dgdcs = self._calc_basis(
                 i,
                 itype,
                 js,
@@ -103,13 +103,12 @@ class NumpyMTPEngine(EngineBase):
                 self.mbd.dbdris[:, j] += basis_jac_rs[:, k]
             self.mbd.dbdeps += r_ijs.T @ basis_jac_rs
 
-            self.mbd.de_dcs[itype] += (moment_coeffs * basis_jac_cs.T).sum(axis=-1).T
+            self.mbd.de_dcs[itype] += dedcs
 
-            tmp = (moment_coeffs * basis_jac_rc.T).sum(axis=-1).T
             for k, j in enumerate(js):
-                self.mbd.ddedcs[itype, :, :, :, i] -= tmp[:, :, :, k]
-                self.mbd.ddedcs[itype, :, :, :, j] += tmp[:, :, :, k]
-            self.mbd.ds_dcs[itype] += r_ijs.T @ tmp
+                self.mbd.ddedcs[itype, :, :, :, i] -= dgdcs[:, :, :, k]
+                self.mbd.ddedcs[itype, :, :, :, j] += dgdcs[:, :, :, k]
+            self.mbd.ds_dcs[itype] += r_ijs.T @ dgdcs
 
         forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1).T * -1.0
         stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T
