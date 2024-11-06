@@ -272,7 +272,6 @@ def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
     (
         nb.float64[:],
         nb.float64[:, :],
-        nb.float64[:, :, :],
         nb.int64[:, :],
         nb.float64[:, :],
         nb.float64[:, :],
@@ -282,8 +281,7 @@ def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
 )
 def _calc_moment_basic(
     r_abs,
-    r_unit,
-    r_unit_pows,
+    r_ijs,
     alpha_index_basic,
     rb_values,
     rb_derivs,
@@ -291,6 +289,13 @@ def _calc_moment_basic(
     moment_jacobian,
 ) -> None:
     """Compute basic moment components and its jacobian wrt `r_ijs`."""
+    # Precompute unit vectors
+    r_unit = _calc_r_unit(r_ijs, r_abs)
+
+    # Precompute powers
+    max_pow = int(np.max(alpha_index_basic))
+    r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
+
     number_of_js = moment_jacobian.shape[1]
     for j in range(number_of_js):
         for aib_i, aib in enumerate(alpha_index_basic):
@@ -456,17 +461,9 @@ def _nb_calc_local_energy_and_gradient(
     moment_components = np.zeros(alpha_moments_count)
     moment_jacobian = np.zeros((alpha_moments_count, number_of_js, 3))
 
-    # Precompute unit vectors
-    r_unit = _calc_r_unit(r_ijs, r_abs)
-
-    # Precompute powers
-    max_pow = int(np.max(alpha_index_basic))
-    r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
-
     _calc_moment_basic(
         r_abs,
-        r_unit,
-        r_unit_pows,
+        r_ijs,
         alpha_index_basic,
         rb_values,
         rb_derivs,
@@ -522,17 +519,9 @@ def _nb_calc_moment(
     moment_components = np.zeros(alpha_moments_count)
     moment_jacobian = np.zeros((alpha_moments_count, number_of_js, 3))
 
-    # Precompute unit vectors
-    r_unit = _calc_r_unit(r_ijs, r_abs)
-
-    # Precompute powers
-    max_pow = int(np.max(alpha_index_basic))
-    r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
-
     _calc_moment_basic(
         r_abs,
-        r_unit,
-        r_unit_pows,
+        r_ijs,
         alpha_index_basic,
         rb_values,
         rb_derivs,
