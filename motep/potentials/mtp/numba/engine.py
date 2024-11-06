@@ -22,26 +22,6 @@ class NumbaMTPEngine(EngineBase):
         super().__init__(*args, **kwargs)
         self.calculate = self._calc_train if self._is_trained else self._calc_run
 
-    def _calc_radial_basis(
-        self,
-        r_abs: np.ndarray,
-        itype,
-        jtypes,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        scaling = self.mtp_data["scaling"]
-        min_dist = self.mtp_data["min_dist"]
-        max_dist = self.mtp_data["max_dist"]
-        radial_coeffs = self.mtp_data["radial_coeffs"]
-        return _nb_calc_radial_funcs(
-            r_abs,
-            itype,
-            jtypes,
-            radial_coeffs,
-            scaling,
-            min_dist,
-            max_dist,
-        )
-
     def _calc_max_ijs(self, atoms: Atoms) -> tuple:
         # TODO: precompute distances and send in indices.
         # See also jax implementation of full tensor version
@@ -82,7 +62,15 @@ class NumbaMTPEngine(EngineBase):
             (number_of_js, _) = r_ijs.shape
             jtypes = np.array([self.mtp_data["species"][atoms.numbers[j]] for j in js])
             r_abs = _nb_linalg_norm(r_ijs)
-            rb_values, rb_derivs = self._calc_radial_basis(r_abs, itype, jtypes)
+            rb_values, rb_derivs = _nb_calc_radial_funcs(
+                r_abs,
+                itype,
+                jtypes,
+                mtp_data["radial_coeffs"],
+                mtp_data["scaling"],
+                mtp_data["min_dist"],
+                mtp_data["max_dist"],
+            )
             local_energy, local_gradient = _nb_calc_local_energy_and_gradient(
                 r_ijs,
                 r_abs,
@@ -130,7 +118,15 @@ class NumbaMTPEngine(EngineBase):
             js, r_ijs = self._get_distances(atoms, i)
             jtypes = np.array([self.mtp_data["species"][atoms.numbers[j]] for j in js])
             r_abs = _nb_linalg_norm(r_ijs)
-            rb_values, rb_derivs = self._calc_radial_basis(r_abs, itype, jtypes)
+            rb_values, rb_derivs = _nb_calc_radial_funcs(
+                r_abs,
+                itype,
+                jtypes,
+                mtp_data["radial_coeffs"],
+                mtp_data["scaling"],
+                mtp_data["min_dist"],
+                mtp_data["max_dist"],
+            )
             basis_values, basis_jac_rs = _nb_calc_moment(
                 r_abs,
                 r_ijs,
