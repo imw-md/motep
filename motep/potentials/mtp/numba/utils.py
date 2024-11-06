@@ -312,30 +312,30 @@ def _calc_moment_basic(
                     * mult0
                     * (rb_derivs[mu, j] - xyzpow * rb_values[mu, j] / r_abs[j])
                 )
-                if k == 0:
-                    moment_jacobian[aib_i, j, k] += (
-                        rb_values[mu, j]
-                        * (xpow * r_unit_pows[xpow - 1, j, 0])
-                        * r_unit_pows[ypow, j, 1]
-                        * r_unit_pows[zpow, j, 2]
-                        / r_abs[j]
-                    )
-                elif k == 1:
-                    moment_jacobian[aib_i, j, k] += (
-                        rb_values[mu, j]
-                        * r_unit_pows[xpow, j, 0]
-                        * (ypow * r_unit_pows[ypow - 1, j, 1])
-                        * r_unit_pows[zpow, j, 2]
-                        / r_abs[j]
-                    )
-                elif k == 2:
-                    moment_jacobian[aib_i, j, k] += (
-                        rb_values[mu, j]
-                        * r_unit_pows[xpow, j, 0]
-                        * r_unit_pows[ypow, j, 1]
-                        * (zpow * r_unit_pows[zpow - 1, j, 2])
-                        / r_abs[j]
-                    )
+            if xpow != 0:
+                moment_jacobian[aib_i, j, 0] += (
+                    rb_values[mu, j]
+                    * (xpow * r_unit_pows[xpow - 1, j, 0])
+                    * r_unit_pows[ypow, j, 1]
+                    * r_unit_pows[zpow, j, 2]
+                    / r_abs[j]
+                )
+            if ypow != 0:
+                moment_jacobian[aib_i, j, 1] += (
+                    rb_values[mu, j]
+                    * r_unit_pows[xpow, j, 0]
+                    * (ypow * r_unit_pows[ypow - 1, j, 1])
+                    * r_unit_pows[zpow, j, 2]
+                    / r_abs[j]
+                )
+            if zpow != 0:
+                moment_jacobian[aib_i, j, 2] += (
+                    rb_values[mu, j]
+                    * r_unit_pows[xpow, j, 0]
+                    * r_unit_pows[ypow, j, 1]
+                    * (zpow * r_unit_pows[zpow - 1, j, 2])
+                    / r_abs[j]
+                )
 
 
 @nb.njit(
