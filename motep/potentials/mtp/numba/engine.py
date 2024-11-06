@@ -69,13 +69,6 @@ class NumbaMTPEngine(EngineBase):
 
         mtp_data = self.mtp_data
 
-        alpha_moments_count = mtp_data["alpha_moments_count"]
-        alpha_moment_mapping = mtp_data["alpha_moment_mapping"]
-        alpha_index_basic = mtp_data["alpha_index_basic"]
-        alpha_index_times = mtp_data["alpha_index_times"]
-        species_coeffs = mtp_data["species_coeffs"]
-        moment_coeffs = mtp_data["moment_coeffs"]
-
         number_of_atoms = len(atoms)
         max_number_of_js, all_js, all_r_ijs = self._calc_max_ijs(atoms)
         itypes = [mtp_data["species"][atoms.numbers[i]] for i in range(number_of_atoms)]
@@ -95,13 +88,13 @@ class NumbaMTPEngine(EngineBase):
                 r_abs,
                 rb_values,
                 rb_derivs,
-                alpha_moments_count,
-                alpha_moment_mapping,
-                alpha_index_basic,
-                alpha_index_times,
+                mtp_data["alpha_moments_count"],
+                mtp_data["alpha_moment_mapping"],
+                mtp_data["alpha_index_basic"],
+                mtp_data["alpha_index_times"],
                 itype,
-                species_coeffs,
-                moment_coeffs,
+                mtp_data["species_coeffs"],
+                mtp_data["moment_coeffs"],
             )
             energy += local_energy
             stress += r_ijs.T @ local_gradient
@@ -130,10 +123,6 @@ class NumbaMTPEngine(EngineBase):
         self.mbd.clean()
         self.rbd.clean()
 
-        alpha_moments_count = mtp_data["alpha_moments_count"]
-        alpha_moment_mapping = mtp_data["alpha_moment_mapping"]
-        alpha_index_basic = mtp_data["alpha_index_basic"]
-        alpha_index_times = mtp_data["alpha_index_times"]
         moment_coeffs = mtp_data["moment_coeffs"]
 
         stress = np.zeros((3, 3))
@@ -147,10 +136,10 @@ class NumbaMTPEngine(EngineBase):
                 r_ijs,
                 rb_values,
                 rb_derivs,
-                alpha_moments_count,
-                alpha_moment_mapping,
-                alpha_index_basic,
-                alpha_index_times,
+                mtp_data["alpha_moments_count"],
+                mtp_data["alpha_moment_mapping"],
+                mtp_data["alpha_index_basic"],
+                mtp_data["alpha_index_times"],
             )
 
             self.mbd.values += basis_values
