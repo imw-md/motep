@@ -2,6 +2,11 @@ import numba as nb
 import numpy as np
 
 
+@nb.njit
+def _nb_linalg_norm(r_ijs: np.ndarray) -> np.ndarray:
+    return np.sqrt((r_ijs**2).sum(axis=1))
+
+
 #
 # The below implementation is from some reason slightly slower up to level 10 for larger systems.
 # This should be tested again for higher levels

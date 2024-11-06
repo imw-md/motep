@@ -10,6 +10,7 @@ from .utils import (
     _nb_calc_moment,
     _nb_calc_radial_basis,
     _nb_forces_from_gradient,
+    _nb_linalg_norm,
 )
 
 
@@ -87,7 +88,7 @@ class NumbaMTPEngine(EngineBase):
             r_ijs = all_r_ijs[i]
             (number_of_js, _) = r_ijs.shape
             jtypes = np.array([self.mtp_data["species"][atoms.numbers[j]] for j in js])
-            r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=1))
+            r_abs = _nb_linalg_norm(r_ijs)
             rb_values, rb_derivs = self._calc_radial_basis(r_abs, itype, jtypes)
             local_energy, local_gradient = _nb_calc_local_energy_and_gradient(
                 r_ijs,
@@ -139,7 +140,7 @@ class NumbaMTPEngine(EngineBase):
         for i, itype in enumerate(itypes):
             js, r_ijs = self._get_distances(atoms, i)
             jtypes = np.array([self.mtp_data["species"][atoms.numbers[j]] for j in js])
-            r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=1))
+            r_abs = _nb_linalg_norm(r_ijs)
             rb_values, rb_derivs = self._calc_radial_basis(r_abs, itype, jtypes)
             basis_values, basis_jac_rs = _nb_calc_moment(
                 r_abs,
