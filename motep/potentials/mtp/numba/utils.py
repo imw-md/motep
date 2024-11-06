@@ -296,20 +296,15 @@ def _calc_moment_basic(
         for aib_i, aib in enumerate(alpha_index_basic):
             mu, xpow, ypow, zpow = aib
             xyzpow = xpow + ypow + zpow
-            val = (
-                rb_values[mu, j]
-                * r_unit_pows[xpow, j, 0]
-                * r_unit_pows[ypow, j, 1]
-                * r_unit_pows[zpow, j, 2]
-            )
-            moment_components[aib_i] += val
-
+            mult0 = 1.0
+            mult0 *= r_unit_pows[xpow, j, 0]
+            mult0 *= r_unit_pows[ypow, j, 1]
+            mult0 *= r_unit_pows[zpow, j, 2]
+            moment_components[aib_i] += rb_values[mu, j] * mult0
             for k in range(3):
                 moment_jacobian[aib_i, j, k] = (
                     r_unit[j, k]
-                    * r_unit_pows[xpow, j, 0]
-                    * r_unit_pows[ypow, j, 1]
-                    * r_unit_pows[zpow, j, 2]
+                    * mult0
                     * (rb_derivs[mu, j] - xyzpow * rb_values[mu, j] / r_abs[j])
                 )
                 if k == 0:
