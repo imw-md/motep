@@ -44,11 +44,11 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
     ----------
     basis_vs : npt.NDArray[np.float64]
         Values of the basis functions multiplied by the smoothing funciton
-        with the shape of (neighbors, radial_basis_size).
+        with the shape of (radial_basis_size, neighbors).
         This is T(r) * (R_cut - r)^2 in Eq. (4) in [Podryabinkin_JCP_2023_MLIP]_.
     basis_ds : npt.NDArray[np.float64]
         Derivatives of the basis functions multiplied by the smoothing funciton
-        with the shape of (neighbors, radial_basis_size).
+        with the shape of (radial_basis_size, neighbors).
 
     .. [Podryabinkin_JCP_2023_MLIP]
           E. Podryabinkin, K. Garifullin, A. Shapeev, and I. Novikov,
@@ -98,7 +98,7 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
             values[i] = 2.0 * s * values[i - 1] - values[i - 2]
             derivs[i] = 2.0 * (d * values[i - 1] + s * derivs[i - 1]) - derivs[i - 2]
 
-        return values.T, derivs.T
+        return values, derivs
 
     def update_coeffs(self, coeffs: npt.NDArray[np.float64]) -> None:
         """Update radial basis coefficients."""
@@ -135,15 +135,15 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
 
         vs0, ds0 = self.vander(r_abs)
 
-        self.basis_vs = vs0 * smooth_values[:, None]
-        self.basis_ds = ds0 * smooth_values[:, None] + vs0 * smooth_derivs[:, None]
+        self.basis_vs = vs0 * smooth_values
+        self.basis_ds = ds0 * smooth_values + vs0 * smooth_derivs
 
         radial_part_vs = np.sum(
-            self.basis_vs[:, None, :] * self.coeffs[itype, jtypes],
+            self.basis_vs.T[:, None, :] * self.coeffs[itype, jtypes],
             axis=-1,
         ).T
         radial_part_ds = np.sum(
-            self.basis_ds[:, None, :] * self.coeffs[itype, jtypes],
+            self.basis_ds.T[:, None, :] * self.coeffs[itype, jtypes],
             axis=-1,
         ).T
 
