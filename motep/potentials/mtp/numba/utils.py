@@ -297,10 +297,10 @@ def _calc_moment_basic(
     r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
 
     number_of_js = moment_jacobian.shape[1]
-    for j in range(number_of_js):
-        for aib_i, aib in enumerate(alpha_index_basic):
-            mu, xpow, ypow, zpow = aib
-            xyzpow = xpow + ypow + zpow
+    for aib_i, aib in enumerate(alpha_index_basic):
+        mu, xpow, ypow, zpow = aib
+        xyzpow = xpow + ypow + zpow
+        for j in range(number_of_js):
             mult0 = 1.0
             mult0 *= r_unit_pows[xpow, j, 0]
             mult0 *= r_unit_pows[ypow, j, 1]
