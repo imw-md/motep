@@ -8,7 +8,7 @@ from motep.potentials.mtp.base import EngineBase
 from .utils import (
     _nb_calc_local_energy_and_gradient,
     _nb_calc_moment,
-    _nb_calc_radial_basis,
+    _nb_calc_radial_funcs,
     _nb_forces_from_gradient,
     _nb_linalg_norm,
 )
@@ -32,7 +32,7 @@ class NumbaMTPEngine(EngineBase):
         min_dist = self.mtp_data["min_dist"]
         max_dist = self.mtp_data["max_dist"]
         radial_coeffs = self.mtp_data["radial_coeffs"]
-        return _nb_calc_radial_basis(
+        return _nb_calc_radial_funcs(
             r_abs,
             itype,
             jtypes,
