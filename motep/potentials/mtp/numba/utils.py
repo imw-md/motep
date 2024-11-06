@@ -1,5 +1,12 @@
+from typing import Any
+
 import numba as nb
 import numpy as np
+
+
+@nb.njit
+def _nb_linalg_norm(r_ijs: np.ndarray) -> np.ndarray:
+    return np.sqrt((r_ijs**2).sum(axis=1))
 
 
 #
@@ -194,28 +201,55 @@ def _nb_chebyshev(r, number_of_terms, min_dist, max_dist):
 
 @nb.njit
 def _nb_calc_radial_basis(
-    r_abs, itype, jtypes, radial_coeffs, scaling, min_dist, max_dist
-):
-    (nrs,) = r_abs.shape
-    _, _, nmu, rb_size = radial_coeffs.shape
-    values = np.zeros((nmu, nrs))
-    derivs = np.zeros((nmu, nrs))
-    for j in range(nrs):
-        is_within_cutoff = r_abs[j] < max_dist
-        # The below is for the "full_array" implementation
-        # is_within_cutoff = 0 < r_abs[j] and r_abs[j] < max_dist
-        if is_within_cutoff:
-            smoothing = (max_dist - r_abs[j]) ** 2
-            smooth_deriv = -2 * (max_dist - r_abs[j])
-            rb_values, rb_derivs = _nb_chebyshev(r_abs[j], rb_size, min_dist, max_dist)
-            for i_mu in range(nmu):
-                for i_rb in range(rb_size):
-                    coeffs = scaling * radial_coeffs[itype, jtypes[j], i_mu, i_rb]
-                    values[i_mu, j] += coeffs * rb_values[i_rb] * smoothing
-                    derivs[i_mu, j] += coeffs * (
-                        rb_derivs[i_rb] * smoothing + rb_values[i_rb] * smooth_deriv
-                    )
+    r_abs: np.ndarray[Any, np.float64],
+    radial_basis_size: np.int64,
+    scaling: np.float64,
+    min_dist: np.float64,
+    max_dist: np.float64,
+) -> tuple[np.ndarray[Any, np.float64], np.ndarray[Any, np.float64]]:
+    """Calculate radial basis values."""
+    number_of_neighbors = r_abs.size
+    values = np.zeros((number_of_neighbors, radial_basis_size))
+    derivs = np.zeros((number_of_neighbors, radial_basis_size))
+    for j in range(number_of_neighbors):
+        if r_abs[j] < max_dist:
+            smooth_value = scaling * (max_dist - r_abs[j]) ** 2
+            smooth_deriv = -2.0 * scaling * (max_dist - r_abs[j])
+            vs0, ds0 = _nb_chebyshev(r_abs[j], radial_basis_size, min_dist, max_dist)
+            for k in range(radial_basis_size):
+                values[j, k] = vs0[k] * smooth_value
+                derivs[j, k] = ds0[k] * smooth_value + vs0[k] * smooth_deriv
     return values, derivs
+
+
+@nb.njit
+def _nb_calc_radial_funcs(
+    r_abs: np.ndarray[Any, np.float64],
+    itype: np.int64,
+    jtypes: np.ndarray[Any, np.int64],
+    radial_coeffs: np.ndarray,
+    scaling: np.float64,
+    min_dist: np.float64,
+    max_dist: np.float64,
+) -> tuple[np.ndarray[Any, np.float64], np.ndarray[Any, np.float64]]:
+    """Calculate radial parts."""
+    _, _, radial_funcs_count, radial_basis_size = radial_coeffs.shape
+    values, derivs = _nb_calc_radial_basis(
+        r_abs,
+        radial_basis_size,
+        scaling,
+        min_dist,
+        max_dist,
+    )
+    radial_part_vs = np.zeros((radial_funcs_count, r_abs.size))
+    radial_part_ds = np.zeros((radial_funcs_count, r_abs.size))
+    for j in range(r_abs.size):
+        for i_mu in range(radial_funcs_count):
+            for i_rb in range(radial_basis_size):
+                c = radial_coeffs[itype, jtypes[j], i_mu, i_rb]
+                radial_part_vs[i_mu, j] += c * values[j, i_rb]
+                radial_part_ds[i_mu, j] += c * derivs[j, i_rb]
+    return radial_part_vs, radial_part_ds
 
 
 @nb.njit(nb.float64[:, :](nb.float64[:, :], nb.float64[:]))
@@ -238,7 +272,6 @@ def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
     (
         nb.float64[:],
         nb.float64[:, :],
-        nb.float64[:, :, :],
         nb.int64[:, :],
         nb.float64[:, :],
         nb.float64[:, :],
@@ -248,8 +281,7 @@ def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
 )
 def _calc_moment_basic(
     r_abs,
-    r_unit,
-    r_unit_pows,
+    r_ijs,
     alpha_index_basic,
     rb_values,
     rb_derivs,
@@ -257,51 +289,53 @@ def _calc_moment_basic(
     moment_jacobian,
 ) -> None:
     """Compute basic moment components and its jacobian wrt `r_ijs`."""
-    number_of_js = moment_jacobian.shape[1]
-    for j in range(number_of_js):
-        for aib_i, aib in enumerate(alpha_index_basic):
-            mu, xpow, ypow, zpow = aib
-            xyzpow = xpow + ypow + zpow
-            val = (
-                rb_values[mu, j]
-                * r_unit_pows[xpow, j, 0]
-                * r_unit_pows[ypow, j, 1]
-                * r_unit_pows[zpow, j, 2]
-            )
-            moment_components[aib_i] += val
+    # Precompute unit vectors
+    r_unit = _calc_r_unit(r_ijs, r_abs)
 
+    # Precompute powers
+    max_pow = int(np.max(alpha_index_basic))
+    r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
+
+    number_of_js = moment_jacobian.shape[1]
+    for aib_i, aib in enumerate(alpha_index_basic):
+        mu, xpow, ypow, zpow = aib
+        xyzpow = xpow + ypow + zpow
+        for j in range(number_of_js):
+            mult0 = 1.0
+            mult0 *= r_unit_pows[xpow, j, 0]
+            mult0 *= r_unit_pows[ypow, j, 1]
+            mult0 *= r_unit_pows[zpow, j, 2]
+            moment_components[aib_i] += rb_values[mu, j] * mult0
             for k in range(3):
                 moment_jacobian[aib_i, j, k] = (
                     r_unit[j, k]
-                    * r_unit_pows[xpow, j, 0]
-                    * r_unit_pows[ypow, j, 1]
-                    * r_unit_pows[zpow, j, 2]
+                    * mult0
                     * (rb_derivs[mu, j] - xyzpow * rb_values[mu, j] / r_abs[j])
                 )
-                if k == 0:
-                    moment_jacobian[aib_i, j, k] += (
-                        rb_values[mu, j]
-                        * (xpow * r_unit_pows[xpow - 1, j, 0])
-                        * r_unit_pows[ypow, j, 1]
-                        * r_unit_pows[zpow, j, 2]
-                        / r_abs[j]
-                    )
-                elif k == 1:
-                    moment_jacobian[aib_i, j, k] += (
-                        rb_values[mu, j]
-                        * r_unit_pows[xpow, j, 0]
-                        * (ypow * r_unit_pows[ypow - 1, j, 1])
-                        * r_unit_pows[zpow, j, 2]
-                        / r_abs[j]
-                    )
-                elif k == 2:
-                    moment_jacobian[aib_i, j, k] += (
-                        rb_values[mu, j]
-                        * r_unit_pows[xpow, j, 0]
-                        * r_unit_pows[ypow, j, 1]
-                        * (zpow * r_unit_pows[zpow - 1, j, 2])
-                        / r_abs[j]
-                    )
+            if xpow != 0:
+                moment_jacobian[aib_i, j, 0] += (
+                    rb_values[mu, j]
+                    * (xpow * r_unit_pows[xpow - 1, j, 0])
+                    * r_unit_pows[ypow, j, 1]
+                    * r_unit_pows[zpow, j, 2]
+                    / r_abs[j]
+                )
+            if ypow != 0:
+                moment_jacobian[aib_i, j, 1] += (
+                    rb_values[mu, j]
+                    * r_unit_pows[xpow, j, 0]
+                    * (ypow * r_unit_pows[ypow - 1, j, 1])
+                    * r_unit_pows[zpow, j, 2]
+                    / r_abs[j]
+                )
+            if zpow != 0:
+                moment_jacobian[aib_i, j, 2] += (
+                    rb_values[mu, j]
+                    * r_unit_pows[xpow, j, 0]
+                    * r_unit_pows[ypow, j, 1]
+                    * (zpow * r_unit_pows[zpow - 1, j, 2])
+                    / r_abs[j]
+                )
 
 
 @nb.njit(
@@ -427,17 +461,9 @@ def _nb_calc_local_energy_and_gradient(
     moment_components = np.zeros(alpha_moments_count)
     moment_jacobian = np.zeros((alpha_moments_count, number_of_js, 3))
 
-    # Precompute unit vectors
-    r_unit = _calc_r_unit(r_ijs, r_abs)
-
-    # Precompute powers
-    max_pow = int(np.max(alpha_index_basic))
-    r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
-
     _calc_moment_basic(
         r_abs,
-        r_unit,
-        r_unit_pows,
+        r_ijs,
         alpha_index_basic,
         rb_values,
         rb_derivs,
@@ -493,17 +519,9 @@ def _nb_calc_moment(
     moment_components = np.zeros(alpha_moments_count)
     moment_jacobian = np.zeros((alpha_moments_count, number_of_js, 3))
 
-    # Precompute unit vectors
-    r_unit = _calc_r_unit(r_ijs, r_abs)
-
-    # Precompute powers
-    max_pow = int(np.max(alpha_index_basic))
-    r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
-
     _calc_moment_basic(
         r_abs,
-        r_unit,
-        r_unit_pows,
+        r_ijs,
         alpha_index_basic,
         rb_values,
         rb_derivs,

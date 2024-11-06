@@ -83,7 +83,7 @@ class RadialBasisData:
         rbs = mtp_data["radial_basis_size"]
 
         self.values = np.full((spc, spc, rbs), np.nan)
-        self.dqdris = np.full((spc, spc, rbs, 3, natoms), np.nan)
+        self.dqdris = np.full((spc, spc, rbs, natoms, 3), np.nan)
         self.dqdeps = np.full((spc, spc, rbs, 3, 3), np.nan)
 
     def clean(self) -> None:

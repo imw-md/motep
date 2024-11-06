@@ -106,7 +106,9 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         size = species_count * species_count * radial_basis_size
 
         values = np.stack([atoms.calc.engine.rbd.values for atoms in images])
-        dqdris = np.stack([atoms.calc.engine.rbd.dqdris.T for atoms in images])
+        dqdris = np.stack(
+            [atoms.calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0) for atoms in images],
+        )
         values = values.reshape(-1, size)
         dqdris = dqdris.reshape(-1, size)
         tmp = []

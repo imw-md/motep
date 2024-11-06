@@ -8,8 +8,9 @@ from motep.potentials.mtp.base import EngineBase
 from .utils import (
     _nb_calc_local_energy_and_gradient,
     _nb_calc_moment,
-    _nb_calc_radial_basis,
+    _nb_calc_radial_funcs,
     _nb_forces_from_gradient,
+    _nb_linalg_norm,
 )
 
 
@@ -31,7 +32,7 @@ class NumbaMTPEngine(EngineBase):
         min_dist = self.mtp_data["min_dist"]
         max_dist = self.mtp_data["max_dist"]
         radial_coeffs = self.mtp_data["radial_coeffs"]
-        return _nb_calc_radial_basis(
+        return _nb_calc_radial_funcs(
             r_abs,
             itype,
             jtypes,
@@ -68,13 +69,6 @@ class NumbaMTPEngine(EngineBase):
 
         mtp_data = self.mtp_data
 
-        alpha_moments_count = mtp_data["alpha_moments_count"]
-        alpha_moment_mapping = mtp_data["alpha_moment_mapping"]
-        alpha_index_basic = mtp_data["alpha_index_basic"]
-        alpha_index_times = mtp_data["alpha_index_times"]
-        species_coeffs = mtp_data["species_coeffs"]
-        moment_coeffs = mtp_data["moment_coeffs"]
-
         number_of_atoms = len(atoms)
         max_number_of_js, all_js, all_r_ijs = self._calc_max_ijs(atoms)
         itypes = [mtp_data["species"][atoms.numbers[i]] for i in range(number_of_atoms)]
@@ -87,20 +81,20 @@ class NumbaMTPEngine(EngineBase):
             r_ijs = all_r_ijs[i]
             (number_of_js, _) = r_ijs.shape
             jtypes = np.array([self.mtp_data["species"][atoms.numbers[j]] for j in js])
-            r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=1))
+            r_abs = _nb_linalg_norm(r_ijs)
             rb_values, rb_derivs = self._calc_radial_basis(r_abs, itype, jtypes)
             local_energy, local_gradient = _nb_calc_local_energy_and_gradient(
                 r_ijs,
                 r_abs,
                 rb_values,
                 rb_derivs,
-                alpha_moments_count,
-                alpha_moment_mapping,
-                alpha_index_basic,
-                alpha_index_times,
+                mtp_data["alpha_moments_count"],
+                mtp_data["alpha_moment_mapping"],
+                mtp_data["alpha_index_basic"],
+                mtp_data["alpha_index_times"],
                 itype,
-                species_coeffs,
-                moment_coeffs,
+                mtp_data["species_coeffs"],
+                mtp_data["moment_coeffs"],
             )
             energy += local_energy
             stress += r_ijs.T @ local_gradient
@@ -129,27 +123,23 @@ class NumbaMTPEngine(EngineBase):
         self.mbd.clean()
         self.rbd.clean()
 
-        alpha_moments_count = mtp_data["alpha_moments_count"]
-        alpha_moment_mapping = mtp_data["alpha_moment_mapping"]
-        alpha_index_basic = mtp_data["alpha_index_basic"]
-        alpha_index_times = mtp_data["alpha_index_times"]
         moment_coeffs = mtp_data["moment_coeffs"]
 
         stress = np.zeros((3, 3))
         for i, itype in enumerate(itypes):
             js, r_ijs = self._get_distances(atoms, i)
             jtypes = np.array([self.mtp_data["species"][atoms.numbers[j]] for j in js])
-            r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=1))
+            r_abs = _nb_linalg_norm(r_ijs)
             rb_values, rb_derivs = self._calc_radial_basis(r_abs, itype, jtypes)
             basis_values, basis_jac_rs = _nb_calc_moment(
                 r_abs,
                 r_ijs,
                 rb_values,
                 rb_derivs,
-                alpha_moments_count,
-                alpha_moment_mapping,
-                alpha_index_basic,
-                alpha_index_times,
+                mtp_data["alpha_moments_count"],
+                mtp_data["alpha_moment_mapping"],
+                mtp_data["alpha_index_basic"],
+                mtp_data["alpha_index_times"],
             )
 
             self.mbd.values += basis_values

@@ -67,29 +67,29 @@ class MomentBasis:
 
         # f * tensor = dMb/dc (before summation over neighbors)
         # `val.shape == (alpha_index_basis_count, radial_basis_size, neighbors)`
-        val = rb.basis_vs.T * mult0[:, None, :]
+        val = rb.basis_vs * mult0[:, None, :]
 
         # d(d(f * tensor)/dr)/dc = d(dMb/dr)/dc (before summation over neighbors)
         # `der.shape == (alpha_index_basis_count, radial_basis_size, neighbors, 3)`
-        der = (rb.basis_ds.T * mult0[:, None, :])[..., None] * r_ijs_unit
+        der = (rb.basis_ds * mult0[:, None, :])[..., None] * r_ijs_unit
 
         der -= (val.T * k).T[..., None] * r_ijs_unit / r_abs[:, None]
         der[..., 0] += (
-            rb.basis_vs.T[None, :, :]
+            rb.basis_vs[None, :, :]
             * xpow[:, None, None]
             * r_unit_pows[xpow - 1, None, :, 0]
             * r_unit_pows[ypow, None, :, 1]
             * r_unit_pows[zpow, None, :, 2]
         ) / r_abs
         der[..., 1] += (
-            rb.basis_vs.T[None, :, :]
+            rb.basis_vs[None, :, :]
             * ypow[:, None, None]
             * r_unit_pows[xpow, None, :, 0]
             * r_unit_pows[ypow - 1, None, :, 1]
             * r_unit_pows[zpow, None, :, 2]
         ) / r_abs
         der[..., 2] += (
-            rb.basis_vs.T[None, :, :]
+            rb.basis_vs[None, :, :]
             * zpow[:, None, None]
             * r_unit_pows[xpow, None, :, 0]
             * r_unit_pows[ypow, None, :, 1]
