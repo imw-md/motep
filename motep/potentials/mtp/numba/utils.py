@@ -520,6 +520,7 @@ def _nb_calc_local_energy_and_gradient(
         nb.float64[:],
         nb.float64[:, :, :],
         nb.float64[:, :, :, :],
+        nb.float64[:, :, :, :, :, :],
     ),
 )
 def _calc_moment_basic_with_jacobian_radial_coeffs(
@@ -534,6 +535,7 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
     moment_components: np.ndarray,
     moment_jacobian: np.ndarray,
     moment_jac_cs: np.ndarray,
+    moment_jac_rc: np.ndarray,
 ) -> None:
     """Compute basic moment components and its jacobian wrt `r_ijs`."""
     # Precompute unit vectors
@@ -543,9 +545,8 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
     max_pow = int(np.max(alpha_index_basic))
     r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
 
-    aibc = alpha_index_basic.shape[0]
     rbs = rb_coeffs.shape[3]
-    der = np.zeros((aibc, rbs, jtypes.size, 3))
+    der = np.zeros(3)
     for aib_i, aib in enumerate(alpha_index_basic):
         mu, xpow, ypow, zpow = aib
         xyzpow = xpow + ypow + zpow
@@ -557,13 +558,13 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
             for ib in range(rbs):
                 val = rb_values[ib, j] * mult0
                 for k in range(3):
-                    der[aib_i, ib, j, k] = (
+                    der[k] = (
                         r_unit[j, k]
                         * mult0
                         * (rb_derivs[ib, j] - xyzpow * rb_values[ib, j] / r_abs[j])
                     )
                 if xpow != 0:
-                    der[aib_i, ib, j, 0] += (
+                    der[0] += (
                         rb_values[ib, j]
                         * (xpow * r_unit_pows[xpow - 1, j, 0])
                         * r_unit_pows[ypow, j, 1]
@@ -571,7 +572,7 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
                         / r_abs[j]
                     )
                 if ypow != 0:
-                    der[aib_i, ib, j, 1] += (
+                    der[1] += (
                         rb_values[ib, j]
                         * r_unit_pows[xpow, j, 0]
                         * (ypow * r_unit_pows[ypow - 1, j, 1])
@@ -579,7 +580,7 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
                         / r_abs[j]
                     )
                 if zpow != 0:
-                    der[aib_i, ib, j, 2] += (
+                    der[2] += (
                         rb_values[ib, j]
                         * r_unit_pows[xpow, j, 0]
                         * r_unit_pows[ypow, j, 1]
@@ -590,12 +591,58 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
 
                 moment_components[aib_i] += c * val
                 for k in range(3):
-                    moment_jacobian[aib_i, j, k] += c * der[aib_i, ib, j, k]
+                    moment_jacobian[aib_i, j, k] += c * der[k]
                 moment_jac_cs[aib_i, jtype, mu, ib] += val
+                for k in range(3):
+                    moment_jac_rc[aib_i, jtype, mu, ib, j, k] += der[k]
+
+
+@nb.njit
+def _calc_site_energy_jacobian(
+    alpha_index_times: np.ndarray,
+    alpha_moment_mapping: np.ndarray,
+    moment_coeffs: np.ndarray,
+    moment_values: np.ndarray,
+    moment_jac_rs: np.ndarray,
+    moment_jac_cs: np.ndarray,
+    moment_jac_rc: np.ndarray,
+) -> np.ndarray:
+    """Calculate Jacobian of site energy gradients to radial basis coefficients.
+
+    Returns
+    -------
+    dgdcs : np.ndarray
+        d(dV/dr)/dc.
+
+    """
+    tmp0 = np.zeros_like(moment_values)
+    tmp1 = np.zeros_like(moment_jac_rs)
+    tmp0[alpha_moment_mapping] = moment_coeffs  # dV/dB
+    for ait in alpha_index_times[::-1]:
+        i1, i2, mult, i3 = ait
+        tmp0[i1] += mult * tmp0[i3] * moment_values[i2]
+        tmp0[i2] += mult * tmp0[i3] * moment_values[i1]
+    for ait in alpha_index_times:
+        i1, i2, mult, i3 = ait
+        tmp1[i1] += mult * tmp0[i3] * moment_jac_rs[i2]
+        tmp1[i2] += mult * tmp0[i3] * moment_jac_rs[i1]
+    dgdcs = np.zeros(moment_jac_rc.shape[1:])
+    amc = moment_jac_rc.shape[0]
+    for i in range(amc):
+        dgdcs += moment_jac_rc[i] * tmp0[i]
+    dgdcs += (moment_jac_cs[:, ..., None, None] * tmp1[:, None, None, None]).sum(axis=0)
+    return dgdcs
 
 
 @nb.njit(
-    nb.types.Tuple((nb.float64[:], nb.float64[:, :, :], nb.float64[:, :, :]))(
+    nb.types.Tuple(
+        (
+            nb.float64[:],
+            nb.float64[:, :, :],
+            nb.float64[:, :, :],
+            nb.float64[:, :, :, :, :],
+        ),
+    )(
         nb.int64,
         nb.int64[:],
         nb.float64[:],
@@ -623,11 +670,13 @@ def _nb_calc_moment(
     alpha_index_basic: np.ndarray,
     alpha_index_times: np.ndarray,
     moment_coeffs: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     _, species_count, rfs, rbs = rb_coeffs.shape
-    moment_components = np.zeros(alpha_moments_count)
-    moment_jacobian = np.zeros((alpha_moments_count, *r_ijs.shape))
-    moment_jac_cs = np.zeros((alpha_moments_count, species_count, rfs, rbs))
+    amc = alpha_moments_count
+    moment_values = np.zeros(amc)
+    moment_jac_rs = np.zeros((amc, *r_ijs.shape))
+    moment_jac_cs = np.zeros((amc, species_count, rfs, rbs))
+    moment_jac_rc = np.zeros((amc, species_count, rfs, rbs, *r_ijs.shape))
 
     _calc_moment_basic_with_jacobian_radial_coeffs(
         itype,
@@ -638,15 +687,16 @@ def _nb_calc_moment(
         rb_values,
         rb_derivs,
         rb_coeffs,
-        moment_components,
-        moment_jacobian,
+        moment_values,
+        moment_jac_rs,
         moment_jac_cs,
+        moment_jac_rc,
     )
 
     _calc_moment_times(
         alpha_index_times,
-        moment_components,
-        moment_jacobian,
+        moment_values,
+        moment_jac_rs,
         moment_jac_cs,
     )
 
@@ -654,10 +704,21 @@ def _nb_calc_moment(
     for i, j in enumerate(alpha_moment_mapping):
         dedcs += moment_jac_cs[j] * moment_coeffs[i]
 
+    dgdcs = _calc_site_energy_jacobian(
+        alpha_index_times,
+        alpha_moment_mapping,
+        moment_coeffs,
+        moment_values,
+        moment_jac_rs,
+        moment_jac_cs,
+        moment_jac_rc,
+    )
+
     return (
-        moment_components[alpha_moment_mapping],
-        moment_jacobian[alpha_moment_mapping],
+        moment_values[alpha_moment_mapping],
+        moment_jac_rs[alpha_moment_mapping],
         dedcs,
+        dgdcs,
     )
 
 

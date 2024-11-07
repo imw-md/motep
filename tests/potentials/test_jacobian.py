@@ -67,7 +67,7 @@ def test_jac_energy(
 
 @pytest.mark.parametrize("coeffs", ["moment_coeffs", "species_coeffs", "radial_coeffs"])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("engine", ["numpy"])
+@pytest.mark.parametrize("engine", ["numpy", "numba"])
 def test_jac_forces(
     engine: str,
     level: int,
@@ -107,7 +107,7 @@ def test_jac_forces(
 
 @pytest.mark.parametrize("coeffs", ["moment_coeffs", "species_coeffs", "radial_coeffs"])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("engine", ["numpy"])
+@pytest.mark.parametrize("engine", ["numpy", "numba"])
 def test_jac_stress(
     engine: str,
     level: int,
