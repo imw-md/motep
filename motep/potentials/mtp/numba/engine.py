@@ -94,11 +94,12 @@ class NumbaMTPEngine(EngineBase):
         forces = _nb_forces_from_gradient(gradient, all_js, max_number_of_js)
 
         if atoms.cell.rank == 3:
-            stress = (stress + stress.T) * 0.5  # symmetrize
-            stress /= atoms.get_volume()
-            stress = stress.flat[[0, 4, 8, 5, 2, 1]]
+            stress += stress.T  # symmetrize
+            stress *= 0.5 / atoms.get_volume()
         else:
-            stress = np.full(6, np.nan)
+            stress[:, :] = np.nan
+
+        stress = stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return energy, forces, stress
 
