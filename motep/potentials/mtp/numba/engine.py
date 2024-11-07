@@ -63,11 +63,7 @@ class NumbaMTPEngine(EngineBase):
             js = all_js[:, i]
             r_ijs = all_r_ijs[i]
             (number_of_js, _) = r_ijs.shape
-            jtypes = np.fromiter(
-                (self.mtp_data["species"].index(atoms.numbers[j]) for j in js),
-                dtype=int,
-                count=js.size,
-            )
+            jtypes = itypes[js]
             r_abs = _nb_linalg_norm(r_ijs)
             rb_values, rb_derivs = _nb_calc_radial_funcs(
                 r_abs,
@@ -122,11 +118,7 @@ class NumbaMTPEngine(EngineBase):
         stress = np.zeros((3, 3))
         for i, itype in enumerate(itypes):
             js, r_ijs = self._get_distances(atoms, i)
-            jtypes = np.fromiter(
-                (self.mtp_data["species"].index(atoms.numbers[j]) for j in js),
-                dtype=int,
-                count=js.size,
-            )
+            jtypes = itypes[js]
             r_abs = _nb_linalg_norm(r_ijs)
             rb_values, rb_derivs = _nb_calc_radial_basis(
                 r_abs,

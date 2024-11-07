@@ -62,7 +62,7 @@ class NumpyMTPEngine(EngineBase):
 
         for i, itype in enumerate(itypes):
             js, r_ijs = self._get_distances(atoms, i)
-            jtypes = [self.mtp_data["species"].index(atoms.numbers[j]) for j in js]
+            jtypes = itypes[js]
             basis_values, basis_jac_rs, dedcs, dgdcs = self._calc_basis(
                 i,
                 itype,
