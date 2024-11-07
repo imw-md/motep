@@ -126,7 +126,7 @@ class NumbaMTPEngine(EngineBase):
                 mtp_data["min_dist"],
                 mtp_data["max_dist"],
             )
-            basis_values, basis_jac_rs = _nb_calc_moment(
+            basis_values, basis_jac_rs, dedcs = _nb_calc_moment(
                 itype,
                 jtypes,
                 r_abs,
@@ -138,6 +138,7 @@ class NumbaMTPEngine(EngineBase):
                 mtp_data["alpha_moment_mapping"],
                 mtp_data["alpha_index_basic"],
                 mtp_data["alpha_index_times"],
+                mtp_data["moment_coeffs"],
             )
 
             self.mbd.values += basis_values
@@ -148,6 +149,8 @@ class NumbaMTPEngine(EngineBase):
                 self.mbd.dbdris[:, i] -= basis_jac_rs[:, k]
                 self.mbd.dbdris[:, j] += basis_jac_rs[:, k]
             self.mbd.dbdeps += r_ijs.T @ basis_jac_rs
+
+            self.mbd.de_dcs[itype] += dedcs
 
         energy = energies.sum()
         forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1).T * -1.0

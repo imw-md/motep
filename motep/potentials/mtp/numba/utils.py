@@ -351,12 +351,14 @@ def _calc_moment_basic(
         nb.int64[:, :],
         nb.float64[:],
         nb.float64[:, :, :],
+        nb.float64[:, :, :, :],
     ),
 )
 def _calc_moment_times(
     alpha_index_times,
     moment_components,
     moment_jacobian,
+    moment_jac_cs,
 ):
     number_of_js = moment_jacobian.shape[1]
     for ait in alpha_index_times:
@@ -368,6 +370,10 @@ def _calc_moment_times(
                     moment_jacobian[i1, j, k] * moment_components[i2]
                     + moment_components[i1] * moment_jacobian[i2, j, k]
                 )
+        moment_jac_cs[i3] += mult * (
+            moment_jac_cs[i1] * moment_components[i2]
+            + moment_components[i1] * moment_jac_cs[i2]
+        )
 
 
 # @nb.njit(
@@ -513,6 +519,7 @@ def _nb_calc_local_energy_and_gradient(
         nb.float64[:, :, :, :],
         nb.float64[:],
         nb.float64[:, :, :],
+        nb.float64[:, :, :, :],
     ),
 )
 def _calc_moment_basic_with_jacobian_radial_coeffs(
@@ -526,6 +533,7 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
     rb_coeffs: np.ndarray,
     moment_components: np.ndarray,
     moment_jacobian: np.ndarray,
+    moment_jac_cs: np.ndarray,
 ) -> None:
     """Compute basic moment components and its jacobian wrt `r_ijs`."""
     # Precompute unit vectors
@@ -547,6 +555,7 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
             mult0 *= r_unit_pows[ypow, j, 1]
             mult0 *= r_unit_pows[zpow, j, 2]
             for ib in range(rbs):
+                val = rb_values[ib, j] * mult0
                 for k in range(3):
                     der[aib_i, ib, j, k] = (
                         r_unit[j, k]
@@ -578,13 +587,15 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
                         / r_abs[j]
                     )
                 c = rb_coeffs[itype, jtype, mu, ib]
-                moment_components[aib_i] += c * rb_values[ib, j] * mult0
+
+                moment_components[aib_i] += c * val
                 for k in range(3):
                     moment_jacobian[aib_i, j, k] += c * der[aib_i, ib, j, k]
+                moment_jac_cs[aib_i, jtype, mu, ib] += val
 
 
 @nb.njit(
-    nb.types.Tuple((nb.float64[:], nb.float64[:, :, :]))(
+    nb.types.Tuple((nb.float64[:], nb.float64[:, :, :], nb.float64[:, :, :]))(
         nb.int64,
         nb.int64[:],
         nb.float64[:],
@@ -596,6 +607,7 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
         nb.int64[:],
         nb.int64[:, :],
         nb.int64[:, :],
+        nb.float64[:],
     ),
 )
 def _nb_calc_moment(
@@ -610,10 +622,12 @@ def _nb_calc_moment(
     alpha_moment_mapping: np.ndarray,
     alpha_index_basic: np.ndarray,
     alpha_index_times: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
-    (number_of_js,) = r_abs.shape
+    moment_coeffs: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    _, species_count, rfs, rbs = rb_coeffs.shape
     moment_components = np.zeros(alpha_moments_count)
-    moment_jacobian = np.zeros((alpha_moments_count, number_of_js, 3))
+    moment_jacobian = np.zeros((alpha_moments_count, *r_ijs.shape))
+    moment_jac_cs = np.zeros((alpha_moments_count, species_count, rfs, rbs))
 
     _calc_moment_basic_with_jacobian_radial_coeffs(
         itype,
@@ -626,17 +640,24 @@ def _nb_calc_moment(
         rb_coeffs,
         moment_components,
         moment_jacobian,
+        moment_jac_cs,
     )
 
     _calc_moment_times(
         alpha_index_times,
         moment_components,
         moment_jacobian,
+        moment_jac_cs,
     )
+
+    dedcs = np.zeros((species_count, rfs, rbs))
+    for i, j in enumerate(alpha_moment_mapping):
+        dedcs += moment_jac_cs[j] * moment_coeffs[i]
 
     return (
         moment_components[alpha_moment_mapping],
         moment_jacobian[alpha_moment_mapping],
+        dedcs,
     )
 
 
