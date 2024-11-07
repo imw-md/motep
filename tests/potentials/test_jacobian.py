@@ -19,13 +19,13 @@ def make_atoms(engine: str, level: int, data_path: pathlib.Path) -> Atoms:
         pytest.skip()
     atoms = read_cfg(path / "out.cfg", index=-1)
     mtp_data_ref = read_mtp(path / "pot.mtp")
-    atoms.calc = MTP(mtp_data=mtp_data_ref, engine=engine)
+    atoms.calc = MTP(mtp_data=mtp_data_ref, engine=engine, is_trained=True)
     return atoms
 
 
 @pytest.mark.parametrize("coeffs", ["moment_coeffs", "species_coeffs", "radial_coeffs"])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("engine", ["numpy"])
+@pytest.mark.parametrize("engine", ["numpy", "numba"])
 def test_jac_energy(
     engine: str,
     level: int,
@@ -67,7 +67,7 @@ def test_jac_energy(
 
 @pytest.mark.parametrize("coeffs", ["moment_coeffs", "species_coeffs", "radial_coeffs"])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("engine", ["numpy"])
+@pytest.mark.parametrize("engine", ["numpy", "numba"])
 def test_jac_forces(
     engine: str,
     level: int,
@@ -107,7 +107,7 @@ def test_jac_forces(
 
 @pytest.mark.parametrize("coeffs", ["moment_coeffs", "species_coeffs", "radial_coeffs"])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("engine", ["numpy"])
+@pytest.mark.parametrize("engine", ["numpy", "numba"])
 def test_jac_stress(
     engine: str,
     level: int,

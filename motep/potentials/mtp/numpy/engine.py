@@ -5,7 +5,6 @@ Modified version: Yuji Ikeda
 """
 
 import numpy as np
-import numpy.typing as npt
 from ase import Atoms
 
 from motep.potentials.mtp import get_types
@@ -13,20 +12,6 @@ from motep.potentials.mtp.base import EngineBase
 from motep.potentials.mtp.data import MTPData
 from motep.potentials.mtp.numpy.moment import MomentBasis
 from motep.radial import ChebyshevArrayRadialBasis
-
-
-class Jac(dict):
-    @property
-    def parameters(self) -> npt.NDArray[np.float64]:
-        shape = self["radial_coeffs"].shape
-        return np.concatenate(
-            (
-                self["scaling"],
-                self["moment_coeffs"],
-                self["species_coeffs"],
-                self["radial_coeffs"].reshape(-1, *shape[4::]),
-            ),
-        )
 
 
 class NumpyMTPEngine(EngineBase):
@@ -122,49 +107,3 @@ class NumpyMTPEngine(EngineBase):
         self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return self.results["energy"], self.results["forces"], self.results["stress"]
-
-    def jac_energy(self, atoms: Atoms) -> MTPData:
-        """Calculate the Jacobian of the energy with respect to the MTP parameters."""
-        sps = self.mtp_data["species"]
-        nbs = list(atoms.numbers)
-
-        jac = MTPData()  # placeholder of the Jacobian with respect to the parameters
-        jac["scaling"] = 0.0
-        jac["moment_coeffs"] = self.mbd.values.copy()
-        jac["species_coeffs"] = np.fromiter((nbs.count(s) for s in sps), dtype=float)
-        jac["radial_coeffs"] = self.mbd.de_dcs.copy()
-
-        return jac
-
-    def jac_forces(self, atoms: Atoms) -> MTPData:
-        """Calculate the Jacobian of the forces with respect to the MTP parameters.
-
-        `jac.parameters` have the shape of `(nparams, natoms, 3)`.
-
-        """
-        spc = self.mtp_data["species_count"]
-        number_of_atoms = len(atoms)
-
-        jac = Jac()  # placeholder of the Jacobian with respect to the parameters
-        jac["scaling"] = np.zeros((1, number_of_atoms, 3))
-        jac["moment_coeffs"] = self.mbd.dbdris * -1.0
-        jac["species_coeffs"] = np.zeros((spc, number_of_atoms, 3))
-        jac["radial_coeffs"] = self.mbd.ddedcs * -1.0
-
-        return jac
-
-    def jac_stress(self, atoms: Atoms) -> MTPData:
-        """Calculate the Jacobian of the forces with respect to the MTP parameters.
-
-        `jac.parameters` have the shape of `(nparams, natoms, 3)`.
-
-        """
-        spc = self.mtp_data["species_count"]
-
-        jac = Jac()  # placeholder of the Jacobian with respect to the parameters
-        jac["scaling"] = np.zeros((1, 3, 3))
-        jac["moment_coeffs"] = self.mbd.dbdeps.copy()
-        jac["species_coeffs"] = np.zeros((spc, 3, 3))
-        jac["radial_coeffs"] = self.mbd.ds_dcs.copy()
-
-        return jac
