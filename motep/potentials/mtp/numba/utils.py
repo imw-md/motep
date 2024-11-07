@@ -1,13 +1,7 @@
-from typing import Any
-
 import numba as nb
 import numpy as np
 
-
-@nb.njit
-def _nb_linalg_norm(r_ijs: np.ndarray) -> np.ndarray:
-    return np.sqrt((r_ijs**2).sum(axis=1))
-
+from .chebyshev import _nb_calc_radial_basis_ene_only
 
 #
 # The below implementation is from some reason slightly slower up to level 10 for larger systems.
@@ -182,90 +176,6 @@ def _nb_forces_from_gradient(
 
 
 @nb.njit
-def _nb_chebyshev(r, number_of_terms, min_dist, max_dist):
-    values = np.empty((number_of_terms))
-    derivs = np.empty((number_of_terms))
-    r_scaled = (2 * r - (min_dist + max_dist)) / (max_dist - min_dist)
-    r_deriv = 2 / (max_dist - min_dist)
-    values[0] = 1
-    values[1] = r_scaled
-    derivs[0] = 0
-    derivs[1] = r_deriv
-    for i in range(2, number_of_terms):
-        values[i] = 2 * r_scaled * values[i - 1] - values[i - 2]
-        derivs[i] = (
-            2 * (r_scaled * derivs[i - 1] + r_deriv * values[i - 1]) - derivs[i - 2]
-        )
-    return values, derivs
-
-
-@nb.njit(
-    nb.types.Tuple((nb.float64[:, :], nb.float64[:, :]))(
-        nb.float64[:],
-        nb.int64,
-        nb.float64,
-        nb.float64,
-        nb.float64,
-    ),
-)
-def _nb_calc_radial_basis(
-    r_abs: np.ndarray[Any, np.float64],
-    radial_basis_size: np.int64,
-    scaling: np.float64,
-    min_dist: np.float64,
-    max_dist: np.float64,
-) -> tuple[np.ndarray[Any, np.float64], np.ndarray[Any, np.float64]]:
-    """Calculate radial basis values."""
-    number_of_neighbors = r_abs.size
-    values = np.zeros((radial_basis_size, number_of_neighbors))
-    derivs = np.zeros((radial_basis_size, number_of_neighbors))
-    for j in range(number_of_neighbors):
-        if r_abs[j] < max_dist:
-            smooth_value = scaling * (max_dist - r_abs[j]) ** 2
-            smooth_deriv = -2.0 * scaling * (max_dist - r_abs[j])
-            vs0, ds0 = _nb_chebyshev(r_abs[j], radial_basis_size, min_dist, max_dist)
-            for k in range(radial_basis_size):
-                values[k, j] = vs0[k] * smooth_value
-                derivs[k, j] = ds0[k] * smooth_value + vs0[k] * smooth_deriv
-    return values, derivs
-
-
-@nb.njit
-def _nb_calc_radial_funcs(
-    r_abs: np.ndarray[Any, np.float64],
-    itype: np.int64,
-    jtypes: np.ndarray[Any, np.int64],
-    radial_coeffs: np.ndarray,
-    scaling: np.float64,
-    min_dist: np.float64,
-    max_dist: np.float64,
-) -> tuple[np.ndarray[Any, np.float64], np.ndarray[Any, np.float64]]:
-    """Calculate radial parts."""
-    _, _, radial_funcs_count, radial_basis_size = radial_coeffs.shape
-    values, derivs = _nb_calc_radial_basis(
-        r_abs,
-        radial_basis_size,
-        scaling,
-        min_dist,
-        max_dist,
-    )
-    radial_part_vs = np.zeros((radial_funcs_count, r_abs.size))
-    radial_part_ds = np.zeros((radial_funcs_count, r_abs.size))
-    for j in range(r_abs.size):
-        for i_mu in range(radial_funcs_count):
-            for i_rb in range(radial_basis_size):
-                c = radial_coeffs[itype, jtypes[j], i_mu, i_rb]
-                radial_part_vs[i_mu, j] += c * values[i_rb, j]
-                radial_part_ds[i_mu, j] += c * derivs[i_rb, j]
-    return radial_part_vs, radial_part_ds
-
-
-@nb.njit(nb.float64[:, :](nb.float64[:, :], nb.float64[:]))
-def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
-    return r_ijs[:, :] / r_abs[:, None]
-
-
-@nb.njit
 def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
     number_of_js = r_unit.shape[0]
     r_unit_pows = np.ones((max_pow + 1, number_of_js, 3))
@@ -289,7 +199,7 @@ def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
 )
 def _calc_moment_basic(
     r_abs,
-    r_ijs,
+    r_ijs_unit,
     alpha_index_basic,
     rb_values,
     rb_derivs,
@@ -297,12 +207,9 @@ def _calc_moment_basic(
     moment_jacobian,
 ) -> None:
     """Compute basic moment components and its jacobian wrt `r_ijs`."""
-    # Precompute unit vectors
-    r_unit = _calc_r_unit(r_ijs, r_abs)
-
     # Precompute powers
     max_pow = int(np.max(alpha_index_basic))
-    r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
+    r_unit_pows = _calc_r_unit_pows(r_ijs_unit, max_pow)
 
     number_of_js = moment_jacobian.shape[1]
     for aib_i, aib in enumerate(alpha_index_basic):
@@ -316,7 +223,7 @@ def _calc_moment_basic(
             moment_components[aib_i] += rb_values[mu, j] * mult0
             for k in range(3):
                 moment_jacobian[aib_i, j, k] = (
-                    r_unit[j, k]
+                    r_ijs_unit[j, k]
                     * mult0
                     * (rb_derivs[mu, j] - xyzpow * rb_values[mu, j] / r_abs[j])
                 )
@@ -459,7 +366,7 @@ def _propagate_backward(
     )
 )
 def _nb_calc_local_energy_and_gradient(
-    r_ijs,
+    r_ijs_unit,
     r_abs,
     rb_values,
     rb_derivs,
@@ -477,7 +384,7 @@ def _nb_calc_local_energy_and_gradient(
 
     _calc_moment_basic(
         r_abs,
-        r_ijs,
+        r_ijs_unit,
         alpha_index_basic,
         rb_values,
         rb_derivs,
@@ -778,36 +685,6 @@ def numba_calc_energy(
         )
         energy += loc_energy
     return energy
-
-
-@nb.njit
-def _nb_calc_radial_basis_ene_only(
-    r_abs, itype, jtypes, radial_coeffs, scaling, min_dist, max_dist
-):
-    (nrs,) = r_abs.shape
-    _, _, nmu, rb_size = radial_coeffs.shape
-    values = np.zeros((nmu, nrs))
-    for j in range(nrs):
-        is_within_cutoff = r_abs[j] < max_dist
-        if is_within_cutoff:
-            smoothing = (max_dist - r_abs[j]) ** 2
-            rb_values = _nb_chebyshev_ene_only(r_abs[j], rb_size, min_dist, max_dist)
-            for i_mu in range(nmu):
-                for i_rb in range(rb_size):
-                    coeffs = scaling * radial_coeffs[itype, jtypes[j], i_mu, i_rb]
-                    values[i_mu, j] += coeffs * rb_values[i_rb] * smoothing
-    return values
-
-
-@nb.njit
-def _nb_chebyshev_ene_only(r, number_of_terms, min_dist, max_dist):
-    values = np.empty((number_of_terms))
-    r_scaled = (2 * r - (min_dist + max_dist)) / (max_dist - min_dist)
-    values[0] = 1
-    values[1] = r_scaled
-    for i in range(2, number_of_terms):
-        values[i] = 2 * r_scaled * values[i - 1] - values[i - 2]
-    return values
 
 
 @nb.njit(

@@ -1,19 +1,17 @@
 """MTP written using numba."""
 
+import numba as nb
 import numpy as np
 from ase import Atoms
 
 from motep.potentials.mtp import get_types
 from motep.potentials.mtp.base import EngineBase
 
+from .chebyshev import _nb_calc_radial_basis, _nb_calc_radial_funcs
 from .utils import (
-    _calc_r_unit,
     _nb_calc_local_energy_and_gradient,
     _nb_calc_moment,
-    _nb_calc_radial_basis,
-    _nb_calc_radial_funcs,
     _nb_forces_from_gradient,
-    _nb_linalg_norm,
     _store_radial_basis_values,
 )
 
@@ -63,12 +61,9 @@ class NumbaMTPEngine(EngineBase):
             js = all_js[:, i]
             r_ijs = all_r_ijs[i]
             (number_of_js, _) = r_ijs.shape
-            jtypes = np.fromiter(
-                (self.mtp_data["species"].index(atoms.numbers[j]) for j in js),
-                dtype=int,
-                count=js.size,
-            )
+            jtypes = itypes[js]
             r_abs = _nb_linalg_norm(r_ijs)
+            r_ijs_unit = _calc_r_unit(r_ijs, r_abs)
             rb_values, rb_derivs = _nb_calc_radial_funcs(
                 r_abs,
                 itype,
@@ -79,7 +74,7 @@ class NumbaMTPEngine(EngineBase):
                 mtp_data["max_dist"],
             )
             local_energy, local_gradient = _nb_calc_local_energy_and_gradient(
-                r_ijs,
+                r_ijs_unit,
                 r_abs,
                 rb_values,
                 rb_derivs,
@@ -98,11 +93,12 @@ class NumbaMTPEngine(EngineBase):
         forces = _nb_forces_from_gradient(gradient, all_js, max_number_of_js)
 
         if atoms.cell.rank == 3:
-            stress = (stress + stress.T) * 0.5  # symmetrize
-            stress /= atoms.get_volume()
-            stress = stress.flat[[0, 4, 8, 5, 2, 1]]
+            stress += stress.T  # symmetrize
+            stress *= 0.5 / atoms.get_volume()
         else:
-            stress = np.full(6, np.nan)
+            stress[:, :] = np.nan
+
+        stress = stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return energy, forces, stress
 
@@ -122,12 +118,9 @@ class NumbaMTPEngine(EngineBase):
         stress = np.zeros((3, 3))
         for i, itype in enumerate(itypes):
             js, r_ijs = self._get_distances(atoms, i)
-            jtypes = np.fromiter(
-                (self.mtp_data["species"].index(atoms.numbers[j]) for j in js),
-                dtype=int,
-                count=js.size,
-            )
+            jtypes = itypes[js]
             r_abs = _nb_linalg_norm(r_ijs)
+            r_ijs_unit = _calc_r_unit(r_ijs, r_abs)
             rb_values, rb_derivs = _nb_calc_radial_basis(
                 r_abs,
                 mtp_data["radial_basis_size"],
@@ -135,10 +128,6 @@ class NumbaMTPEngine(EngineBase):
                 mtp_data["min_dist"],
                 mtp_data["max_dist"],
             )
-
-            # Precompute unit vectors
-            r_ijs_unit = _calc_r_unit(r_ijs, r_abs)
-
             _store_radial_basis_values(
                 i,
                 itype,
@@ -192,3 +181,13 @@ class NumbaMTPEngine(EngineBase):
         stress = stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return energy, forces, stress
+
+
+@nb.njit(nb.float64[:, :](nb.float64[:, :], nb.float64[:]))
+def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
+    return r_ijs[:, :] / r_abs[:, None]
+
+
+@nb.njit(nb.float64[:](nb.float64[:, :]))
+def _nb_linalg_norm(r_ijs: np.ndarray) -> np.ndarray:
+    return np.sqrt((r_ijs**2).sum(axis=1))

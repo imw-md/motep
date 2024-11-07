@@ -4,7 +4,7 @@ import numpy as np
 import numpy.typing as npt
 
 from motep.potentials.mtp.data import MTPData
-from motep.radial import ChebyshevArrayRadialBasis
+from motep.potentials.mtp.numpy.chebyshev import ChebyshevArrayRadialBasis
 
 
 class MomentBasis:
