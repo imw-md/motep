@@ -6,12 +6,11 @@ from ase import Atoms
 from motep.potentials.mtp import get_types
 from motep.potentials.mtp.base import EngineBase
 
+from .chebyshev import _nb_calc_radial_basis, _nb_calc_radial_funcs
 from .utils import (
     _calc_r_unit,
     _nb_calc_local_energy_and_gradient,
     _nb_calc_moment,
-    _nb_calc_radial_basis,
-    _nb_calc_radial_funcs,
     _nb_forces_from_gradient,
     _nb_linalg_norm,
     _store_radial_basis_values,
