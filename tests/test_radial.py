@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from motep.radial import (
+from motep.potentials.mtp.numpy.chebyshev import (
     ChebyshevArrayRadialBasis,
     ChebyshevPolynomialRadialBasis,
     RadialBasisBase,
