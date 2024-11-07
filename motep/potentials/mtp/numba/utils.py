@@ -199,7 +199,15 @@ def _nb_chebyshev(r, number_of_terms, min_dist, max_dist):
     return values, derivs
 
 
-@nb.njit
+@nb.njit(
+    nb.types.Tuple((nb.float64[:, :], nb.float64[:, :]))(
+        nb.float64[:],
+        nb.int64,
+        nb.float64,
+        nb.float64,
+        nb.float64,
+    ),
+)
 def _nb_calc_radial_basis(
     r_abs: np.ndarray[Any, np.float64],
     radial_basis_size: np.int64,
@@ -209,16 +217,16 @@ def _nb_calc_radial_basis(
 ) -> tuple[np.ndarray[Any, np.float64], np.ndarray[Any, np.float64]]:
     """Calculate radial basis values."""
     number_of_neighbors = r_abs.size
-    values = np.zeros((number_of_neighbors, radial_basis_size))
-    derivs = np.zeros((number_of_neighbors, radial_basis_size))
+    values = np.zeros((radial_basis_size, number_of_neighbors))
+    derivs = np.zeros((radial_basis_size, number_of_neighbors))
     for j in range(number_of_neighbors):
         if r_abs[j] < max_dist:
             smooth_value = scaling * (max_dist - r_abs[j]) ** 2
             smooth_deriv = -2.0 * scaling * (max_dist - r_abs[j])
             vs0, ds0 = _nb_chebyshev(r_abs[j], radial_basis_size, min_dist, max_dist)
             for k in range(radial_basis_size):
-                values[j, k] = vs0[k] * smooth_value
-                derivs[j, k] = ds0[k] * smooth_value + vs0[k] * smooth_deriv
+                values[k, j] = vs0[k] * smooth_value
+                derivs[k, j] = ds0[k] * smooth_value + vs0[k] * smooth_deriv
     return values, derivs
 
 
@@ -247,8 +255,8 @@ def _nb_calc_radial_funcs(
         for i_mu in range(radial_funcs_count):
             for i_rb in range(radial_basis_size):
                 c = radial_coeffs[itype, jtypes[j], i_mu, i_rb]
-                radial_part_vs[i_mu, j] += c * values[j, i_rb]
-                radial_part_ds[i_mu, j] += c * derivs[j, i_rb]
+                radial_part_vs[i_mu, j] += c * values[i_rb, j]
+                radial_part_ds[i_mu, j] += c * derivs[i_rb, j]
     return radial_part_vs, radial_part_ds
 
 
@@ -494,11 +502,96 @@ def _nb_calc_local_energy_and_gradient(
 
 
 @nb.njit(
+    (
+        nb.int64,
+        nb.int64[:],
+        nb.float64[:],
+        nb.float64[:, :],
+        nb.int64[:, :],
+        nb.float64[:, :],
+        nb.float64[:, :],
+        nb.float64[:, :, :, :],
+        nb.float64[:],
+        nb.float64[:, :, :],
+    ),
+)
+def _calc_moment_basic_with_jacobian_radial_coeffs(
+    itype,
+    jtypes,
+    r_abs: np.ndarray,
+    r_ijs: np.ndarray,
+    alpha_index_basic: np.ndarray,
+    rb_values: np.ndarray,
+    rb_derivs: np.ndarray,
+    rb_coeffs: np.ndarray,
+    moment_components: np.ndarray,
+    moment_jacobian: np.ndarray,
+) -> None:
+    """Compute basic moment components and its jacobian wrt `r_ijs`."""
+    # Precompute unit vectors
+    r_unit = _calc_r_unit(r_ijs, r_abs)
+
+    # Precompute powers
+    max_pow = int(np.max(alpha_index_basic))
+    r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
+
+    aibc = alpha_index_basic.shape[0]
+    rbs = rb_coeffs.shape[3]
+    der = np.zeros((aibc, rbs, jtypes.size, 3))
+    for aib_i, aib in enumerate(alpha_index_basic):
+        mu, xpow, ypow, zpow = aib
+        xyzpow = xpow + ypow + zpow
+        for j, jtype in enumerate(jtypes):
+            mult0 = 1.0
+            mult0 *= r_unit_pows[xpow, j, 0]
+            mult0 *= r_unit_pows[ypow, j, 1]
+            mult0 *= r_unit_pows[zpow, j, 2]
+            for ib in range(rbs):
+                for k in range(3):
+                    der[aib_i, ib, j, k] = (
+                        r_unit[j, k]
+                        * mult0
+                        * (rb_derivs[ib, j] - xyzpow * rb_values[ib, j] / r_abs[j])
+                    )
+                if xpow != 0:
+                    der[aib_i, ib, j, 0] += (
+                        rb_values[ib, j]
+                        * (xpow * r_unit_pows[xpow - 1, j, 0])
+                        * r_unit_pows[ypow, j, 1]
+                        * r_unit_pows[zpow, j, 2]
+                        / r_abs[j]
+                    )
+                if ypow != 0:
+                    der[aib_i, ib, j, 1] += (
+                        rb_values[ib, j]
+                        * r_unit_pows[xpow, j, 0]
+                        * (ypow * r_unit_pows[ypow - 1, j, 1])
+                        * r_unit_pows[zpow, j, 2]
+                        / r_abs[j]
+                    )
+                if zpow != 0:
+                    der[aib_i, ib, j, 2] += (
+                        rb_values[ib, j]
+                        * r_unit_pows[xpow, j, 0]
+                        * r_unit_pows[ypow, j, 1]
+                        * (zpow * r_unit_pows[zpow - 1, j, 2])
+                        / r_abs[j]
+                    )
+                c = rb_coeffs[itype, jtype, mu, ib]
+                moment_components[aib_i] += c * rb_values[ib, j] * mult0
+                for k in range(3):
+                    moment_jacobian[aib_i, j, k] += c * der[aib_i, ib, j, k]
+
+
+@nb.njit(
     nb.types.Tuple((nb.float64[:], nb.float64[:, :, :]))(
+        nb.int64,
+        nb.int64[:],
         nb.float64[:],
         nb.float64[:, :],
         nb.float64[:, :],
         nb.float64[:, :],
+        nb.float64[:, :, :, :],
         nb.int64,
         nb.int64[:],
         nb.int64[:, :],
@@ -506,10 +599,13 @@ def _nb_calc_local_energy_and_gradient(
     ),
 )
 def _nb_calc_moment(
+    itype,
+    jtypes,
     r_abs: np.ndarray,
     r_ijs: np.ndarray,
     rb_values: np.ndarray,
     rb_derivs: np.ndarray,
+    rb_coeffs: np.ndarray,
     alpha_moments_count: np.int64,
     alpha_moment_mapping: np.ndarray,
     alpha_index_basic: np.ndarray,
@@ -519,12 +615,15 @@ def _nb_calc_moment(
     moment_components = np.zeros(alpha_moments_count)
     moment_jacobian = np.zeros((alpha_moments_count, number_of_js, 3))
 
-    _calc_moment_basic(
+    _calc_moment_basic_with_jacobian_radial_coeffs(
+        itype,
+        jtypes,
         r_abs,
         r_ijs,
         alpha_index_basic,
         rb_values,
         rb_derivs,
+        rb_coeffs,
         moment_components,
         moment_jacobian,
     )

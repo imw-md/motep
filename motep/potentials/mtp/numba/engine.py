@@ -8,6 +8,7 @@ from motep.potentials.mtp.base import EngineBase
 from .utils import (
     _nb_calc_local_energy_and_gradient,
     _nb_calc_moment,
+    _nb_calc_radial_basis,
     _nb_calc_radial_funcs,
     _nb_forces_from_gradient,
     _nb_linalg_norm,
@@ -118,20 +119,21 @@ class NumbaMTPEngine(EngineBase):
             js, r_ijs = self._get_distances(atoms, i)
             jtypes = np.array([self.mtp_data["species"][atoms.numbers[j]] for j in js])
             r_abs = _nb_linalg_norm(r_ijs)
-            rb_values, rb_derivs = _nb_calc_radial_funcs(
+            rb_values, rb_derivs = _nb_calc_radial_basis(
                 r_abs,
-                itype,
-                jtypes,
-                mtp_data["radial_coeffs"],
+                mtp_data["radial_basis_size"],
                 mtp_data["scaling"],
                 mtp_data["min_dist"],
                 mtp_data["max_dist"],
             )
             basis_values, basis_jac_rs = _nb_calc_moment(
+                itype,
+                jtypes,
                 r_abs,
                 r_ijs,
                 rb_values,
                 rb_derivs,
+                mtp_data["radial_coeffs"],
                 mtp_data["alpha_moments_count"],
                 mtp_data["alpha_moment_mapping"],
                 mtp_data["alpha_index_basic"],
