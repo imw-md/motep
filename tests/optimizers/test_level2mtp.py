@@ -15,7 +15,7 @@ from motep.optimizers.level2mtp import Level2MTPOptimizer
 
 @pytest.mark.parametrize("level", [2, 4, 6])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
-@pytest.mark.parametrize("engine", ["numpy"])
+@pytest.mark.parametrize("engine", ["numpy", "numba"])
 def test_molecules(
     engine: str,
     molecule: int,

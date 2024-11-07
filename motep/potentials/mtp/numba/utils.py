@@ -527,7 +527,7 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
     itype,
     jtypes,
     r_abs: np.ndarray,
-    r_ijs: np.ndarray,
+    r_ijs_unit: np.ndarray,
     alpha_index_basic: np.ndarray,
     rb_values: np.ndarray,
     rb_derivs: np.ndarray,
@@ -538,12 +538,9 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
     moment_jac_rc: np.ndarray,
 ) -> None:
     """Compute basic moment components and its jacobian wrt `r_ijs`."""
-    # Precompute unit vectors
-    r_unit = _calc_r_unit(r_ijs, r_abs)
-
     # Precompute powers
     max_pow = int(np.max(alpha_index_basic))
-    r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
+    r_unit_pows = _calc_r_unit_pows(r_ijs_unit, max_pow)
 
     rbs = rb_coeffs.shape[3]
     der = np.zeros(3)
@@ -559,7 +556,7 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
                 val = rb_values[ib, j] * mult0
                 for k in range(3):
                     der[k] = (
-                        r_unit[j, k]
+                        r_ijs_unit[j, k]
                         * mult0
                         * (rb_derivs[ib, j] - xyzpow * rb_values[ib, j] / r_abs[j])
                     )
@@ -661,7 +658,7 @@ def _nb_calc_moment(
     itype,
     jtypes,
     r_abs: np.ndarray,
-    r_ijs: np.ndarray,
+    r_ijs_unit: np.ndarray,
     rb_values: np.ndarray,
     rb_derivs: np.ndarray,
     rb_coeffs: np.ndarray,
@@ -674,15 +671,15 @@ def _nb_calc_moment(
     _, species_count, rfs, rbs = rb_coeffs.shape
     amc = alpha_moments_count
     moment_values = np.zeros(amc)
-    moment_jac_rs = np.zeros((amc, *r_ijs.shape))
+    moment_jac_rs = np.zeros((amc, *r_ijs_unit.shape))
     moment_jac_cs = np.zeros((amc, species_count, rfs, rbs))
-    moment_jac_rc = np.zeros((amc, species_count, rfs, rbs, *r_ijs.shape))
+    moment_jac_rc = np.zeros((amc, species_count, rfs, rbs, *r_ijs_unit.shape))
 
     _calc_moment_basic_with_jacobian_radial_coeffs(
         itype,
         jtypes,
         r_abs,
-        r_ijs,
+        r_ijs_unit,
         alpha_index_basic,
         rb_values,
         rb_derivs,
@@ -869,3 +866,30 @@ def _nb_calc_local_energy_only(
     for basis_i, moment_i in enumerate(alpha_moment_mapping):
         energy += moment_coeffs[basis_i] * moment_components[moment_i]
     return energy
+
+
+@nb.njit
+def _store_radial_basis_values(
+    i: np.int64,
+    itype: np.int64,
+    js: np.ndarray,
+    jtypes: np.ndarray,
+    r_ijs: np.ndarray,
+    r_ijs_unit: np.ndarray,
+    basis_vs: np.ndarray,
+    basis_ds: np.ndarray,
+    values: np.ndarray,
+    dqdris: np.ndarray,
+    dqdeps: np.ndarray,
+) -> None:
+    radial_basis_size = basis_vs.shape[0]
+    for ib in range(radial_basis_size):
+        for k, j in enumerate(js):
+            jtype = jtypes[k]
+            values[itype, jtype, ib] += basis_vs[ib, k]
+            for ixyz0 in range(3):
+                tmp = basis_ds[ib, k] * r_ijs_unit[k, ixyz0]
+                dqdris[itype, jtype, ib, i, ixyz0] -= tmp
+                dqdris[itype, jtype, ib, j, ixyz0] += tmp
+                for ixyz1 in range(3):
+                    dqdeps[itype, jtype, ib, ixyz0, ixyz1] += tmp * r_ijs[k, ixyz1]
