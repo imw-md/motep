@@ -1,6 +1,8 @@
 import numba as nb
 import numpy as np
 
+from .chebyshev import _nb_calc_radial_basis_ene_only
+
 
 @nb.njit
 def _nb_linalg_norm(r_ijs: np.ndarray) -> np.ndarray:
@@ -697,36 +699,6 @@ def numba_calc_energy(
         )
         energy += loc_energy
     return energy
-
-
-@nb.njit
-def _nb_calc_radial_basis_ene_only(
-    r_abs, itype, jtypes, radial_coeffs, scaling, min_dist, max_dist
-):
-    (nrs,) = r_abs.shape
-    _, _, nmu, rb_size = radial_coeffs.shape
-    values = np.zeros((nmu, nrs))
-    for j in range(nrs):
-        is_within_cutoff = r_abs[j] < max_dist
-        if is_within_cutoff:
-            smoothing = (max_dist - r_abs[j]) ** 2
-            rb_values = _nb_chebyshev_ene_only(r_abs[j], rb_size, min_dist, max_dist)
-            for i_mu in range(nmu):
-                for i_rb in range(rb_size):
-                    coeffs = scaling * radial_coeffs[itype, jtypes[j], i_mu, i_rb]
-                    values[i_mu, j] += coeffs * rb_values[i_rb] * smoothing
-    return values
-
-
-@nb.njit
-def _nb_chebyshev_ene_only(r, number_of_terms, min_dist, max_dist):
-    values = np.empty((number_of_terms))
-    r_scaled = (2 * r - (min_dist + max_dist)) / (max_dist - min_dist)
-    values[0] = 1
-    values[1] = r_scaled
-    for i in range(2, number_of_terms):
-        values[i] = 2 * r_scaled * values[i - 1] - values[i - 2]
-    return values
 
 
 @nb.njit(
