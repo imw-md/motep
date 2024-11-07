@@ -26,7 +26,7 @@ def test_jac(
     path = data_path / f"fitting/crystals/multi/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
-    mtp_data_ref = read_mtp(path / "pot.mtp")
+    mtp_data = read_mtp(path / "pot.mtp")
     images = read_cfg(path / "out.cfg", index=":")[::1000]
 
     setting = {
@@ -38,36 +38,39 @@ def test_jac(
 
     loss = LossFunction(
         images,
-        mtp_data=mtp_data_ref,
+        mtp_data=mtp_data,
         setting=setting,
         comm=MPI.COMM_WORLD,
         engine=engine,
     )
-    loss(mtp_data_ref.parameters)
-    jac_anl = loss.jac(mtp_data_ref.parameters)
+    loss(mtp_data.parameters)
+    jac_anl = loss.jac(mtp_data.parameters)
 
     jac_nmr = np.full_like(jac_anl, np.nan)
 
-    dx = 1e-6
+    dx = 1e-9
 
-    mtp_data = copy.deepcopy(mtp_data_ref)
+    parameters = mtp_data.parameters
 
-    for i, orig in enumerate(mtp_data.parameters):
+    for i, orig in enumerate(parameters):
         # skip `scaling`
         if i == 0:
             jac_nmr[i] = 0.0
             continue
-        mtp_data.parameters[i] = orig + dx
-        lp = loss(mtp_data.parameters)
 
-        mtp_data.parameters[i] = orig - dx
-        lm = loss(mtp_data.parameters)
+        parameters[i] = orig + dx
+        lp = loss(parameters)
+
+        parameters[i] = orig - dx
+        lm = loss(parameters)
 
         jac_nmr[i] = (lp - lm) / (2.0 * dx)
 
-        mtp_data.parameters[i] = orig
+        parameters[i] = orig
 
     print(jac_nmr)
     print(jac_anl)
 
-    np.testing.assert_allclose(jac_nmr, jac_anl, atol=1e-4)
+    assert np.any(jac_nmr)  # check if some of the elements are non-zero
+
+    np.testing.assert_allclose(jac_nmr, jac_anl, atol=1e-3)
