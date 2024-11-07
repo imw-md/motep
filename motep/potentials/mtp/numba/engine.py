@@ -1,5 +1,6 @@
 """MTP written using numba."""
 
+import numba as nb
 import numpy as np
 from ase import Atoms
 
@@ -8,11 +9,9 @@ from motep.potentials.mtp.base import EngineBase
 
 from .chebyshev import _nb_calc_radial_basis, _nb_calc_radial_funcs
 from .utils import (
-    _calc_r_unit,
     _nb_calc_local_energy_and_gradient,
     _nb_calc_moment,
     _nb_forces_from_gradient,
-    _nb_linalg_norm,
     _store_radial_basis_values,
 )
 
@@ -64,6 +63,7 @@ class NumbaMTPEngine(EngineBase):
             (number_of_js, _) = r_ijs.shape
             jtypes = itypes[js]
             r_abs = _nb_linalg_norm(r_ijs)
+            r_ijs_unit = _calc_r_unit(r_ijs, r_abs)
             rb_values, rb_derivs = _nb_calc_radial_funcs(
                 r_abs,
                 itype,
@@ -74,7 +74,7 @@ class NumbaMTPEngine(EngineBase):
                 mtp_data["max_dist"],
             )
             local_energy, local_gradient = _nb_calc_local_energy_and_gradient(
-                r_ijs,
+                r_ijs_unit,
                 r_abs,
                 rb_values,
                 rb_derivs,
@@ -120,6 +120,7 @@ class NumbaMTPEngine(EngineBase):
             js, r_ijs = self._get_distances(atoms, i)
             jtypes = itypes[js]
             r_abs = _nb_linalg_norm(r_ijs)
+            r_ijs_unit = _calc_r_unit(r_ijs, r_abs)
             rb_values, rb_derivs = _nb_calc_radial_basis(
                 r_abs,
                 mtp_data["radial_basis_size"],
@@ -127,10 +128,6 @@ class NumbaMTPEngine(EngineBase):
                 mtp_data["min_dist"],
                 mtp_data["max_dist"],
             )
-
-            # Precompute unit vectors
-            r_ijs_unit = _calc_r_unit(r_ijs, r_abs)
-
             _store_radial_basis_values(
                 i,
                 itype,
@@ -184,3 +181,13 @@ class NumbaMTPEngine(EngineBase):
         stress = stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return energy, forces, stress
+
+
+@nb.njit(nb.float64[:, :](nb.float64[:, :], nb.float64[:]))
+def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
+    return r_ijs[:, :] / r_abs[:, None]
+
+
+@nb.njit(nb.float64[:](nb.float64[:, :]))
+def _nb_linalg_norm(r_ijs: np.ndarray) -> np.ndarray:
+    return np.sqrt((r_ijs**2).sum(axis=1))

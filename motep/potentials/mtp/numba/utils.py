@@ -3,12 +3,6 @@ import numpy as np
 
 from .chebyshev import _nb_calc_radial_basis_ene_only
 
-
-@nb.njit
-def _nb_linalg_norm(r_ijs: np.ndarray) -> np.ndarray:
-    return np.sqrt((r_ijs**2).sum(axis=1))
-
-
 #
 # The below implementation is from some reason slightly slower up to level 10 for larger systems.
 # This should be tested again for higher levels
@@ -181,11 +175,6 @@ def _nb_forces_from_gradient(
     return forces
 
 
-@nb.njit(nb.float64[:, :](nb.float64[:, :], nb.float64[:]))
-def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
-    return r_ijs[:, :] / r_abs[:, None]
-
-
 @nb.njit
 def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
     number_of_js = r_unit.shape[0]
@@ -210,7 +199,7 @@ def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
 )
 def _calc_moment_basic(
     r_abs,
-    r_ijs,
+    r_ijs_unit,
     alpha_index_basic,
     rb_values,
     rb_derivs,
@@ -218,12 +207,9 @@ def _calc_moment_basic(
     moment_jacobian,
 ) -> None:
     """Compute basic moment components and its jacobian wrt `r_ijs`."""
-    # Precompute unit vectors
-    r_unit = _calc_r_unit(r_ijs, r_abs)
-
     # Precompute powers
     max_pow = int(np.max(alpha_index_basic))
-    r_unit_pows = _calc_r_unit_pows(r_unit, max_pow)
+    r_unit_pows = _calc_r_unit_pows(r_ijs_unit, max_pow)
 
     number_of_js = moment_jacobian.shape[1]
     for aib_i, aib in enumerate(alpha_index_basic):
@@ -237,7 +223,7 @@ def _calc_moment_basic(
             moment_components[aib_i] += rb_values[mu, j] * mult0
             for k in range(3):
                 moment_jacobian[aib_i, j, k] = (
-                    r_unit[j, k]
+                    r_ijs_unit[j, k]
                     * mult0
                     * (rb_derivs[mu, j] - xyzpow * rb_values[mu, j] / r_abs[j])
                 )
@@ -380,7 +366,7 @@ def _propagate_backward(
     )
 )
 def _nb_calc_local_energy_and_gradient(
-    r_ijs,
+    r_ijs_unit,
     r_abs,
     rb_values,
     rb_derivs,
@@ -398,7 +384,7 @@ def _nb_calc_local_energy_and_gradient(
 
     _calc_moment_basic(
         r_abs,
-        r_ijs,
+        r_ijs_unit,
         alpha_index_basic,
         rb_values,
         rb_derivs,
