@@ -10,7 +10,6 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss import LossFunction
 from motep.optimizers.lls import LLSOptimizer
-from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting
 
 
@@ -29,7 +28,7 @@ def test_without_forces(
     fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (fitting_path / "initial.mtp").exists():
         pytest.skip()
-    data = read_mtp(fitting_path / "initial.mtp")
+    mtp_data = read_mtp(fitting_path / "initial.mtp")
     images = read_cfg(original_path / "training.cfg", index=":")
 
     for atoms in images:
@@ -45,7 +44,6 @@ def test_without_forces(
 
     optimized = ["moment_coeffs"]
 
-    mtp_data = MTPData(data)
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters
     mtp_data.print()
@@ -82,7 +80,7 @@ def test_molecules(
     fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (fitting_path / "initial.mtp").exists():
         pytest.skip()
-    data = read_mtp(fitting_path / "initial.mtp")
+    mtp_data = read_mtp(fitting_path / "initial.mtp")
     images = read_cfg(original_path / "training.cfg", index=":")
 
     setting = LossSetting(
@@ -95,7 +93,6 @@ def test_molecules(
 
     optimized = ["moment_coeffs"]
 
-    mtp_data = MTPData(data)
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters
     mtp_data.print()
@@ -178,7 +175,6 @@ def test_crystals(
 
     optimized = ["moment_coeffs"]
 
-    mtp_data = MTPData(mtp_data)
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters
 
@@ -271,7 +267,6 @@ def test_species_coeffs(
     rng = np.random.default_rng(42)
 
     optimized = ["moment_coeffs", "species_coeffs"]
-    mtp_data = MTPData(mtp_data)
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters
 
