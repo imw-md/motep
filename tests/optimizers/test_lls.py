@@ -4,6 +4,7 @@ import pathlib
 
 import numpy as np
 import pytest
+from ase import Atoms
 from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
@@ -11,6 +12,17 @@ from motep.io.mlip.mtp import read_mtp
 from motep.loss import LossFunction
 from motep.optimizers.lls import LLSOptimizer
 from motep.setting import LossSetting
+
+
+def make_molecules(molecule: int, level: int, data_path: pathlib.Path) -> list[Atoms]:
+    """Make the ASE `Atoms` object with the calculator."""
+    original_path = data_path / f"original/molecules/{molecule}"
+    fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
+    if not (fitting_path / "initial.mtp").exists():
+        pytest.skip()
+    mtp_data = read_mtp(fitting_path / "initial.mtp")
+    images = read_cfg(original_path / "training.cfg", index=":")
+    return images, mtp_data
 
 
 @pytest.mark.parametrize("level", [2])
@@ -24,12 +36,7 @@ def test_without_forces(
     data_path: pathlib.Path,
 ) -> None:
     """Test if `LLSOptimizer` works for the training data without forces."""
-    original_path = data_path / f"original/molecules/{molecule}"
-    fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
-    if not (fitting_path / "initial.mtp").exists():
-        pytest.skip()
-    mtp_data = read_mtp(fitting_path / "initial.mtp")
-    images = read_cfg(original_path / "training.cfg", index=":")
+    images, mtp_data = make_molecules(molecule, level, data_path)
 
     for atoms in images:
         del atoms.calc.results["forces"]
@@ -76,12 +83,7 @@ def test_molecules(
     data_path: pathlib.Path,
 ) -> None:
     """Test `LLSOptimizer` for molecules."""
-    original_path = data_path / f"original/molecules/{molecule}"
-    fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
-    if not (fitting_path / "initial.mtp").exists():
-        pytest.skip()
-    mtp_data = read_mtp(fitting_path / "initial.mtp")
-    images = read_cfg(original_path / "training.cfg", index=":")
+    images, mtp_data = make_molecules(molecule, level, data_path)
 
     setting = LossSetting(
         energy_weight=1.0,
@@ -251,12 +253,7 @@ def test_species_coeffs(
     data_path: pathlib.Path,
 ) -> None:
     """Check if the loss function is smaller when optimizing also `species_coeffs`."""
-    original_path = data_path / f"original/molecules/{molecule}"
-    fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
-    if not (fitting_path / "initial.mtp").exists():
-        pytest.skip()
-    mtp_data = read_mtp(fitting_path / "initial.mtp")
-    images = read_cfg(original_path / "training.cfg", index=":")
+    images, mtp_data = make_molecules(molecule, level, data_path)
 
     setting = LossSetting(
         energy_weight=1.0,
