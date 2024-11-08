@@ -73,14 +73,12 @@ class LLSOptimizerBase(OptimizerBase):
     def _calc_vector(self) -> np.ndarray:
         """Calculate the vector for linear least squares (LLS)."""
         setting = self.loss.setting
-        images = self.loss.images
         energies = self._calc_energies()
         tmp = []
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting.energy_weight) * energies)
         if "forces" in self.minimized:
-            forces = np.hstack([atoms.calc.targets["forces"].flat for atoms in images])
-            tmp.append(np.sqrt(setting.force_weight) * forces * -1.0)
+            tmp.append(np.sqrt(setting.force_weight) * self._calc_vector_forces())
         if "stress" in self.minimized:
             tmp.append(np.sqrt(setting.stress_weight) * self._calc_vector_stress())
         return np.hstack(tmp)
@@ -119,6 +117,14 @@ class LLSOptimizerBase(OptimizerBase):
             dtype=float,
             count=len(images),
         )
+
+    def _calc_vector_forces(self) -> np.ndarray:
+        if not self.loss.idcs_frc.size:
+            return np.empty(0)
+        key = "forces"
+        images = self.loss.images
+        idcs_frc = self.loss.idcs_frc
+        return -1.0 * np.hstack([images[i].calc.targets[key].flat for i in idcs_frc])
 
     def _calc_vector_stress(self) -> np.ndarray:
         key = "stress"
@@ -210,22 +216,27 @@ class LLSOptimizer(LLSOptimizerBase):
 
     def _calc_matrix_moment_coeffs(self) -> np.ndarray:
         loss = self.loss
-        mtp_data = loss.mtp_data
         images = loss.images
         setting = loss.setting
         basis_values = np.array([atoms.calc.engine.mbd.values for atoms in images])
-        basis_dbdris = np.vstack(
-            [atoms.calc.engine.mbd.dbdris.transpose(1, 2, 0) for atoms in images],
-        )
-        basis_dbdris = basis_dbdris.reshape((-1, mtp_data["alpha_scalar_moments"]))
         tmp = []
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting.energy_weight) * basis_values)
         if "forces" in self.minimized:
-            tmp.append(np.sqrt(setting.force_weight) * basis_dbdris)
+            tmp.append(np.sqrt(setting.force_weight) * self._calc_matrix_forces())
         if "stress" in self.minimized:
             tmp.append(np.sqrt(setting.stress_weight) * self._calc_matrix_stress())
         return np.vstack(tmp)
+
+    def _calc_matrix_forces(self) -> np.ndarray:
+        if not self.loss.idcs_frc.size:
+            return np.empty((0, self.loss.mtp_data["alpha_scalar_moments"]))
+        images = self.loss.images
+        idcs_frc = self.loss.idcs_frc
+        matrix = np.vstack(
+            [images[i].calc.engine.mbd.dbdris.transpose(1, 2, 0) for i in idcs_frc],
+        )
+        return matrix.reshape((-1, self.loss.mtp_data["alpha_scalar_moments"]))
 
     def _calc_matrix_stress(self) -> np.ndarray:
         images = self.loss.images

@@ -4,14 +4,73 @@ import pathlib
 
 import numpy as np
 import pytest
+from ase import Atoms
 from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss import LossFunction
 from motep.optimizers.lls import LLSOptimizer
-from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting
+
+
+def make_molecules(molecule: int, level: int, data_path: pathlib.Path) -> list[Atoms]:
+    """Make the ASE `Atoms` object with the calculator."""
+    original_path = data_path / f"original/molecules/{molecule}"
+    fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
+    if not (fitting_path / "initial.mtp").exists():
+        pytest.skip()
+    mtp_data = read_mtp(fitting_path / "initial.mtp")
+    images = read_cfg(original_path / "training.cfg", index=":")
+    return images, mtp_data
+
+
+@pytest.mark.parametrize("level", [2])
+@pytest.mark.parametrize("molecule", [762])
+@pytest.mark.parametrize("engine", ["numpy"])
+def test_without_forces(
+    *,
+    engine: str,
+    molecule: int,
+    level: int,
+    data_path: pathlib.Path,
+) -> None:
+    """Test if `LLSOptimizer` works for the training data without forces."""
+    images, mtp_data = make_molecules(molecule, level, data_path)
+
+    for atoms in images:
+        del atoms.calc.results["forces"]
+
+    setting = LossSetting(
+        energy_weight=1.0,
+        force_weight=0.01,
+        stress_weight=0.0,
+    )
+
+    rng = np.random.default_rng(42)
+
+    optimized = ["moment_coeffs"]
+
+    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
+    mtp_data.parameters = parameters
+    mtp_data.print()
+
+    loss = LossFunction(
+        images,
+        mtp_data=mtp_data,
+        setting=setting,
+        comm=MPI.COMM_WORLD,
+        engine=engine,
+    )
+
+    parameters_ref = np.array(parameters, copy=True)
+    loss(parameters_ref)  # update paramters
+    loss.print_errors()
+
+    minimized = ["energy", "forces"]
+    optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
+    parameters = optimizer.optimize(parameters, bounds)
+    print()
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
@@ -24,12 +83,7 @@ def test_molecules(
     data_path: pathlib.Path,
 ) -> None:
     """Test `LLSOptimizer` for molecules."""
-    original_path = data_path / f"original/molecules/{molecule}"
-    fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
-    if not (fitting_path / "initial.mtp").exists():
-        pytest.skip()
-    data = read_mtp(fitting_path / "initial.mtp")
-    images = read_cfg(original_path / "training.cfg", index=":")
+    images, mtp_data = make_molecules(molecule, level, data_path)
 
     setting = LossSetting(
         energy_weight=1.0,
@@ -41,7 +95,6 @@ def test_molecules(
 
     optimized = ["moment_coeffs"]
 
-    mtp_data = MTPData(data)
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters
     mtp_data.print()
@@ -124,7 +177,6 @@ def test_crystals(
 
     optimized = ["moment_coeffs"]
 
-    mtp_data = MTPData(mtp_data)
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters
 
@@ -201,12 +253,7 @@ def test_species_coeffs(
     data_path: pathlib.Path,
 ) -> None:
     """Check if the loss function is smaller when optimizing also `species_coeffs`."""
-    original_path = data_path / f"original/molecules/{molecule}"
-    fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
-    if not (fitting_path / "initial.mtp").exists():
-        pytest.skip()
-    mtp_data = read_mtp(fitting_path / "initial.mtp")
-    images = read_cfg(original_path / "training.cfg", index=":")
+    images, mtp_data = make_molecules(molecule, level, data_path)
 
     setting = LossSetting(
         energy_weight=1.0,
@@ -217,7 +264,6 @@ def test_species_coeffs(
     rng = np.random.default_rng(42)
 
     optimized = ["moment_coeffs", "species_coeffs"]
-    mtp_data = MTPData(mtp_data)
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters
 
