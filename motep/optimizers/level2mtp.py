@@ -106,19 +106,31 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         size = species_count * species_count * radial_basis_size
 
         values = np.stack([atoms.calc.engine.rbd.values for atoms in images])
-        dqdris = np.stack(
-            [atoms.calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0) for atoms in images],
-        )
         values = values.reshape(-1, size)
-        dqdris = dqdris.reshape(-1, size)
         tmp = []
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting.energy_weight) * values)
         if "forces" in self.minimized:
-            tmp.append(np.sqrt(setting.force_weight) * dqdris)
+            tmp.append(np.sqrt(setting.force_weight) * self._calc_matrix_forces())
         if "stress" in self.minimized:
             tmp.append(np.sqrt(setting.stress_weight) * self._calc_matrix_stress())
         return np.vstack(tmp)
+
+    def _calc_matrix_forces(self) -> np.ndarray:
+        species_count = self.loss.mtp_data["species_count"]
+        radial_basis_size = self.loss.mtp_data["radial_basis_size"]
+        size = species_count * species_count * radial_basis_size
+
+        if not self.loss.idcs_frc.size:
+            return np.empty((0, size))
+
+        images = self.loss.images
+        idcs = self.loss.idcs_frc
+
+        matrix = np.stack(
+            [images[i].calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0) for i in idcs],
+        )
+        return matrix.reshape(-1, size)
 
     def _calc_matrix_stress(self) -> np.ndarray:
         images = self.loss.images

@@ -14,6 +14,53 @@ from motep.optimizers.level2mtp import Level2MTPOptimizer
 from motep.setting import LossSetting
 
 
+@pytest.mark.parametrize("level", [2])
+@pytest.mark.parametrize("molecule", [762])
+@pytest.mark.parametrize("engine", ["numpy"])
+def test_without_forces(
+    engine: str,
+    molecule: int,
+    level: int,
+    data_path: pathlib.Path,
+) -> None:
+    """Test if `Level2MTPOptimizer` works for the training data without forces."""
+    original_path = data_path / f"original/molecules/{molecule}"
+    fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
+    if not (fitting_path / "initial.mtp").exists():
+        pytest.skip()
+    mtp_data = read_mtp(fitting_path / "initial.mtp")
+    species = {762: [1], 291: [6, 1], 14214: [9, 1], 23208: [8]}[molecule]
+    mtp_data["species"] = species
+    images = read_cfg(original_path / "training.cfg", index=":", species=species)
+
+    for atoms in images:
+        del atoms.calc.results["forces"]
+
+    setting = LossSetting(
+        energy_weight=1.0,
+        force_weight=0.01,
+        stress_weight=0.0,
+    )
+
+    rng = np.random.default_rng(42)
+
+    loss = LossFunction(
+        images,
+        mtp_data=mtp_data,
+        setting=setting,
+        comm=MPI.COMM_WORLD,
+        engine=engine,
+    )
+
+    optimized = ["radial_coeffs"]
+
+    minimized = ["energy", "forces"]
+    optimizer = Level2MTPOptimizer(loss, optimized=optimized, minimized=minimized)
+    parameters, bounds = mtp_data.initialize(optimized=[], rng=rng)
+    parameters = optimizer.optimize(parameters, bounds)
+    print()
+
+
 @pytest.mark.parametrize("level", [2, 4, 6])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
 @pytest.mark.parametrize("engine", ["numpy", "numba"])
