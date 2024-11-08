@@ -1,6 +1,5 @@
 """Tests for trainer.py."""
 
-import copy
 import pathlib
 
 import numpy as np
@@ -10,6 +9,7 @@ from mpi4py import MPI
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss import LossFunction
+from motep.setting import LossSetting
 
 
 @pytest.mark.parametrize("stress_times_volume", [False, True])
@@ -29,12 +29,12 @@ def test_jac(
     mtp_data = read_mtp(path / "pot.mtp")
     images = read_cfg(path / "out.cfg", index=":")[::1000]
 
-    setting = {
-        "energy-weight": 1.0,
-        "force-weight": 0.01,
-        "stress-weight": 0.001,
-        "stress-times-volume": stress_times_volume,
-    }
+    setting = LossSetting(
+        energy_weight=1.0,
+        force_weight=0.01,
+        stress_weight=0.001,
+        stress_times_volume=stress_times_volume,
+    )
 
     loss = LossFunction(
         images,

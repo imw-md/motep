@@ -12,11 +12,11 @@ $$
 
 ```toml
 [loss]
-energy-weight = 1.0
-force-weight = 0.01
-stress-weight = 0.001
-stress-times-volume = false
+energy_weight = 1.0
+force_weight = 0.01
+stress_weight = 0.001
+stress_times-volume = false
 ```
 
-- `stress-times-volume`: If `true`, the stress is scaled by the cell volume,
+- `stress_times_volume`: If `true`, the stress is scaled by the cell volume,
 making it an extensive property.

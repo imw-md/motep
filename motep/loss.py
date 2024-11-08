@@ -1,7 +1,6 @@
 """Loss function."""
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -12,6 +11,7 @@ from scipy.constants import eV
 
 from motep.calculator import MTP
 from motep.potentials.mtp.data import MTPData
+from motep.setting import LossSetting
 
 
 def calc_properties(
@@ -92,7 +92,7 @@ class LossFunctionBase(ABC):
         self,
         images: list[Atoms],
         mtp_data: MTPData,
-        setting: dict[str, Any],
+        setting: LossSetting,
         *,
         comm: MPI.Comm,
     ) -> None:
@@ -104,8 +104,8 @@ class LossFunctionBase(ABC):
             List of ASE Atoms objects for the training dataset.
         mtp_data : :class:`motep.initializer.MTPData`
             :class:`motep.initializer.MTPData` object.
-        setting : dict[str, Any]
-            Setting for the training.
+        setting : :class:`motep.setting.LossSetting`
+            Setting of the loss function.
         comm : MPI.Comm
             MPI.Comm object.
 
@@ -155,7 +155,7 @@ class LossFunctionBase(ABC):
             for i in self.idcs_str
         )
         stress_ses = np.fromiter(iterable, dtype=float, count=self.idcs_str.size)
-        if self.setting.get("stress-times-volume"):
+        if self.setting.stress_times_volume:
             stress_ses *= self.volumes**2
         return self.configuration_weight[self.idcs_str] @ stress_ses
 
@@ -179,9 +179,9 @@ class LossFunctionBase(ABC):
         """Calculate the value of the loss function."""
         self._run_calculations()
         return (
-            self.setting["energy-weight"] * self._calc_loss_energy()
-            + self.setting["force-weight"] * self._calc_loss_forces()
-            + self.setting["stress-weight"] * self._calc_loss_stress()
+            self.setting.energy_weight * self._calc_loss_energy()
+            + self.setting.force_weight * self._calc_loss_forces()
+            + self.setting.stress_weight * self._calc_loss_stress()
         )
 
     def _jac_energy(self) -> npt.NDArray[np.float64]:
@@ -217,16 +217,16 @@ class LossFunctionBase(ABC):
 
         images = self.images
         jacs = np.array([per_configuration(images[i]) for i in self.idcs_str])
-        if self.setting.get("stress-times-volume"):
+        if self.setting.stress_times_volume:
             jacs *= self.volumes[self.idcs_str, None]
         return self.configuration_weight[self.idcs_str] @ jacs
 
     def jac(self, parameters: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         """Calculate the Jacobian of the loss function."""
         return (
-            self.setting["energy-weight"] * self._jac_energy()
-            + self.setting["force-weight"] * self._jac_forces()
-            + self.setting["stress-weight"] * self._jac_stress()
+            self.setting.energy_weight * self._jac_energy()
+            + self.setting.force_weight * self._jac_forces()
+            + self.setting.stress_weight * self._jac_stress()
         )
 
     def _calc_errors_energy(self) -> dict[str, float]:

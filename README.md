@@ -40,9 +40,9 @@ potential_final = 'final.mtp'
 engine = 'numpy'  # {'numpy', 'numba', 'mlippy'}
 
 [loss]  # setting for the loss function
-energy-weight = 1.0
-force-weight = 0.01
-stress-weight = 0.001
+energy_weight = 1.0
+force_weight = 0.01
+stress_weight = 0.001
 
 # optimization steps
 

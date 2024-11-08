@@ -11,6 +11,7 @@ from motep.io.mlip.mtp import read_mtp
 from motep.loss import LossFunction
 from motep.optimizers.lls import LLSOptimizer
 from motep.potentials.mtp.data import MTPData
+from motep.setting import LossSetting
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
@@ -30,11 +31,11 @@ def test_molecules(
     data = read_mtp(fitting_path / "initial.mtp")
     images = read_cfg(original_path / "training.cfg", index=":")
 
-    setting = {
-        "energy-weight": 1.0,
-        "force-weight": 0.01,
-        "stress-weight": 0.0,
-    }
+    setting = LossSetting(
+        energy_weight=1.0,
+        force_weight=0.01,
+        stress_weight=0.0,
+    )
 
     rng = np.random.default_rng(42)
 
@@ -112,12 +113,12 @@ def test_crystals(
     mtp_data = read_mtp(fitting_path / "initial.mtp")
     images = read_cfg(original_path / "training.cfg", index=":")[::100]
 
-    setting = {
-        "energy-weight": 1.0,
-        "force-weight": 0.01,
-        "stress-weight": 0.001,
-        "stress-times-volume": stress_times_volume,
-    }
+    setting = LossSetting(
+        energy_weight=1.0,
+        force_weight=0.01,
+        stress_weight=0.001,
+        stress_times_volume=stress_times_volume,
+    )
 
     rng = np.random.default_rng(42)
 
@@ -207,11 +208,11 @@ def test_species_coeffs(
     mtp_data = read_mtp(fitting_path / "initial.mtp")
     images = read_cfg(original_path / "training.cfg", index=":")
 
-    setting = {
-        "energy-weight": 1.0,
-        "force-weight": 0.01,
-        "stress-weight": 0.001,
-    }
+    setting = LossSetting(
+        energy_weight=1.0,
+        force_weight=0.01,
+        stress_weight=0.001,
+    )
 
     rng = np.random.default_rng(42)
 
