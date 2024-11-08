@@ -1,5 +1,7 @@
 """Loss function."""
 
+import pathlib
+
 import mlippy
 
 from motep.io.mlip.mtp import write_mtp
@@ -23,17 +25,24 @@ def init_calc(file: str, mtp_data: MTPData, species: list[int]):
 
 
 class MlippyLossFunction(LossFunctionBase):
-    def __init__(self, *args: tuple, **kwargs: dict) -> None:
+    def __init__(
+        self,
+        *args: tuple,
+        potential_initial: pathlib.Path | str = "initial.mtp",
+        potential_final: pathlib.Path | str = "final.mtp",
+        **kwargs: dict,
+    ) -> None:
         super().__init__(*args, **kwargs)
-        file = self.setting["potential_initial"]
-        mlip = init_calc(file, self.mtp_data, self.setting["species"])
+        self.potential_initial = potential_initial
+        self.potential_final = potential_final
+        mlip = init_calc(self.potential_initial, self.mtp_data, self.setting.species)
         for atoms in self.images:
             targets = atoms.calc.results
             atoms.calc = mlippy.MLIP_Calculator(mlip, {})
             atoms.calc.targets = targets
 
     def __call__(self, parameters: list[float]) -> float:
-        file = self.setting["potential_final"]
+        file = self.potential_final
         self.mtp_data.parameters = parameters
         write_mtp(file, self.mtp_data)
         options = {"mtp-filename": file}

@@ -2,34 +2,42 @@
 
 import pathlib
 import tomllib
+from dataclasses import dataclass, field
 from typing import Any
 
 
-def _make_default_setting() -> dict[str, Any]:
-    """Make default setting."""
-    # The keys are set one by one here to fix their order.
-    setting = {}
-    setting["configurations"] = "training.cfg"
-    setting["potential_initial"] = "initial.mtp"
-    setting["potential_final"] = "final.mtp"
-    setting["seed"] = None
-    setting["engine"] = "numpy"
-    setting["loss"] = {
-        "energy-weight": 1.0,
-        "force-weight": 0.01,
-        "stress-weight": 0.001,
-        "stress-times-volume": False,
-    }
-    setting["steps"] = [
-        {"method": "L-BFGS-B", "optimized": ["radial_coeffs", "moment_coeffs"]},
-    ]
-    return setting
+@dataclass
+class Setting:
+    """Setting of the training."""
+
+    configurations: list[str] = field(default_factory=lambda: ["training.cfg"])
+    species: list[int] = field(default_factory=list)
+    potential_initial: str = "initial.mtp"
+    potential_final: str = "final.mtp"
+    seed: int | None = None
+    engine: str = "numpy"
+    loss: dict[str, Any] = field(
+        default_factory=lambda: {
+            "energy-weight": 1.0,
+            "force-weight": 0.01,
+            "stress-weight": 0.001,
+            "stress-times-volume": False,
+        },
+    )
+    steps: list[dict] = field(
+        default_factory=lambda: [
+            {"method": "L-BFGS-B", "optimized": ["radial_coeffs", "moment_coeffs"]},
+        ],
+    )
 
 
-def parse_setting(filename: str) -> dict[str, Any]:
+def parse_setting(filename: str) -> Setting:
     """Parse setting file."""
     with pathlib.Path(filename).open("rb") as f:
         setting_overwritten = tomllib.load(f)
+
+    if isinstance(setting_overwritten["configurations"], str):
+        setting_overwritten["configurations"] = [setting_overwritten["configurations"]]
 
     # convert the old style "steps" like {'steps`: ['L-BFGS-B']} to the new one
     # {'steps`: {'method': 'L-BFGS-B'}
@@ -38,8 +46,4 @@ def parse_setting(filename: str) -> dict[str, Any]:
         if not isinstance(value, dict):
             setting_overwritten["steps"][i] = {"method": value}
 
-    setting = _make_default_setting()
-
-    setting.update(setting_overwritten)
-
-    return setting
+    return Setting(**setting_overwritten)

@@ -41,25 +41,37 @@ def run(args: argparse.Namespace) -> None:
         pprint(setting, sort_dicts=False)
         print()
 
-    setting["rng"] = np.random.default_rng(setting["seed"])
+    setting.rng = np.random.default_rng(setting.seed)
 
-    cfg_file = str(pathlib.Path(setting["configurations"]).resolve())
-    untrained_mtp = str(pathlib.Path(setting["potential_initial"]).resolve())
+    cfg_file = str(pathlib.Path(setting.configurations[0]).resolve())
+    untrained_mtp = str(pathlib.Path(setting.potential_initial).resolve())
 
-    species = setting.get("species")
+    species = setting.species or None
     images = read_cfg(cfg_file, index=":", species=species)
-    if "species" not in setting:
-        setting["species"] = _get_dummy_species(images)
+    if not setting.species:
+        setting.species = _get_dummy_species(images)
 
     mtp_data = read_mtp(untrained_mtp)
 
-    if setting["engine"] == "mlippy":
+    if setting.engine == "mlippy":
         from motep.mlippy_loss import MlippyLossFunction
 
-        loss = MlippyLossFunction(images, mtp_data, setting["loss"], comm=comm)
+        loss = MlippyLossFunction(
+            images,
+            mtp_data,
+            setting.loss,
+            potential_initial=setting.potential_initial,
+            potential_final=setting.potential_final,
+            comm=comm,
+        )
     else:
-        engine = setting["engine"]
-        loss = LossFunction(images, mtp_data, setting["loss"], comm=comm, engine=engine)
+        loss = LossFunction(
+            images,
+            mtp_data,
+            setting.loss,
+            engine=setting.engine,
+            comm=comm,
+        )
 
     # Create folders for each rank
     folder_name = f"rank_{rank}"
@@ -67,13 +79,13 @@ def run(args: argparse.Namespace) -> None:
 
     # Change working directory to the created folder
     with cd(folder_name):
-        for i, step in enumerate(setting["steps"]):
+        for i, step in enumerate(setting.steps):
             if rank == 0:
                 print(step["method"])
                 print()
 
             # Print parameters before optimization.
-            parameters, bounds = mtp_data.initialize(step["optimized"], setting["rng"])
+            parameters, bounds = mtp_data.initialize(step["optimized"], setting.rng)
             mtp_data.parameters = parameters
             if rank == 0:
                 mtp_data.print()
@@ -96,7 +108,7 @@ def run(args: argparse.Namespace) -> None:
                 loss.print_errors()
 
     mtp_data.parameters = parameters
-    write_mtp(setting["potential_final"], mtp_data)
+    write_mtp(setting.potential_final, mtp_data)
 
     end_time = time.time()
     if rank == 0:
