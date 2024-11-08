@@ -113,11 +113,11 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         dqdris = dqdris.reshape(-1, size)
         tmp = []
         if "energy" in self.minimized:
-            tmp.append(np.sqrt(setting["energy-weight"]) * values)
+            tmp.append(np.sqrt(setting.energy_weight) * values)
         if "forces" in self.minimized:
-            tmp.append(np.sqrt(setting["force-weight"]) * dqdris)
+            tmp.append(np.sqrt(setting.force_weight) * dqdris)
         if "stress" in self.minimized:
-            tmp.append(np.sqrt(setting["stress-weight"]) * self._calc_matrix_stress())
+            tmp.append(np.sqrt(setting.stress_weight) * self._calc_matrix_stress())
         return np.vstack(tmp)
 
     def _calc_matrix_stress(self) -> np.ndarray:
@@ -129,6 +129,6 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         size = species_count * species_count * radial_basis_size
 
         matrix = np.array([images[i].calc.engine.rbd.dqdeps.T for i in idcs])
-        if self.loss.setting.get("stress-times-volume"):
+        if self.loss.setting.stress_times_volume:
             matrix = (matrix.T * self.loss.volumes[idcs]).T
         return matrix.reshape((-1, size))

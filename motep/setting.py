@@ -7,6 +7,16 @@ from typing import Any
 
 
 @dataclass
+class LossSetting:
+    """Setting of the loss function."""
+
+    energy_weight: float = 1.0
+    force_weight: float = 0.01
+    stress_weight: float = 0.001
+    stress_times_volume: bool = False
+
+
+@dataclass
 class Setting:
     """Setting of the training."""
 
@@ -16,19 +26,16 @@ class Setting:
     potential_final: str = "final.mtp"
     seed: int | None = None
     engine: str = "numpy"
-    loss: dict[str, Any] = field(
-        default_factory=lambda: {
-            "energy-weight": 1.0,
-            "force-weight": 0.01,
-            "stress-weight": 0.001,
-            "stress-times-volume": False,
-        },
-    )
+    loss: dict[str, Any] = field(default_factory=LossSetting)
     steps: list[dict] = field(
         default_factory=lambda: [
             {"method": "L-BFGS-B", "optimized": ["radial_coeffs", "moment_coeffs"]},
         ],
     )
+
+    def __post_init__(self) -> None:
+        """Postprocess attributes."""
+        self.loss = LossSetting(**self.loss)
 
 
 def parse_setting(filename: str) -> Setting:
