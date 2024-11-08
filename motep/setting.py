@@ -5,7 +5,7 @@ import tomllib
 from typing import Any
 
 
-def make_default_setting() -> dict[str, Any]:
+def _make_default_setting() -> dict[str, Any]:
     """Make default setting."""
     # The keys are set one by one here to fix their order.
     setting = {}
@@ -26,16 +26,20 @@ def make_default_setting() -> dict[str, Any]:
     return setting
 
 
-def parse_setting(filename: str) -> dict:
+def parse_setting(filename: str) -> dict[str, Any]:
     """Parse setting file."""
     with pathlib.Path(filename).open("rb") as f:
-        setting = tomllib.load(f)
+        setting_overwritten = tomllib.load(f)
 
     # convert the old style "steps" like {'steps`: ['L-BFGS-B']} to the new one
     # {'steps`: {'method': 'L-BFGS-B'}
     # Default 'optimized' is defined in each `Optimizer` class.
-    for i, value in enumerate(setting["steps"]):
+    for i, value in enumerate(setting_overwritten["steps"]):
         if not isinstance(value, dict):
-            setting["steps"][i] = {"method": value}
+            setting_overwritten["steps"][i] = {"method": value}
+
+    setting = _make_default_setting()
+
+    setting.update(setting_overwritten)
 
     return setting

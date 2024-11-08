@@ -2,7 +2,6 @@
 
 import argparse
 import pathlib
-import sys
 import time
 from pprint import pprint
 
@@ -14,7 +13,7 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss import LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
-from motep.setting import make_default_setting, parse_setting
+from motep.setting import parse_setting
 from motep.utils import cd
 
 
@@ -37,8 +36,7 @@ def run(args: argparse.Namespace) -> None:
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
 
-    setting = make_default_setting()
-    setting.update(parse_setting(args.setting))
+    setting = parse_setting(args.setting)
     if rank == 0:
         pprint(setting, sort_dicts=False)
         print()
