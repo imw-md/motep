@@ -139,14 +139,16 @@ def test_molecules(
         "stress_times_volume",
         "energy_per_conf",
         "forces_per_conf",
+        "stress_per_conf",
     ),
     [
-        (True, True, False, True, True),  # default
-        (False, True, False, True, True),
-        (True, False, False, True, True),
-        (True, True, True, True, True),
-        (True, True, False, False, True),
-        (True, True, False, True, False),
+        (True, True, False, True, True, True),  # default
+        (False, True, False, True, True, True),
+        (True, False, False, True, True, True),
+        (True, True, True, True, True, True),
+        (True, True, False, False, True, True),
+        (True, True, False, True, False, True),
+        (True, True, False, True, True, False),
     ],
 )
 @pytest.mark.parametrize("level", [2, 4])
@@ -162,6 +164,7 @@ def test_crystals(
     stress_times_volume: bool,
     energy_per_conf: bool,
     forces_per_conf: bool,
+    stress_per_conf: bool,
     optimized: list[str],
     data_path: pathlib.Path,
 ) -> None:
@@ -182,6 +185,7 @@ def test_crystals(
         stress_times_volume=stress_times_volume,
         energy_per_conf=energy_per_conf,
         forces_per_conf=forces_per_conf,
+        stress_per_conf=stress_per_conf,
     )
 
     rng = np.random.default_rng(42)

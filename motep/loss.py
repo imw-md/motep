@@ -180,7 +180,8 @@ class LossFunctionBase(ABC):
         stress_ses = np.fromiter(iterable, dtype=float, count=self.idcs_str.size)
         if self.setting.stress_times_volume:
             stress_ses *= self.volumes**2
-        return self.configuration_weight[self.idcs_str] @ stress_ses
+        loss = self.configuration_weight[self.idcs_str] @ stress_ses
+        return loss / len(images) if self.setting.stress_per_conf else loss
 
     def _run_calculations(self) -> None:
         """Run calculations of the properties."""
@@ -247,7 +248,8 @@ class LossFunctionBase(ABC):
         jacs = np.array([per_configuration(self.images[i]) for i in self.idcs_str])
         if self.setting.stress_times_volume:
             jacs *= self.volumes[self.idcs_str, None] ** 2
-        return self.configuration_weight[self.idcs_str] @ jacs
+        jac = self.configuration_weight[self.idcs_str] @ jacs
+        return jac / len(self.images) if self.setting.stress_per_conf else jac
 
     def jac(self, parameters: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         """Calculate the Jacobian of the loss function."""

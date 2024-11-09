@@ -18,6 +18,7 @@ class LossSetting:
     stress_times_volume: bool = False
     energy_per_conf: bool = False
     forces_per_conf: bool = False
+    stress_per_conf: bool = False
 
 
 @dataclass

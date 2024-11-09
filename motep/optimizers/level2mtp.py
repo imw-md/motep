@@ -164,4 +164,6 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         matrix = np.array([images[i].calc.engine.rbd.dqdeps.T for i in idcs])
         if self.loss.setting.stress_times_volume:
             matrix = (matrix.T * self.loss.volumes[idcs]).T
+        if self.loss.setting.stress_per_conf:
+            matrix /= sqrt(len(images))
         return matrix.reshape((-1, size))
