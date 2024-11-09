@@ -12,17 +12,10 @@ from motep.loss import ErrorPrinter, LossFunction
 from motep.setting import LossSetting
 
 
-@pytest.mark.parametrize("stress_times_volume", [False])
-@pytest.mark.parametrize("level", [2])
-@pytest.mark.parametrize("engine", ["numpy"])
-def test_without_forces(
-    *,
-    engine: str,
-    level: int,
-    stress_times_volume: bool,
-    data_path: pathlib.Path,
-) -> None:
+def test_without_forces(data_path: pathlib.Path) -> None:
     """Test if `LossFunction` works for the training data without forces."""
+    engine = "numpy"
+    level = 2
     path = data_path / f"fitting/crystals/multi/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
@@ -35,7 +28,6 @@ def test_without_forces(
         energy_weight=1.0,
         force_weight=0.01,
         stress_weight=0.001,
-        stress_times_volume=stress_times_volume,
     )
 
     loss = LossFunction(
