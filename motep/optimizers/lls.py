@@ -68,22 +68,23 @@ class LLSOptimizerBase(OptimizerBase):
         for i, atoms in enumerate(images):
             for j, s in enumerate(species):
                 counts[i, j] = list(atoms.numbers).count(s)
+        if self.loss.setting.energy_per_atom:
+            counts *= self.loss.inverse_numbers_of_atoms[:, None]
         return counts
 
     def _calc_vector(self) -> np.ndarray:
         """Calculate the vector for linear least squares (LLS)."""
         setting = self.loss.setting
-        energies = self._calc_energies()
         tmp = []
         if "energy" in self.minimized:
-            tmp.append(np.sqrt(setting.energy_weight) * energies)
+            tmp.append(np.sqrt(setting.energy_weight) * self._calc_vector_energy())
         if "forces" in self.minimized:
             tmp.append(np.sqrt(setting.force_weight) * self._calc_vector_forces())
         if "stress" in self.minimized:
             tmp.append(np.sqrt(setting.stress_weight) * self._calc_vector_stress())
         return np.hstack(tmp)
 
-    def _calc_energies(self) -> np.ndarray:
+    def _calc_vector_energy(self) -> np.ndarray:
         """Calculate energies of Atoms objects.
 
         Returns
@@ -107,6 +108,8 @@ class LLSOptimizerBase(OptimizerBase):
                 for atoms in images
             )
             energies -= np.fromiter(iterable, dtype=float, count=len(images))
+        if self.loss.setting.energy_per_atom:
+            energies *= self.loss.inverse_numbers_of_atoms
         return energies
 
     def _calc_target_energies(self) -> np.ndarray:
@@ -215,18 +218,22 @@ class LLSOptimizer(LLSOptimizerBase):
         return np.hstack(tmp)
 
     def _calc_matrix_moment_coeffs(self) -> np.ndarray:
-        loss = self.loss
-        images = loss.images
-        setting = loss.setting
-        basis_values = np.array([atoms.calc.engine.mbd.values for atoms in images])
+        setting = self.loss.setting
         tmp = []
         if "energy" in self.minimized:
-            tmp.append(np.sqrt(setting.energy_weight) * basis_values)
+            tmp.append(np.sqrt(setting.energy_weight) * self._calc_matrix_energy())
         if "forces" in self.minimized:
             tmp.append(np.sqrt(setting.force_weight) * self._calc_matrix_forces())
         if "stress" in self.minimized:
             tmp.append(np.sqrt(setting.stress_weight) * self._calc_matrix_stress())
         return np.vstack(tmp)
+
+    def _calc_matrix_energy(self) -> np.ndarray:
+        images = self.loss.images
+        matrix = np.array([atoms.calc.engine.mbd.values for atoms in images])
+        if self.loss.setting.energy_per_atom:
+            matrix *= self.loss.inverse_numbers_of_atoms[:, None]
+        return matrix
 
     def _calc_matrix_forces(self) -> np.ndarray:
         if not self.loss.idcs_frc.size:

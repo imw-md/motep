@@ -133,6 +133,7 @@ def test_molecules(
     ],
 )
 @pytest.mark.parametrize("stress_times_volume", [False, True])
+@pytest.mark.parametrize("energy_per_atom", [False, True])
 @pytest.mark.parametrize("level", [2, 4])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("engine", ["numpy"])
@@ -141,6 +142,7 @@ def test_crystals(
     engine: str,
     crystal: int,
     level: int,
+    energy_per_atom: bool,
     stress_times_volume: bool,
     optimized: list[str],
     data_path: pathlib.Path,
@@ -157,6 +159,7 @@ def test_crystals(
         energy_weight=1.0,
         force_weight=0.01,
         stress_weight=0.001,
+        energy_per_atom=energy_per_atom,
         stress_times_volume=stress_times_volume,
     )
 
