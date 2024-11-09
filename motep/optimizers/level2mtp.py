@@ -119,6 +119,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         matrix = np.stack([atoms.calc.engine.rbd.values for atoms in images])
         if self.loss.setting.energy_per_atom:
             matrix *= self.loss.inverse_numbers_of_atoms[:, None, None, None]
+        if self.loss.setting.energy_per_conf:
+            matrix /= sqrt(len(images))
         return matrix.reshape(-1, size)
 
     def _calc_matrix_forces(self) -> np.ndarray:
@@ -147,6 +149,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
                     for i in idcs
                 ],
             )
+        if self.loss.setting.forces_per_conf:
+            matrix /= sqrt(len(images))
         return matrix.reshape(-1, size)
 
     def _calc_matrix_stress(self) -> np.ndarray:
@@ -160,4 +164,6 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         matrix = np.array([images[i].calc.engine.rbd.dqdeps.T for i in idcs])
         if self.loss.setting.stress_times_volume:
             matrix = (matrix.T * self.loss.volumes[idcs]).T
+        if self.loss.setting.stress_per_conf:
+            matrix /= sqrt(len(images))
         return matrix.reshape((-1, size))

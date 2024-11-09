@@ -16,6 +16,9 @@ class LossSetting:
     energy_per_atom: bool = True
     forces_per_atom: bool = True
     stress_times_volume: bool = False
+    energy_per_conf: bool = True
+    forces_per_conf: bool = True
+    stress_per_conf: bool = True
 
 
 @dataclass
