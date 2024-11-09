@@ -97,24 +97,27 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         return np.hstack(tmp)
 
     def _calc_matrix_radial_coeffs(self) -> np.ndarray:
-        loss = self.loss
-        mtp_data = loss.mtp_data
-        images = loss.images
-        setting = loss.setting
-        species_count = mtp_data["species_count"]
-        radial_basis_size = mtp_data["radial_basis_size"]
-        size = species_count * species_count * radial_basis_size
-
-        values = np.stack([atoms.calc.engine.rbd.values for atoms in images])
-        values = values.reshape(-1, size)
+        setting = self.loss.setting
         tmp = []
         if "energy" in self.minimized:
-            tmp.append(np.sqrt(setting.energy_weight) * values)
+            tmp.append(np.sqrt(setting.energy_weight) * self._calc_matrix_energy())
         if "forces" in self.minimized:
             tmp.append(np.sqrt(setting.force_weight) * self._calc_matrix_forces())
         if "stress" in self.minimized:
             tmp.append(np.sqrt(setting.stress_weight) * self._calc_matrix_stress())
         return np.vstack(tmp)
+
+    def _calc_matrix_energy(self) -> np.ndarray:
+        loss = self.loss
+        mtp_data = loss.mtp_data
+        images = loss.images
+        species_count = mtp_data["species_count"]
+        radial_basis_size = mtp_data["radial_basis_size"]
+        size = species_count * species_count * radial_basis_size
+        matrix = np.stack([atoms.calc.engine.rbd.values for atoms in images])
+        if self.loss.setting.energy_per_atom:
+            matrix *= self.loss.inverse_numbers_of_atoms[:, None, None, None]
+        return matrix.reshape(-1, size)
 
     def _calc_matrix_forces(self) -> np.ndarray:
         species_count = self.loss.mtp_data["species_count"]

@@ -114,6 +114,14 @@ class LossFunctionBase(ABC):
         self.mtp_data = mtp_data
         self.setting = setting
         self.comm = comm
+
+        numbers_of_atoms = np.fromiter(
+            (len(atoms) for atoms in images),
+            dtype=float,
+            count=len(images),
+        )
+        self.inverse_numbers_of_atoms = 1.0 / numbers_of_atoms
+
         self.idcs_frc = np.fromiter(
             (i for i, atoms in enumerate(images) if "forces" in atoms.calc.results),
             dtype=int,
@@ -137,10 +145,14 @@ class LossFunctionBase(ABC):
         """Evaluate the loss function."""
 
     def _calc_loss_energy(self) -> np.float64:
-        energy_ses = [
-            (atoms.calc.results["energy"] - atoms.calc.targets["energy"]) ** 2
+        iterable = (
+            atoms.calc.results["energy"] - atoms.calc.targets["energy"]
             for atoms in self.images
-        ]  # squared errors
+        )
+        energy_ses = np.fromiter(iterable, dtype=float, count=len(self.images))
+        energy_ses **= 2
+        if self.setting.energy_per_atom:
+            energy_ses *= self.inverse_numbers_of_atoms**2
         return self.configuration_weight @ energy_ses
 
     def _calc_loss_forces(self) -> np.float64:
@@ -200,6 +212,8 @@ class LossFunctionBase(ABC):
             )
 
         jacs = np.array([per_configuration(atoms) for atoms in self.images])
+        if self.setting.energy_per_atom:
+            jacs *= self.inverse_numbers_of_atoms[:, None] ** 2
         return self.configuration_weight @ jacs
 
     def _jac_forces(self) -> npt.NDArray[np.float64]:

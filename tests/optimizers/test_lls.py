@@ -146,7 +146,14 @@ def test_molecules(
     assert errors0["forces"]["RMS"] > errors1["forces"]["RMS"]
 
 
-@pytest.mark.parametrize("stress_times_volume", [False, True])
+@pytest.mark.parametrize(
+    "optimized",
+    [["moment_coeffs"], ["moment_coeffs", "species_coeffs"]],
+)
+@pytest.mark.parametrize(
+    ("energy_per_atom", "stress_times_volume"),
+    [(True, False), (False, False), (True, True)],
+)
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("engine", ["numpy", "numba"])
@@ -155,10 +162,12 @@ def test_crystals(
     engine: str,
     crystal: int,
     level: int,
+    energy_per_atom: bool,
     stress_times_volume: bool,
+    optimized: list[str],
     data_path: pathlib.Path,
 ) -> None:
-    """Test PyMTP."""
+    """Test `LLSOptimizer` for crystals."""
     original_path = data_path / f"original/crystals/{crystal}"
     fitting_path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (fitting_path / "initial.mtp").exists():
@@ -170,12 +179,11 @@ def test_crystals(
         energy_weight=1.0,
         force_weight=0.01,
         stress_weight=0.001,
+        energy_per_atom=energy_per_atom,
         stress_times_volume=stress_times_volume,
     )
 
     rng = np.random.default_rng(42)
-
-    optimized = ["moment_coeffs"]
 
     parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
     mtp_data.parameters = parameters
