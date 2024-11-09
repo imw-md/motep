@@ -151,8 +151,13 @@ def test_molecules(
     [["moment_coeffs"], ["moment_coeffs", "species_coeffs"]],
 )
 @pytest.mark.parametrize(
-    ("energy_per_atom", "stress_times_volume"),
-    [(True, False), (False, False), (True, True)],
+    ("energy_per_atom", "forces_per_atom", "stress_times_volume"),
+    [
+        (True, True, False),
+        (False, True, False),
+        (True, False, False),
+        (True, True, True),
+    ],
 )
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
@@ -163,6 +168,7 @@ def test_crystals(
     crystal: int,
     level: int,
     energy_per_atom: bool,
+    forces_per_atom: bool,
     stress_times_volume: bool,
     optimized: list[str],
     data_path: pathlib.Path,
@@ -180,6 +186,7 @@ def test_crystals(
         forces_weight=0.01,
         stress_weight=0.001,
         energy_per_atom=energy_per_atom,
+        forces_per_atom=forces_per_atom,
         stress_times_volume=stress_times_volume,
     )
 
@@ -247,6 +254,7 @@ def test_crystals(
     # Check loss functions
     # The value should be smaller when all energies, forces, and stress are
     # considered than the value when only part of them are considered.
+    # Note that it is not always true that f0 > f1 because of the stress contribution.
     assert f0 > f2
     assert f1 > f2
 

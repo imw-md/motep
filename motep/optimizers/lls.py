@@ -1,6 +1,7 @@
 """Module for the optimizer based on linear least squares (LLS)."""
 
 from abc import abstractmethod
+from math import sqrt
 from typing import Any
 
 import numpy as np
@@ -127,6 +128,16 @@ class LLSOptimizerBase(OptimizerBase):
         key = "forces"
         images = self.loss.images
         idcs_frc = self.loss.idcs_frc
+        if self.loss.setting.forces_per_atom:
+            return -1.0 * np.hstack(
+                [
+                    (
+                        images[i].calc.targets[key]
+                        * sqrt(self.loss.inverse_numbers_of_atoms[i])
+                    ).flat
+                    for i in idcs_frc
+                ],
+            )
         return -1.0 * np.hstack([images[i].calc.targets[key].flat for i in idcs_frc])
 
     def _calc_vector_stress(self) -> np.ndarray:
@@ -240,9 +251,18 @@ class LLSOptimizer(LLSOptimizerBase):
             return np.empty((0, self.loss.mtp_data["alpha_scalar_moments"]))
         images = self.loss.images
         idcs_frc = self.loss.idcs_frc
-        matrix = np.vstack(
-            [images[i].calc.engine.mbd.dbdris.transpose(1, 2, 0) for i in idcs_frc],
-        )
+        if self.loss.setting.forces_per_atom:
+            matrix = np.vstack(
+                [
+                    images[i].calc.engine.mbd.dbdris.transpose(1, 2, 0)
+                    * sqrt(self.loss.inverse_numbers_of_atoms[i])
+                    for i in idcs_frc
+                ],
+            )
+        else:
+            matrix = np.vstack(
+                [images[i].calc.engine.mbd.dbdris.transpose(1, 2, 0) for i in idcs_frc],
+            )
         return matrix.reshape((-1, self.loss.mtp_data["alpha_scalar_moments"]))
 
     def _calc_matrix_stress(self) -> np.ndarray:

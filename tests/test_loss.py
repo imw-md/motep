@@ -12,7 +12,8 @@ from motep.loss import ErrorPrinter, LossFunction
 from motep.setting import LossSetting
 
 
-def test_without_forces(data_path: pathlib.Path) -> None:
+@pytest.mark.parametrize("forces_per_atom", [False, True])
+def test_without_forces(*, forces_per_atom: bool, data_path: pathlib.Path) -> None:
     """Test if `LossFunction` works for the training data without forces."""
     engine = "numpy"
     level = 2
@@ -28,6 +29,7 @@ def test_without_forces(data_path: pathlib.Path) -> None:
         energy_weight=1.0,
         forces_weight=0.01,
         stress_weight=0.001,
+        forces_per_atom=forces_per_atom,
     )
 
     loss = LossFunction(
@@ -44,8 +46,13 @@ def test_without_forces(data_path: pathlib.Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("energy_per_atom", "stress_times_volume"),
-    [(True, False), (False, False), (True, True)],
+    ("energy_per_atom", "forces_per_atom", "stress_times_volume"),
+    [
+        (True, True, False),
+        (False, True, False),
+        (True, False, False),
+        (True, True, True),
+    ],
 )
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("engine", ["numpy"])
@@ -54,6 +61,7 @@ def test_jac(
     engine: str,
     level: int,
     energy_per_atom: bool,
+    forces_per_atom: bool,
     stress_times_volume: bool,
     data_path: pathlib.Path,
 ) -> None:
@@ -66,9 +74,10 @@ def test_jac(
 
     setting = LossSetting(
         energy_weight=1.0,
-        forces_weight=0.01,
+        forces_weight=1.0 if forces_per_atom else 0.01,
         stress_weight=0.001,
         energy_per_atom=energy_per_atom,
+        forces_per_atom=forces_per_atom,
         stress_times_volume=stress_times_volume,
     )
 

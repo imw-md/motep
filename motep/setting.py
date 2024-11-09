@@ -14,6 +14,7 @@ class LossSetting:
     forces_weight: float = 0.01
     stress_weight: float = 0.001
     energy_per_atom: bool = True
+    forces_per_atom: bool = False
     stress_times_volume: bool = False
 
 
