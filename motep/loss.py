@@ -225,7 +225,7 @@ class LossFunctionBase(ABC):
 
         jacs = np.array([per_configuration(self.images[i]) for i in self.idcs_str])
         if self.setting.stress_times_volume:
-            jacs *= self.volumes[self.idcs_str, None]
+            jacs *= self.volumes[self.idcs_str, None] ** 2
         return self.configuration_weight[self.idcs_str] @ jacs
 
     def jac(self, parameters: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
