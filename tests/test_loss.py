@@ -8,7 +8,7 @@ from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.loss import LossFunction
+from motep.loss import ErrorPrinter, LossFunction
 from motep.setting import LossSetting
 
 
@@ -48,7 +48,7 @@ def test_without_forces(
 
     loss(mtp_data.parameters)
     loss.jac(mtp_data.parameters)
-    loss.print_errors()
+    ErrorPrinter(loss).print()
 
 
 @pytest.mark.parametrize("stress_times_volume", [False, True])
