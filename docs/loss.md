@@ -13,7 +13,7 @@ $$
 ```toml
 [loss]
 energy_weight = 1.0
-force_weight = 0.01
+forces_weight = 0.01
 stress_weight = 0.001
 stress_times-volume = false
 ```

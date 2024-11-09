@@ -102,7 +102,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting.energy_weight) * self._calc_matrix_energy())
         if "forces" in self.minimized:
-            tmp.append(np.sqrt(setting.force_weight) * self._calc_matrix_forces())
+            tmp.append(np.sqrt(setting.forces_weight) * self._calc_matrix_forces())
         if "stress" in self.minimized:
             tmp.append(np.sqrt(setting.stress_weight) * self._calc_matrix_stress())
         return np.vstack(tmp)

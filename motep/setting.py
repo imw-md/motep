@@ -11,7 +11,7 @@ class LossSetting:
     """Setting of the loss function."""
 
     energy_weight: float = 1.0
-    force_weight: float = 0.01
+    forces_weight: float = 0.01
     stress_weight: float = 0.001
     energy_per_atom: bool = True
     stress_times_volume: bool = False

@@ -26,7 +26,7 @@ def test_without_forces(data_path: pathlib.Path) -> None:
 
     setting = LossSetting(
         energy_weight=1.0,
-        force_weight=0.01,
+        forces_weight=0.01,
         stress_weight=0.001,
     )
 
@@ -66,7 +66,7 @@ def test_jac(
 
     setting = LossSetting(
         energy_weight=1.0,
-        force_weight=0.01,
+        forces_weight=0.01,
         stress_weight=0.001,
         energy_per_atom=energy_per_atom,
         stress_times_volume=stress_times_volume,

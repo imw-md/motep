@@ -43,7 +43,7 @@ def test_without_forces(
 
     setting = LossSetting(
         energy_weight=1.0,
-        force_weight=0.01,
+        forces_weight=0.01,
         stress_weight=0.0,
     )
 
@@ -87,7 +87,7 @@ def test_molecules(
 
     setting = LossSetting(
         energy_weight=1.0,
-        force_weight=0.01,
+        forces_weight=0.01,
         stress_weight=0.0,
     )
 
@@ -177,7 +177,7 @@ def test_crystals(
 
     setting = LossSetting(
         energy_weight=1.0,
-        force_weight=0.01,
+        forces_weight=0.01,
         stress_weight=0.001,
         energy_per_atom=energy_per_atom,
         stress_times_volume=stress_times_volume,
@@ -265,7 +265,7 @@ def test_species_coeffs(
 
     setting = LossSetting(
         energy_weight=1.0,
-        force_weight=0.01,
+        forces_weight=0.01,
         stress_weight=0.001,
     )
 

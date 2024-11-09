@@ -200,7 +200,7 @@ class LossFunctionBase(ABC):
         self._run_calculations()
         return (
             self.setting.energy_weight * self._calc_loss_energy()
-            + self.setting.force_weight * self._calc_loss_forces()
+            + self.setting.forces_weight * self._calc_loss_forces()
             + self.setting.stress_weight * self._calc_loss_stress()
         )
 
@@ -246,7 +246,7 @@ class LossFunctionBase(ABC):
         """Calculate the Jacobian of the loss function."""
         return (
             self.setting.energy_weight * self._jac_energy()
-            + self.setting.force_weight * self._jac_forces()
+            + self.setting.forces_weight * self._jac_forces()
             + self.setting.stress_weight * self._jac_stress()
         )
 
