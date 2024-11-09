@@ -1,0 +1,27 @@
+configurations = ['training.cfg']
+potential_initial = 'initial.mtp'
+potential_final = 'pot.mtp'
+seed = 42
+engine = 'numba'
+
+[loss]
+energy_weight = 1.0
+forces_weight = 0.01
+stress_weight = 0.01
+
+[[steps]]
+method = 'Level2MTP'
+minimized = ['energy', 'forces', 'stress']
+optimized = ['species_coeffs', 'radial_coeffs']
+[[steps]]
+method = 'LLS'
+minimized = ['energy', 'forces', 'stress']
+optimized = ['species_coeffs', 'moment_coeffs']
+[[steps]]
+method = 'L-BFGS-B'
+optimized = ['species_coeffs', 'radial_coeffs', 'moment_coeffs']
+[steps.kwargs]
+jac = true
+tol = 1e-12
+[steps.kwargs.options]
+maxiter = 1000
