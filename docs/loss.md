@@ -48,4 +48,7 @@ stress_weight = 0.001
 energy_per_atom = true
 forces_per_atom = true
 stress_times_volume = false
+energy_per_conf = true
+forces_per_conf = true
+stress_per_conf = true
 ```
