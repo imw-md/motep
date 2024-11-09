@@ -9,7 +9,7 @@ from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.loss import LossFunction
+from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers.lls import LLSOptimizer
 from motep.setting import LossSetting
 
@@ -65,7 +65,7 @@ def test_without_forces(
 
     parameters_ref = np.array(parameters, copy=True)
     loss(parameters_ref)  # update paramters
-    loss.print_errors()
+    ErrorPrinter(loss).print()
 
     minimized = ["energy", "forces"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
@@ -109,7 +109,7 @@ def test_molecules(
 
     parameters_ref = np.array(parameters, copy=True)
     loss(parameters_ref)  # update paramters
-    loss.print_errors()
+    ErrorPrinter(loss).print()
 
     minimized = ["energy"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
@@ -119,7 +119,7 @@ def test_molecules(
     mtp_data.parameters = parameters
     mtp_data.print()
     f0 = loss(parameters)  # update paramters
-    errors0 = loss.print_errors()
+    errors0 = ErrorPrinter(loss).print()
 
     # Check if `parameters` are updated.
     assert not np.allclose(parameters, parameters_ref)
@@ -132,7 +132,7 @@ def test_molecules(
     mtp_data.parameters = parameters
     mtp_data.print()
     f1 = loss(parameters)  # update parameters
-    errors1 = loss.print_errors()
+    errors1 = ErrorPrinter(loss).print()
 
     # Check loss functions
     # The value should be smaller when considering both energies and forces than
@@ -192,7 +192,7 @@ def test_crystals(
     mtp_data.parameters = parameters
     mtp_data.print()
     loss(parameters_ref)  # update parameters
-    loss.print_errors()
+    ErrorPrinter(loss).print()
 
     minimized = ["energy"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
@@ -202,7 +202,7 @@ def test_crystals(
     mtp_data.parameters = parameters
     mtp_data.print()
     f0 = loss(parameters)  # update parameters
-    errors0 = loss.print_errors()
+    errors0 = ErrorPrinter(loss).print()
 
     # Check if `parameters` are updated.
     assert not np.allclose(parameters, parameters_ref)
@@ -215,7 +215,7 @@ def test_crystals(
     mtp_data.parameters = parameters
     mtp_data.print()
     f1 = loss(parameters)  # update parameters
-    errors1 = loss.print_errors()
+    errors1 = ErrorPrinter(loss).print()
 
     # Check RMSEs
     # When only the RMSE of the energies is minimized, it should be smaller than
@@ -231,7 +231,7 @@ def test_crystals(
     mtp_data.parameters = parameters
     mtp_data.print()
     f2 = loss(parameters)  # update parameters
-    errors2 = loss.print_errors()
+    errors2 = ErrorPrinter(loss).print()
 
     # Check RMSEs
     assert errors1["stress"]["RMS"] > errors2["stress"]["RMS"]

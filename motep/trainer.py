@@ -11,7 +11,7 @@ from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp, write_mtp
-from motep.loss import LossFunction
+from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
 from motep.setting import parse_setting
 from motep.utils import cd
@@ -105,7 +105,7 @@ def run(args: argparse.Namespace) -> None:
 
             write_mtp(f"intermediate_{i}.mtp", mtp_data)
             if rank == 0:
-                loss.print_errors()
+                ErrorPrinter(loss).print()
 
     mtp_data.parameters = parameters
     write_mtp(setting.potential_final, mtp_data)

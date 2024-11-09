@@ -9,7 +9,7 @@ from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.loss import LossFunction
+from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers.ideal import NoInteractionOptimizer
 from motep.optimizers.level2mtp import Level2MTPOptimizer
 from motep.setting import LossSetting
@@ -102,7 +102,7 @@ def test_molecules(
     mtp_data.parameters = parameters
     mtp_data.print()
     f_ref = loss(parameters)  # update paramters
-    loss.print_errors()
+    ErrorPrinter(loss).print()
 
     parameters_ref = np.array(parameters, copy=True)
 
@@ -116,7 +116,7 @@ def test_molecules(
     mtp_data.parameters = parameters
     mtp_data.print()
     f_e00 = loss(parameters)  # update paramters
-    errors_e00 = loss.print_errors()
+    ErrorPrinter(loss).print()
 
     # Check if `parameters` are updated.
     assert not np.allclose(parameters, parameters_ref)
@@ -181,7 +181,7 @@ def test_crystals(
     mtp_data.parameters = parameters
     mtp_data.print()
     loss(parameters)  # update parameters
-    loss.print_errors()
+    ErrorPrinter(loss).print()
 
     parameters_ref = np.array(parameters, copy=True)
 
@@ -193,7 +193,7 @@ def test_crystals(
     mtp_data.parameters = parameters
     mtp_data.print()
     f0 = loss(parameters)  # update parameters
-    errors0 = loss.print_errors()
+    errors0 = ErrorPrinter(loss).print()
 
     # Check if `parameters` are updated.
     assert not np.allclose(parameters, parameters_ref)
@@ -206,7 +206,7 @@ def test_crystals(
     mtp_data.parameters = parameters
     mtp_data.print()
     f1 = loss(parameters)  # update parameters
-    errors1 = loss.print_errors()
+    errors1 = ErrorPrinter(loss).print()
 
     # Check loss functions
     # The value should be smaller when considering both energies and forces than
@@ -227,7 +227,7 @@ def test_crystals(
     mtp_data.parameters = parameters
     mtp_data.print()
     f2 = loss(parameters)  # update parameters
-    errors2 = loss.print_errors()
+    errors2 = ErrorPrinter(loss).print()
 
     # Check loss functions
     assert f2 < f1
