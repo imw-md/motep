@@ -112,4 +112,4 @@ def test_jac(
 
     assert np.any(jac_nmr)  # check if some of the elements are non-zero
 
-    np.testing.assert_allclose(jac_nmr, jac_anl, atol=1e-3)
+    np.testing.assert_allclose(jac_nmr, jac_anl, atol=1e-6)
