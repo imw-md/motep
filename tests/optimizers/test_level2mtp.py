@@ -43,7 +43,7 @@ def test_without_forces(
 
     setting = LossSetting(
         energy_weight=1.0,
-        force_weight=0.01,
+        forces_weight=0.01,
         stress_weight=0.0,
     )
 
@@ -80,7 +80,7 @@ def test_molecules(
 
     setting = LossSetting(
         energy_weight=1.0,
-        force_weight=0.01,
+        forces_weight=0.01,
         stress_weight=0.0,
     )
 
@@ -133,8 +133,13 @@ def test_molecules(
     ],
 )
 @pytest.mark.parametrize(
-    ("energy_per_atom", "stress_times_volume"),
-    [(True, False), (False, False), (True, True)],
+    ("energy_per_atom", "forces_per_atom", "stress_times_volume"),
+    [
+        (True, True, False),
+        (False, True, False),
+        (True, False, False),
+        (True, True, True),
+    ],
 )
 @pytest.mark.parametrize("level", [2, 4])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
@@ -145,6 +150,7 @@ def test_crystals(
     crystal: int,
     level: int,
     energy_per_atom: bool,
+    forces_per_atom: bool,
     stress_times_volume: bool,
     optimized: list[str],
     data_path: pathlib.Path,
@@ -159,9 +165,10 @@ def test_crystals(
 
     setting = LossSetting(
         energy_weight=1.0,
-        force_weight=0.01,
+        forces_weight=0.01,
         stress_weight=0.001,
         energy_per_atom=energy_per_atom,
+        forces_per_atom=forces_per_atom,
         stress_times_volume=stress_times_volume,
     )
 
@@ -213,11 +220,6 @@ def test_crystals(
     f1 = loss(parameters)  # update parameters
     errors1 = ErrorPrinter(loss).print()
 
-    # Check loss functions
-    # The value should be smaller when considering both energies and forces than
-    # when considering only energies.
-    assert f1 < f0
-
     # Check RMSEs
     # When only the RMSE of the energies is minimized, it should be smaller than
     # the value when minimizing the errors of both the energies and the forces.
@@ -234,11 +236,15 @@ def test_crystals(
     f2 = loss(parameters)  # update parameters
     errors2 = ErrorPrinter(loss).print()
 
-    # Check loss functions
-    assert f2 < f1
-
     # Check RMSEs
     assert errors1["stress"]["RMS"] > errors2["stress"]["RMS"]
+
+    # Check loss functions
+    # The value should be smaller when all energies, forces, and stress are
+    # considered than the value when only part of them are considered.
+    # Note that f0 > f1 is not always true because of the stress contribution.
+    assert f0 > f2
+    assert f1 > f2
 
 
 @pytest.mark.parametrize("minimized", [["energy"]])
@@ -262,7 +268,7 @@ def test_species_coeffs(
 
     setting = LossSetting(
         energy_weight=1.0,
-        force_weight=0.0,
+        forces_weight=0.0,
         stress_weight=0.0,
     )
 

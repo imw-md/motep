@@ -1,5 +1,7 @@
 """Optimizer for Level 2 MTP."""
 
+from math import sqrt
+
 import numpy as np
 
 from motep.optimizers.lls import LLSOptimizerBase
@@ -102,7 +104,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         if "energy" in self.minimized:
             tmp.append(np.sqrt(setting.energy_weight) * self._calc_matrix_energy())
         if "forces" in self.minimized:
-            tmp.append(np.sqrt(setting.force_weight) * self._calc_matrix_forces())
+            tmp.append(np.sqrt(setting.forces_weight) * self._calc_matrix_forces())
         if "stress" in self.minimized:
             tmp.append(np.sqrt(setting.stress_weight) * self._calc_matrix_stress())
         return np.vstack(tmp)
@@ -130,9 +132,21 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         images = self.loss.images
         idcs = self.loss.idcs_frc
 
-        matrix = np.stack(
-            [images[i].calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0) for i in idcs],
-        )
+        if self.loss.setting.forces_per_atom:
+            matrix = np.stack(
+                [
+                    images[i].calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0)
+                    * sqrt(self.loss.inverse_numbers_of_atoms[i])
+                    for i in idcs
+                ],
+            )
+        else:
+            matrix = np.stack(
+                [
+                    images[i].calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0)
+                    for i in idcs
+                ],
+            )
         return matrix.reshape(-1, size)
 
     def _calc_matrix_stress(self) -> np.ndarray:
