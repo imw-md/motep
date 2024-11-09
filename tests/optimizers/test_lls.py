@@ -25,17 +25,11 @@ def make_molecules(molecule: int, level: int, data_path: pathlib.Path) -> list[A
     return images, mtp_data
 
 
-@pytest.mark.parametrize("level", [2])
-@pytest.mark.parametrize("molecule", [762])
-@pytest.mark.parametrize("engine", ["numpy"])
-def test_without_forces(
-    *,
-    engine: str,
-    molecule: int,
-    level: int,
-    data_path: pathlib.Path,
-) -> None:
+def test_without_forces(data_path: pathlib.Path) -> None:
     """Test if `LLSOptimizer` works for the training data without forces."""
+    engine = "numpy"
+    molecule = 762
+    level = 2
     images, mtp_data = make_molecules(molecule, level, data_path)
 
     for atoms in images:
