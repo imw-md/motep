@@ -153,7 +153,8 @@ class LossFunctionBase(ABC):
         energy_ses **= 2
         if self.setting.energy_per_atom:
             energy_ses *= self.inverse_numbers_of_atoms**2
-        return self.configuration_weight @ energy_ses
+        loss = self.configuration_weight @ energy_ses
+        return loss / len(self.images) if self.setting.energy_per_conf else loss
 
     def _calc_loss_forces(self) -> np.float64:
         images = self.images
@@ -215,7 +216,8 @@ class LossFunctionBase(ABC):
         jacs = np.array([per_configuration(atoms) for atoms in self.images])
         if self.setting.energy_per_atom:
             jacs *= self.inverse_numbers_of_atoms[:, None] ** 2
-        return self.configuration_weight @ jacs
+        jac = self.configuration_weight @ jacs
+        return jac / len(self.images) if self.setting.energy_per_conf else jac
 
     def _jac_forces(self) -> npt.NDArray[np.float64]:
         def per_configuration(atoms: Atoms) -> np.float64:

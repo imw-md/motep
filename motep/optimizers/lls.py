@@ -71,6 +71,8 @@ class LLSOptimizerBase(OptimizerBase):
                 counts[i, j] = list(atoms.numbers).count(s)
         if self.loss.setting.energy_per_atom:
             counts *= self.loss.inverse_numbers_of_atoms[:, None]
+        if self.loss.setting.energy_per_conf:
+            counts /= sqrt(len(images))
         return counts
 
     def _calc_vector(self) -> np.ndarray:
@@ -111,6 +113,8 @@ class LLSOptimizerBase(OptimizerBase):
             energies -= np.fromiter(iterable, dtype=float, count=len(images))
         if self.loss.setting.energy_per_atom:
             energies *= self.loss.inverse_numbers_of_atoms
+        if self.loss.setting.energy_per_conf:
+            energies /= sqrt(len(images))
         return energies
 
     def _calc_target_energies(self) -> np.ndarray:
@@ -244,6 +248,8 @@ class LLSOptimizer(LLSOptimizerBase):
         matrix = np.array([atoms.calc.engine.mbd.values for atoms in images])
         if self.loss.setting.energy_per_atom:
             matrix *= self.loss.inverse_numbers_of_atoms[:, None]
+        if self.loss.setting.energy_per_conf:
+            matrix /= sqrt(len(images))
         return matrix
 
     def _calc_matrix_forces(self) -> np.ndarray:

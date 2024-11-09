@@ -119,6 +119,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         matrix = np.stack([atoms.calc.engine.rbd.values for atoms in images])
         if self.loss.setting.energy_per_atom:
             matrix *= self.loss.inverse_numbers_of_atoms[:, None, None, None]
+        if self.loss.setting.energy_per_conf:
+            matrix /= sqrt(len(images))
         return matrix.reshape(-1, size)
 
     def _calc_matrix_forces(self) -> np.ndarray:
