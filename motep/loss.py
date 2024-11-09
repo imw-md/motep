@@ -166,7 +166,8 @@ class LossFunctionBase(ABC):
         forces_ses = np.fromiter(iterable, dtype=float, count=self.idcs_frc.size)
         if self.setting.forces_per_atom:
             forces_ses *= self.inverse_numbers_of_atoms[self.idcs_frc]
-        return self.configuration_weight[self.idcs_frc] @ forces_ses
+        loss = self.configuration_weight[self.idcs_frc] @ forces_ses
+        return loss / len(self.images) if self.setting.forces_per_conf else loss
 
     def _calc_loss_stress(self) -> np.float64:
         images = self.images
@@ -230,7 +231,8 @@ class LossFunctionBase(ABC):
         jacs = np.array([per_configuration(self.images[i]) for i in self.idcs_frc])
         if self.setting.forces_per_atom:
             jacs *= self.inverse_numbers_of_atoms[self.idcs_frc, None]
-        return self.configuration_weight[self.idcs_frc] @ jacs
+        jac = self.configuration_weight[self.idcs_frc] @ jacs
+        return jac / len(self.images) if self.setting.forces_per_conf else jac
 
     def _jac_stress(self) -> npt.NDArray[np.float64]:
         f = voigt_6_to_full_3x3_stress

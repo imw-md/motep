@@ -133,7 +133,7 @@ class LLSOptimizerBase(OptimizerBase):
         images = self.loss.images
         idcs_frc = self.loss.idcs_frc
         if self.loss.setting.forces_per_atom:
-            return -1.0 * np.hstack(
+            vector = -1.0 * np.hstack(
                 [
                     (
                         images[i].calc.targets[key]
@@ -142,7 +142,13 @@ class LLSOptimizerBase(OptimizerBase):
                     for i in idcs_frc
                 ],
             )
-        return -1.0 * np.hstack([images[i].calc.targets[key].flat for i in idcs_frc])
+        else:
+            vector = -1.0 * np.hstack(
+                [images[i].calc.targets[key].flat for i in idcs_frc],
+            )
+        if self.loss.setting.forces_per_conf:
+            vector /= sqrt(len(images))
+        return vector
 
     def _calc_vector_stress(self) -> np.ndarray:
         key = "stress"
@@ -269,6 +275,8 @@ class LLSOptimizer(LLSOptimizerBase):
             matrix = np.vstack(
                 [images[i].calc.engine.mbd.dbdris.transpose(1, 2, 0) for i in idcs_frc],
             )
+        if self.loss.setting.forces_per_conf:
+            matrix /= sqrt(len(images))
         return matrix.reshape((-1, self.loss.mtp_data["alpha_scalar_moments"]))
 
     def _calc_matrix_stress(self) -> np.ndarray:

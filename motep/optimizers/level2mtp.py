@@ -149,6 +149,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
                     for i in idcs
                 ],
             )
+        if self.loss.setting.forces_per_conf:
+            matrix /= sqrt(len(images))
         return matrix.reshape(-1, size)
 
     def _calc_matrix_stress(self) -> np.ndarray:
