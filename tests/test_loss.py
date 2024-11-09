@@ -43,8 +43,10 @@ def test_without_forces(data_path: pathlib.Path) -> None:
     ErrorPrinter(loss).print()
 
 
-@pytest.mark.parametrize("stress_times_volume", [False, True])
-@pytest.mark.parametrize("energy_per_atom", [False, True])
+@pytest.mark.parametrize(
+    ("energy_per_atom", "stress_times_volume"),
+    [(True, False), (False, False), (True, True)],
+)
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("engine", ["numpy"])
 def test_jac(

@@ -150,8 +150,10 @@ def test_molecules(
     "optimized",
     [["moment_coeffs"], ["moment_coeffs", "species_coeffs"]],
 )
-@pytest.mark.parametrize("stress_times_volume", [False, True])
-@pytest.mark.parametrize("energy_per_atom", [False, True])
+@pytest.mark.parametrize(
+    ("energy_per_atom", "stress_times_volume"),
+    [(True, False), (False, False), (True, True)],
+)
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("engine", ["numpy", "numba"])

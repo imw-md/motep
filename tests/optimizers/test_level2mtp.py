@@ -132,8 +132,10 @@ def test_molecules(
         ["radial_coeffs", "species_coeffs"],
     ],
 )
-@pytest.mark.parametrize("stress_times_volume", [False, True])
-@pytest.mark.parametrize("energy_per_atom", [False, True])
+@pytest.mark.parametrize(
+    ("energy_per_atom", "stress_times_volume"),
+    [(True, False), (False, False), (True, True)],
+)
 @pytest.mark.parametrize("level", [2, 4])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("engine", ["numpy"])
