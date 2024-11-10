@@ -84,7 +84,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         mtp_data["moment_coeffs"][...] = 0.0
         mtp_data["moment_coeffs"][000] = 1.0
         mtp_data["radial_coeffs"][000] = 0.0
-        mtp_data["radial_coeffs"][:, :, 0, :] = coeffs[:size].reshape(shape)
+        mtp_data["radial_coeffs"][...] = coeffs[:size].reshape(shape)[:, :, None, :]
         if "species_coeffs" in self.optimized:
             mtp_data["species_coeffs"] = coeffs[size:]
 
