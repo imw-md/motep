@@ -157,14 +157,18 @@ class NumbaMTPEngine(EngineBase):
                 mtp_data["moment_coeffs"],
             )
 
-            self.mbd.values += basis_values
-
             energies[i] += moment_coeffs @ basis_values
 
-            for k, j in enumerate(js):
-                self.mbd.dbdris[:, i] -= basis_jac_rs[:, k]
-                self.mbd.dbdris[:, j] += basis_jac_rs[:, k]
-            self.mbd.dbdeps += r_ijs.T @ basis_jac_rs
+            _update_moment_basis_data_props(
+                i,
+                js,
+                r_ijs,
+                self.mbd.values,
+                self.mbd.dbdris,
+                self.mbd.dbdeps,
+                basis_values,
+                basis_jac_rs,
+            )
 
             _update_moment_basis_data_dcs(
                 i,
@@ -197,6 +201,29 @@ def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
 @nb.njit(nb.float64[:](nb.float64[:, :]))
 def _nb_linalg_norm(r_ijs: np.ndarray) -> np.ndarray:
     return np.sqrt((r_ijs**2).sum(axis=1))
+
+
+@nb.njit
+def _update_moment_basis_data_props(
+    i: np.int64,
+    js: npt.NDArray[np.int64],
+    r_ijs: npt.NDArray[np.float64],
+    mbd_values: npt.NDArray[np.float64],
+    mbd_dbdris: npt.NDArray[np.float64],
+    mbd_dbdeps: npt.NDArray[np.float64],
+    basis_values: npt.NDArray[np.float64],
+    basis_jac_rs: npt.NDArray[np.float64],
+):
+    """Update `MomentBasisData` energies, gradients, and stresses."""
+    mbd_values += basis_values
+    for k, j in enumerate(js):
+        mbd_dbdris[:, i] -= basis_jac_rs[:, k]
+        mbd_dbdris[:, j] += basis_jac_rs[:, k]
+        for ixyz0 in range(3):
+            for ixyz1 in range(3):
+                mbd_dbdeps[:, ixyz0, ixyz1] += (
+                    r_ijs[k, ixyz0] * basis_jac_rs[:, k, ixyz1]
+                )
 
 
 @nb.njit
