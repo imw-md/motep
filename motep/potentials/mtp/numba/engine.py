@@ -2,6 +2,7 @@
 
 import numba as nb
 import numpy as np
+import numpy.typing as npt
 from ase import Atoms
 
 from motep.potentials.mtp import get_types
@@ -165,12 +166,17 @@ class NumbaMTPEngine(EngineBase):
                 self.mbd.dbdris[:, j] += basis_jac_rs[:, k]
             self.mbd.dbdeps += r_ijs.T @ basis_jac_rs
 
-            self.mbd.dedcs[itype] += dedcs
-
-            for k, j in enumerate(js):
-                self.mbd.dgdcs[itype, :, :, :, i] -= dgdcs[:, :, :, k]
-                self.mbd.dgdcs[itype, :, :, :, j] += dgdcs[:, :, :, k]
-            self.mbd.dsdcs[itype] += r_ijs.T @ dgdcs
+            _update_moment_basis_data_dcs(
+                i,
+                itype,
+                js,
+                r_ijs,
+                self.mbd.dedcs,
+                self.mbd.dgdcs,
+                self.mbd.dsdcs,
+                dedcs,
+                dgdcs,
+            )
 
         energy = energies.sum()
         forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1).T * -1.0
@@ -191,3 +197,27 @@ def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
 @nb.njit(nb.float64[:](nb.float64[:, :]))
 def _nb_linalg_norm(r_ijs: np.ndarray) -> np.ndarray:
     return np.sqrt((r_ijs**2).sum(axis=1))
+
+
+@nb.njit
+def _update_moment_basis_data_dcs(
+    i: np.int64,
+    itype: np.int64,
+    js: npt.NDArray[np.int64],
+    r_ijs: npt.NDArray[np.float64],
+    mbd_dedcs: npt.NDArray[np.float64],
+    mbd_dgdcs: npt.NDArray[np.float64],
+    mbd_dsdcs: npt.NDArray[np.float64],
+    tmp_dedcs: npt.NDArray[np.float64],
+    tmp_dgdcs: npt.NDArray[np.float64],
+) -> None:
+    """Update `MomentBasisData` Jacobians with respect to radial coefficients."""
+    mbd_dedcs[itype] += tmp_dedcs
+    for k, j in enumerate(js):
+        mbd_dgdcs[itype, :, :, :, i] -= tmp_dgdcs[:, :, :, k]
+        mbd_dgdcs[itype, :, :, :, j] += tmp_dgdcs[:, :, :, k]
+        for ixyz0 in range(3):
+            for ixyz1 in range(3):
+                mbd_dsdcs[itype, :, :, :, ixyz0, ixyz1] += (
+                    r_ijs[k, ixyz0] * tmp_dgdcs[:, :, :, k, ixyz1]
+                )
