@@ -1,8 +1,3 @@
-import sys
-
-sys.path.append("./")
-
-import os
 import pathlib
 import shutil
 from time import perf_counter
@@ -16,13 +11,15 @@ from motep.calculator import MTP
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 
-fmt = "{:10s}"
+fmt = "{:12s}"
 
 
 class Timer:
-    def __init__(self, name="", print=True):
-        self.name = name
-        self.print = print
+    def __init__(self, name: str = "", print: bool = True) -> None:
+        self.name: str = name
+        self.start: float = float("nan")
+        self.time: float = float("nan")
+        self.print: bool = print
 
     def __enter__(self):
         self.start = perf_counter()
@@ -31,14 +28,14 @@ class Timer:
     def __exit__(self, type, value, traceback):
         self.time = perf_counter() - self.start
         name = " " + self.name if self.name != "" else ""
-        self.readout = f"Time{name}: {self.time * 1000:.3f} ms"
+        readout = f"Time{name}: {self.time * 1000:.3f} ms"
         if self.print:
-            print(self.readout)
+            print(readout)
 
 
 def init_mlippy(pot_path: pathlib.Path, atom_number_list: list[int]):
     tmp_path = pathlib.Path("/tmp/motep_benchmarks/")
-    os.makedirs(tmp_path, exist_ok=True)
+    tmp_path.mkdir(parents=True, exist_ok=True)
     shutil.copy2(pot_path, tmp_path / "pot.mtp")
     pot = mlippy.mtp(str(tmp_path / "pot.mtp"))
     for atomic_number in atom_number_list:
@@ -72,14 +69,14 @@ def time_mtp(
 ):
     parameters = read_mtp(pot_path)
     parameters["species"] = []
-    for i, atomic_number in enumerate(images[0].get_atomic_numbers()):
-        if not atomic_number in parameters["species"]:
+    for atomic_number in images[0].numbers:
+        if atomic_number not in parameters["species"]:
             parameters["species"].append(atomic_number)
     calc = MTP(parameters, engine=engine)
     calc.use_cache = False
 
     # Make initial calc to not time things like compile time and things that are cachable
-    with Timer("0th run with: " + fmt.format(engine)):
+    with Timer(fmt.format(engine + " (0th)")):
         calc.get_potential_energy(images[-1])
 
     with Timer(fmt.format(engine)):
@@ -101,8 +98,9 @@ def time_numba(
     return time_mtp(pot_path, images, "numba")
 
 
-if __name__ == "__main__":
-    data_path = pathlib.Path("tests/data_path")
+def main() -> None:
+    """Run benchmarks."""
+    data_path = pathlib.Path(__file__).parent / "../tests/data_path"
     crystal = "cubic"
     for level in [6, 20]:
         for size_reps in [1, 3]:
@@ -134,3 +132,7 @@ if __name__ == "__main__":
                 np.testing.assert_allclose(e_numpy, e_ref)
             e_numba = time_numba(pot_path, images)
             np.testing.assert_allclose(e_numba, e_ref)
+
+
+if __name__ == "__main__":
+    main()
