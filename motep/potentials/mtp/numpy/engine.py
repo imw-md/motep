@@ -89,12 +89,12 @@ class NumpyMTPEngine(EngineBase):
                 self.mbd.dbdris[:, j] += basis_jac_rs[:, k]
             self.mbd.dbdeps += r_ijs.T @ basis_jac_rs
 
-            self.mbd.de_dcs[itype] += dedcs
+            self.mbd.dedcs[itype] += dedcs
 
             for k, j in enumerate(js):
-                self.mbd.ddedcs[itype, :, :, :, i] -= dgdcs[:, :, :, k]
-                self.mbd.ddedcs[itype, :, :, :, j] += dgdcs[:, :, :, k]
-            self.mbd.ds_dcs[itype] += r_ijs.T @ dgdcs
+                self.mbd.dgdcs[itype, :, :, :, i] -= dgdcs[:, :, :, k]
+                self.mbd.dgdcs[itype, :, :, :, j] += dgdcs[:, :, :, k]
+            self.mbd.dsdcs[itype] += r_ijs.T @ dgdcs
 
         forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1).T * -1.0
         stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T
