@@ -2,10 +2,10 @@ import pathlib
 import shutil
 from time import perf_counter
 
-import ase.atoms
 import ase.io
 import mlippy
 import numpy as np
+from ase import Atoms
 
 from motep.calculator import MTP
 from motep.io.mlip.cfg import read_cfg
@@ -46,10 +46,7 @@ def init_mlippy(pot_path: pathlib.Path, atom_number_list: list[int]):
     return calc
 
 
-def time_mlippy(
-    pot_path: pathlib.Path,
-    images: list[ase.atoms.Atoms],
-):
+def time_mlippy(pot_path: pathlib.Path, images: list[Atoms]) -> np.ndarray:
     atom_number_list = []
     for n in images[0].get_atomic_numbers():
         if n not in atom_number_list:
@@ -64,7 +61,7 @@ def time_mlippy(
 
 def time_mtp(
     pot_path: pathlib.Path,
-    images: list[ase.atoms.Atoms],
+    images: list[Atoms],
     *,
     engine: str,
     is_trained: bool = False,
