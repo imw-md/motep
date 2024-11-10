@@ -11,7 +11,7 @@ from motep.calculator import MTP
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 
-fmt = "{:12s}"
+fmt = "{:20s}"
 
 
 class Timer:
@@ -65,37 +65,27 @@ def time_mlippy(
 def time_mtp(
     pot_path: pathlib.Path,
     images: list[ase.atoms.Atoms],
+    *,
     engine: str,
-):
+    is_trained: bool = False,
+) -> np.ndarray:
     parameters = read_mtp(pot_path)
     parameters["species"] = []
     for atomic_number in images[0].numbers:
         if atomic_number not in parameters["species"]:
             parameters["species"].append(atomic_number)
-    calc = MTP(parameters, engine=engine)
+    calc = MTP(parameters, engine=engine, is_trained=is_trained)
     calc.use_cache = False
 
+    suffix = " (train)" if is_trained else " (run)"
+
     # Make initial calc to not time things like compile time and things that are cachable
-    with Timer(fmt.format(engine + " (0th)")):
+    with Timer(fmt.format(engine + suffix + " (0th)")):
         calc.get_potential_energy(images[-1])
 
-    with Timer(fmt.format(engine)):
+    with Timer(fmt.format(engine + suffix)):
         energies = [calc.get_potential_energy(_) for _ in images]
     return np.array(energies)
-
-
-def time_numpy(
-    pot_path: pathlib.Path,
-    images: list[ase.atoms.Atoms],
-):
-    return time_mtp(pot_path, images, "numpy")
-
-
-def time_numba(
-    pot_path: pathlib.Path,
-    images: list[ase.atoms.Atoms],
-):
-    return time_mtp(pot_path, images, "numba")
 
 
 def main() -> None:
@@ -128,9 +118,11 @@ def main() -> None:
             # pot_path = "/Users/axelforslund/direct-upsampling/directupsampling/tests/resources/Al_mtps/Al_fcc_pbe_10g.mtp"
             e_ref = time_mlippy(pot_path, images)
             if number_of_atoms < 300:
-                e_numpy = time_numpy(pot_path, images)
+                e_numpy = time_mtp(pot_path, images, engine="numpy")
                 np.testing.assert_allclose(e_numpy, e_ref)
-            e_numba = time_numba(pot_path, images)
+            e_numba = time_mtp(pot_path, images, engine="numba")
+            np.testing.assert_allclose(e_numba, e_ref)
+            e_numba = time_mtp(pot_path, images, engine="numba", is_trained=True)
             np.testing.assert_allclose(e_numba, e_ref)
 
 
