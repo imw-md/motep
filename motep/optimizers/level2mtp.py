@@ -135,17 +135,19 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         idcs = self.loss.idcs_frc
 
         if self.loss.setting.forces_per_atom:
-            matrix = np.stack(
+            matrix = np.hstack(
                 [
-                    images[i].calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0)
-                    * sqrt(self.loss.inverse_numbers_of_atoms[i])
+                    (
+                        images[i].calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0)
+                        * sqrt(self.loss.inverse_numbers_of_atoms[i])
+                    ).flat
                     for i in idcs
                 ],
             )
         else:
-            matrix = np.stack(
+            matrix = np.hstack(
                 [
-                    images[i].calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0)
+                    images[i].calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0).flat
                     for i in idcs
                 ],
             )

@@ -12,17 +12,20 @@ mlp=$mlip/bin/mlp
 root=$PWD
 original=$(realpath $(dirname $0))/../../original/crystals
 # crystals=(cubic noncubic)
-crystals=(multi)
-species_counts=(["cubic"]=1 ["noncubic"]=1 ["multi"]=3)
+crystals=(size)
 
 for crystal in $crystals; do
+  species_count=1
+  if [ $crystal = 'multi' ]; then
+    species_count=3
+  fi
   for level in 02 04 06 08 10; do
     echo $crystal
     echo $level
     d=$crystal/$level
     mkdir -p $d
     cd $d
-    update_species_count $mlip/untrained_mtps/$level.mtp ${species_counts[$crystal]}
+    update_species_count $mlip/untrained_mtps/$level.mtp ${species_count}
     $mlp train \
       --init-params=same \
       initial.mtp \
