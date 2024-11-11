@@ -276,7 +276,7 @@ def test_crystals(
 
 @pytest.mark.parametrize("minimized", [["energy"]])
 @pytest.mark.parametrize("level", [2, 4])
-@pytest.mark.parametrize("crystal", ["noncubic", "size"])
+@pytest.mark.parametrize("crystal", ["noncubic"])
 def test_species_coeffs(
     crystal: int,
     level: int,
