@@ -67,7 +67,7 @@ def test_molecules(
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 # @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
-@pytest.mark.parametrize("crystal", ["noncubic"])
+@pytest.mark.parametrize("crystal", ["size", "multi"])
 @pytest.mark.parametrize("is_trained", [False, True])
 # @pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
 @pytest.mark.parametrize("engine", [NumbaMTPEngine])

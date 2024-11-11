@@ -167,7 +167,7 @@ def test_molecules(
     ],
 )
 @pytest.mark.parametrize("level", [2, 4])
-@pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
+@pytest.mark.parametrize("crystal", ["noncubic", "size"])
 @pytest.mark.parametrize("engine", ["numpy"])
 def test_crystals(
     *,
@@ -276,7 +276,7 @@ def test_crystals(
 
 @pytest.mark.parametrize("minimized", [["energy"]])
 @pytest.mark.parametrize("level", [2, 4])
-@pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
+@pytest.mark.parametrize("crystal", ["noncubic", "size"])
 def test_species_coeffs(
     crystal: int,
     level: int,
