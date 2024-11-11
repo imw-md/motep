@@ -11,10 +11,15 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers.lls import LLSOptimizer
+from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting
 
 
-def make_molecules(molecule: int, level: int, data_path: pathlib.Path) -> list[Atoms]:
+def make_molecules(
+    molecule: int,
+    level: int,
+    data_path: pathlib.Path,
+) -> tuple[list[Atoms], MTPData]:
     """Make the ASE `Atoms` object with the calculator."""
     original_path = data_path / f"original/molecules/{molecule}"
     fitting_path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
@@ -25,17 +30,26 @@ def make_molecules(molecule: int, level: int, data_path: pathlib.Path) -> list[A
     return images, mtp_data
 
 
-@pytest.mark.parametrize("level", [2])
-@pytest.mark.parametrize("molecule", [762])
-@pytest.mark.parametrize("engine", ["numpy"])
-def test_without_forces(
-    *,
-    engine: str,
-    molecule: int,
+def make_crystals(
+    crystal: str,
     level: int,
     data_path: pathlib.Path,
-) -> None:
+) -> tuple[list[Atoms], MTPData]:
+    """Make the ASE `Atoms` object with the calculator."""
+    original_path = data_path / f"original/crystals/{crystal}"
+    fitting_path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
+    if not (fitting_path / "initial.mtp").exists():
+        pytest.skip()
+    mtp_data = read_mtp(fitting_path / "initial.mtp")
+    images = read_cfg(original_path / "training.cfg", index=":")
+    return images, mtp_data
+
+
+def test_without_forces(data_path: pathlib.Path) -> None:
     """Test if `LLSOptimizer` works for the training data without forces."""
+    engine = "numpy"
+    molecule = 762
+    level = 2
     images, mtp_data = make_molecules(molecule, level, data_path)
 
     for atoms in images:
@@ -187,12 +201,8 @@ def test_crystals(
     data_path: pathlib.Path,
 ) -> None:
     """Test `LLSOptimizer` for crystals."""
-    original_path = data_path / f"original/crystals/{crystal}"
-    fitting_path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
-    if not (fitting_path / "initial.mtp").exists():
-        pytest.skip()
-    mtp_data = read_mtp(fitting_path / "initial.mtp")
-    images = read_cfg(original_path / "training.cfg", index=":")[::100]
+    images, mtp_data = make_crystals(crystal, level, data_path)
+    images = images[::100]
 
     setting = LossSetting(
         energy_weight=1.0,

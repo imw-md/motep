@@ -32,9 +32,9 @@ class MomentBasisData:
     values: npt.NDArray[np.float64] | None = None
     dbdris: npt.NDArray[np.float64] | None = None
     dbdeps: npt.NDArray[np.float64] | None = None
-    de_dcs: npt.NDArray[np.float64] | None = None
-    ddedcs: npt.NDArray[np.float64] | None = None
-    ds_dcs: npt.NDArray[np.float64] | None = None
+    dedcs: npt.NDArray[np.float64] | None = None
+    dgdcs: npt.NDArray[np.float64] | None = None
+    dsdcs: npt.NDArray[np.float64] | None = None
 
     def initialize(self, natoms: int, mtp_data: MTPData) -> None:
         """Initialize moment basis properties."""
@@ -46,18 +46,18 @@ class MomentBasisData:
         self.values = np.full((asm), np.nan)
         self.dbdris = np.full((asm, natoms, 3), np.nan)
         self.dbdeps = np.full((asm, 3, 3), np.nan)
-        self.de_dcs = np.full((spc, spc, rfc, rbs), np.nan)
-        self.ddedcs = np.full((spc, spc, rfc, rbs, natoms, 3), np.nan)
-        self.ds_dcs = np.full((spc, spc, rfc, rbs, 3, 3), np.nan)
+        self.dedcs = np.full((spc, spc, rfc, rbs), np.nan)
+        self.dgdcs = np.full((spc, spc, rfc, rbs, natoms, 3), np.nan)
+        self.dsdcs = np.full((spc, spc, rfc, rbs, 3, 3), np.nan)
 
     def clean(self) -> None:
         """Clean up moment basis properties."""
         self.values[...] = 0.0
         self.dbdris[...] = 0.0
         self.dbdeps[...] = 0.0
-        self.de_dcs[...] = 0.0
-        self.ddedcs[...] = 0.0
-        self.ds_dcs[...] = 0.0
+        self.dedcs[...] = 0.0
+        self.dgdcs[...] = 0.0
+        self.dsdcs[...] = 0.0
 
 
 @dataclass
@@ -184,8 +184,8 @@ class EngineBase:
             stress *= 0.5 / volume
             self.mbd.dbdeps += self.mbd.dbdeps.transpose(0, 2, 1)
             self.mbd.dbdeps *= 0.5 / volume
-            self.mbd.ds_dcs += self.mbd.ds_dcs.swapaxes(-2, -1)
-            self.mbd.ds_dcs *= 0.5 / volume
+            self.mbd.dsdcs += self.mbd.dsdcs.swapaxes(-2, -1)
+            self.mbd.dsdcs *= 0.5 / volume
             axes = 0, 1, 2, 4, 3
             self.rbd.dqdeps += self.rbd.dqdeps.transpose(axes)
             self.rbd.dqdeps *= 0.5 / volume
@@ -203,7 +203,7 @@ class EngineBase:
         jac["scaling"] = 0.0
         jac["moment_coeffs"] = self.mbd.values.copy()
         jac["species_coeffs"] = np.fromiter((nbs.count(s) for s in sps), dtype=float)
-        jac["radial_coeffs"] = self.mbd.de_dcs.copy()
+        jac["radial_coeffs"] = self.mbd.dedcs.copy()
 
         return jac
 
@@ -220,7 +220,7 @@ class EngineBase:
         jac["scaling"] = np.zeros((1, number_of_atoms, 3))
         jac["moment_coeffs"] = self.mbd.dbdris * -1.0
         jac["species_coeffs"] = np.zeros((spc, number_of_atoms, 3))
-        jac["radial_coeffs"] = self.mbd.ddedcs * -1.0
+        jac["radial_coeffs"] = self.mbd.dgdcs * -1.0
 
         return jac
 
@@ -236,7 +236,7 @@ class EngineBase:
         jac["scaling"] = np.zeros((1, 3, 3))
         jac["moment_coeffs"] = self.mbd.dbdeps.copy()
         jac["species_coeffs"] = np.zeros((spc, 3, 3))
-        jac["radial_coeffs"] = self.mbd.ds_dcs.copy()
+        jac["radial_coeffs"] = self.mbd.dsdcs.copy()
 
         return jac
 
