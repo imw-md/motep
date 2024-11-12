@@ -44,7 +44,7 @@ class LLSOptimizerBase(OptimizerBase):
     def _calc_matrix_species_coeffs(self) -> np.ndarray:
         loss = self.loss
         images = loss.images
-        species = loss.mtp_data["species"]
+        species = loss.mtp_data.species
         setting = loss.setting
         tmp = []
         if "energy" in self.minimized:
@@ -63,7 +63,7 @@ class LLSOptimizerBase(OptimizerBase):
 
     def _calc_matrix_energies_species_coeffs(self) -> np.ndarray:
         loss = self.loss
-        species = loss.mtp_data["species"]
+        species = loss.mtp_data.species
         images = loss.images
         counts = np.full((len(images), len(species)), np.nan)
         for i, atoms in enumerate(images):
@@ -102,12 +102,12 @@ class LLSOptimizerBase(OptimizerBase):
         loss = self.loss
         mtp_data = loss.mtp_data
         images = loss.images
-        species: list[int] = mtp_data["species"]
+        species: list[int] = mtp_data.species
 
         energies = self._calc_target_energies()
         if "species_coeffs" not in self.optimized:
             iterable = (
-                np.add.reduce(mtp_data["species_coeffs"][get_types(atoms, species)])
+                np.add.reduce(mtp_data.species_coeffs[get_types(atoms, species)])
                 for atoms in images
             )
             energies -= np.fromiter(iterable, dtype=float, count=len(images))
@@ -221,10 +221,10 @@ class LLSOptimizer(LLSOptimizerBase):
         coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
 
         # Update `mtp_data` and `parameters`.
-        asm = self.loss.mtp_data["alpha_scalar_moments"]
-        self.loss.mtp_data["moment_coeffs"] = coeffs[:asm]
+        asm = self.loss.mtp_data.alpha_scalar_moments
+        self.loss.mtp_data.moment_coeffs = coeffs[:asm]
         if "species_coeffs" in self.optimized:
-            self.loss.mtp_data["species_coeffs"] = coeffs[asm:]
+            self.loss.mtp_data.species_coeffs = coeffs[asm:]
         parameters = self.loss.mtp_data.parameters
 
         # Print the value of the loss function.
@@ -262,7 +262,7 @@ class LLSOptimizer(LLSOptimizerBase):
 
     def _calc_matrix_forces(self) -> np.ndarray:
         if not self.loss.idcs_frc.size:
-            return np.empty((0, self.loss.mtp_data["alpha_scalar_moments"]))
+            return np.empty((0, self.loss.mtp_data.alpha_scalar_moments))
         images = self.loss.images
         idcs_frc = self.loss.idcs_frc
         if self.loss.setting.forces_per_atom:
@@ -279,7 +279,7 @@ class LLSOptimizer(LLSOptimizerBase):
             )
         if self.loss.setting.forces_per_conf:
             matrix /= sqrt(len(images))
-        return matrix.reshape((-1, self.loss.mtp_data["alpha_scalar_moments"]))
+        return matrix.reshape((-1, self.loss.mtp_data.alpha_scalar_moments))
 
     def _calc_matrix_stress(self) -> np.ndarray:
         images = self.loss.images
@@ -289,4 +289,4 @@ class LLSOptimizer(LLSOptimizerBase):
             matrix = (matrix.T * self.loss.volumes[idcs_str]).T
         if self.loss.setting.stress_per_conf:
             matrix /= sqrt(len(images))
-        return matrix.reshape((-1, self.loss.mtp_data["alpha_scalar_moments"]))
+        return matrix.reshape((-1, self.loss.mtp_data.alpha_scalar_moments))

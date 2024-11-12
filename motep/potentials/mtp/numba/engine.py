@@ -53,7 +53,7 @@ class NumbaMTPEngine(EngineBase):
         mtp_data = self.mtp_data
 
         max_number_of_js, all_js, all_r_ijs = self._calc_max_ijs(atoms)
-        itypes = get_types(atoms, self.mtp_data["species"])
+        itypes = get_types(atoms, self.mtp_data.species)
 
         energy = 0.0
         stress = np.zeros((3, 3))
@@ -69,23 +69,23 @@ class NumbaMTPEngine(EngineBase):
                 r_abs,
                 itype,
                 jtypes,
-                mtp_data["radial_coeffs"],
-                mtp_data["scaling"],
-                mtp_data["min_dist"],
-                mtp_data["max_dist"],
+                mtp_data.radial_coeffs,
+                mtp_data.scaling,
+                mtp_data.min_dist,
+                mtp_data.max_dist,
             )
             local_energy, local_gradient = _nb_calc_local_energy_and_gradient(
                 r_ijs_unit,
                 r_abs,
                 rb_values,
                 rb_derivs,
-                mtp_data["alpha_moments_count"],
-                mtp_data["alpha_moment_mapping"],
-                mtp_data["alpha_index_basic"],
-                mtp_data["alpha_index_times"],
+                mtp_data.alpha_moments_count,
+                mtp_data.alpha_moment_mapping,
+                mtp_data.alpha_index_basic,
+                mtp_data.alpha_index_times,
                 itype,
-                mtp_data["species_coeffs"],
-                mtp_data["moment_coeffs"],
+                mtp_data.species_coeffs,
+                mtp_data.moment_coeffs,
             )
             energy += local_energy
             stress += r_ijs.T @ local_gradient
@@ -108,13 +108,13 @@ class NumbaMTPEngine(EngineBase):
 
         mtp_data = self.mtp_data
 
-        itypes = get_types(atoms, self.mtp_data["species"])
-        energies = self.mtp_data["species_coeffs"][itypes]
+        itypes = get_types(atoms, self.mtp_data.species)
+        energies = self.mtp_data.species_coeffs[itypes]
 
         self.mbd.clean()
         self.rbd.clean()
 
-        moment_coeffs = mtp_data["moment_coeffs"]
+        moment_coeffs = mtp_data.moment_coeffs
 
         stress = np.zeros((3, 3))
         for i, itype in enumerate(itypes):
@@ -124,10 +124,10 @@ class NumbaMTPEngine(EngineBase):
             r_ijs_unit = _calc_r_unit(r_ijs, r_abs)
             rb_values, rb_derivs = _nb_calc_radial_basis(
                 r_abs,
-                mtp_data["radial_basis_size"],
-                mtp_data["scaling"],
-                mtp_data["min_dist"],
-                mtp_data["max_dist"],
+                mtp_data.radial_basis_size,
+                mtp_data.scaling,
+                mtp_data.min_dist,
+                mtp_data.max_dist,
             )
             _store_radial_basis_values(
                 i,
@@ -149,12 +149,12 @@ class NumbaMTPEngine(EngineBase):
                 r_ijs_unit,
                 rb_values,
                 rb_derivs,
-                mtp_data["radial_coeffs"],
-                mtp_data["alpha_moments_count"],
-                mtp_data["alpha_moment_mapping"],
-                mtp_data["alpha_index_basic"],
-                mtp_data["alpha_index_times"],
-                mtp_data["moment_coeffs"],
+                mtp_data.radial_coeffs,
+                mtp_data.alpha_moments_count,
+                mtp_data.alpha_moment_mapping,
+                mtp_data.alpha_index_basic,
+                mtp_data.alpha_index_times,
+                mtp_data.moment_coeffs,
             )
 
             energies[i] += moment_coeffs @ basis_values

@@ -38,13 +38,13 @@ class MomentBasis:
             Derivatives of the basis functions with respect to :math:`x_j, y_j, z_j`.
 
         """
-        species_count = self.mtp_data["species_count"]
-        rfs = self.mtp_data["radial_funcs_count"]
-        rbs = self.mtp_data["radial_basis_size"]
-        amc = self.mtp_data["alpha_moments_count"]
-        alpha_index_basic = self.mtp_data["alpha_index_basic"]
-        alpha_index_times = self.mtp_data["alpha_index_times"]
-        alpha_moment_mapping = self.mtp_data["alpha_moment_mapping"]
+        species_count = self.mtp_data.species_count
+        rfs = self.mtp_data.radial_funcs_count
+        rbs = self.mtp_data.radial_basis_size
+        amc = self.mtp_data.alpha_moments_count
+        alpha_index_basic = self.mtp_data.alpha_index_basic
+        alpha_index_times = self.mtp_data.alpha_index_times
+        alpha_moment_mapping = self.mtp_data.alpha_moment_mapping
 
         r_ijs_unit = (r_ijs.T / r_abs).T
         moment_values = np.zeros(amc)
@@ -117,7 +117,7 @@ class MomentBasis:
             alpha_index_times,
         )
 
-        moment_coeffs = self.mtp_data["moment_coeffs"]
+        moment_coeffs = self.mtp_data.moment_coeffs
         dedcs = (moment_jac_cs[alpha_moment_mapping].T @ moment_coeffs).T
 
         dgdcs = _calc_site_energy_jacobian(

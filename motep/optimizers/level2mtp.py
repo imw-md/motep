@@ -75,18 +75,18 @@ class Level2MTPOptimizer(LLSOptimizerBase):
 
     def _update_parameters(self, coeffs: np.ndarray) -> np.ndarray:
         mtp_data = self.loss.mtp_data
-        species_count = mtp_data["species_count"]
-        rbs = mtp_data["radial_basis_size"]
+        species_count = mtp_data.species_count
+        rbs = mtp_data.radial_basis_size
         size = species_count * species_count * rbs
         shape = species_count, species_count, rbs
 
-        mtp_data["scaling"] = 1.0
-        mtp_data["moment_coeffs"][...] = 0.0
-        mtp_data["moment_coeffs"][000] = 1.0
-        mtp_data["radial_coeffs"][000] = 0.0
-        mtp_data["radial_coeffs"][...] = coeffs[:size].reshape(shape)[:, :, None, :]
+        mtp_data.scaling = 1.0
+        mtp_data.moment_coeffs[...] = 0.0
+        mtp_data.moment_coeffs[000] = 1.0
+        mtp_data.radial_coeffs[000] = 0.0
+        mtp_data.radial_coeffs[...] = coeffs[:size].reshape(shape)[:, :, None, :]
         if "species_coeffs" in self.optimized:
-            mtp_data["species_coeffs"] = coeffs[size:]
+            mtp_data.species_coeffs = coeffs[size:]
 
         return mtp_data.parameters
 
@@ -113,8 +113,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         loss = self.loss
         mtp_data = loss.mtp_data
         images = loss.images
-        species_count = mtp_data["species_count"]
-        radial_basis_size = mtp_data["radial_basis_size"]
+        species_count = mtp_data.species_count
+        radial_basis_size = mtp_data.radial_basis_size
         size = species_count * species_count * radial_basis_size
         matrix = np.stack([atoms.calc.engine.rbd.values for atoms in images])
         if self.loss.setting.energy_per_atom:
@@ -124,8 +124,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         return matrix.reshape(-1, size)
 
     def _calc_matrix_forces(self) -> np.ndarray:
-        species_count = self.loss.mtp_data["species_count"]
-        radial_basis_size = self.loss.mtp_data["radial_basis_size"]
+        species_count = self.loss.mtp_data.species_count
+        radial_basis_size = self.loss.mtp_data.radial_basis_size
         size = species_count * species_count * radial_basis_size
 
         if not self.loss.idcs_frc.size:
@@ -159,8 +159,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         images = self.loss.images
         idcs = self.loss.idcs_str
 
-        species_count = self.loss.mtp_data["species_count"]
-        radial_basis_size = self.loss.mtp_data["radial_basis_size"]
+        species_count = self.loss.mtp_data.species_count
+        radial_basis_size = self.loss.mtp_data.radial_basis_size
         size = species_count * species_count * radial_basis_size
 
         matrix = np.array([images[i].calc.engine.rbd.dqdeps.T for i in idcs])

@@ -82,9 +82,9 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
             (neighbors, radial_basis_size)
 
         """
-        min_dist = self.mtp_data["min_dist"]
-        max_dist = self.mtp_data["max_dist"]
-        radial_basis_size = self.mtp_data["radial_basis_size"]
+        min_dist = self.mtp_data.min_dist
+        max_dist = self.mtp_data.max_dist
+        radial_basis_size = self.mtp_data.radial_basis_size
 
         values = np.zeros((radial_basis_size, r_abs.size))
         derivs = np.zeros((radial_basis_size, r_abs.size))
@@ -126,8 +126,8 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
           J. Chem. Phys. 159, (2023).
 
         """
-        scaling = self.mtp_data["scaling"]
-        max_dist = self.mtp_data["max_dist"]
+        scaling = self.mtp_data.scaling
+        max_dist = self.mtp_data.max_dist
 
         in_cutoff = r_abs < max_dist
         smooth_values = np.where(in_cutoff, scaling * (max_dist - r_abs) ** 2, 0.0)
@@ -172,8 +172,8 @@ class ChebyshevPolynomialRadialBasis(RadialBasisBase):
         """Initialize radial basis functions."""
         from numpy.polynomial import Chebyshev
 
-        min_dist = self.mtp_data["min_dist"]
-        max_dist = self.mtp_data["max_dist"]
+        min_dist = self.mtp_data.min_dist
+        max_dist = self.mtp_data.max_dist
 
         radial_basis_funcs = []
         radial_basis_dfdrs = []  # derivatives
@@ -209,9 +209,9 @@ class ChebyshevPolynomialRadialBasis(RadialBasisBase):
         jtypes: list[int],
     ) -> tuple[np.ndarray, np.ndarray]:
         """Calculate values of radial basis functions."""
-        scaling = self.mtp_data["scaling"]
-        max_dist = self.mtp_data["max_dist"]
-        radial_funcs_count = self.mtp_data["radial_funcs_count"]
+        scaling = self.mtp_data.scaling
+        max_dist = self.mtp_data.max_dist
+        radial_funcs_count = self.mtp_data.radial_funcs_count
 
         is_within_cutoff = r_abs < max_dist
         smooth_values = scaling * (max_dist - r_abs) ** 2

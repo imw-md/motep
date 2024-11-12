@@ -3,6 +3,7 @@
 import itertools
 import os
 import pathlib
+from dataclasses import asdict
 from typing import TextIO
 
 import numpy as np
@@ -10,7 +11,7 @@ import numpy as np
 from motep.potentials.mtp.data import MTPData
 
 
-def _parse_radial_coeffs(file: TextIO, data: MTPData) -> np.ndarray:
+def _parse_radial_coeffs(file: TextIO, data: dict) -> np.ndarray:
     coeffs = []
     for _ in range(data["species_count"]):
         for _ in range(data["species_count"]):
@@ -29,7 +30,7 @@ def _parse_radial_coeffs(file: TextIO, data: MTPData) -> np.ndarray:
 
 def read_mtp(file: os.PathLike) -> MTPData:
     """Read an MLIP .mtp file."""
-    data = MTPData()
+    data = {}
     with pathlib.Path(file).open("r", encoding="utf-8") as fd:
         for line in fd:
             if line.strip() == "MTP":
@@ -66,7 +67,7 @@ def read_mtp(file: os.PathLike) -> MTPData:
                 key = "radial_coeffs"
                 data[key] = _parse_radial_coeffs(fd, data)
 
-    return data
+    return MTPData(**data)
 
 
 def _format_value(value: float | int | list | str) -> str:
@@ -116,16 +117,17 @@ def write_mtp(file: os.PathLike, data: MTPData) -> None:
         "species_coeffs",
         "moment_coeffs",
     ]
+    data = asdict(data)
     species_count = data["species_count"]
     with pathlib.Path(file).open("w", encoding="utf-8") as fd:
         fd.write("MTP\n")
         for key in keys0:
-            if key in data:
+            if data[key] is not None:
                 fd.write(f"{key} = {_format_value(data[key])}\n")
         for key in keys1:
-            if key in data:
+            if data[key] is not None:
                 fd.write(f"\t{key} = {_format_value(data[key])}\n")
-        if "radial_coeffs" in data:
+        if data["radial_coeffs"] is not None:
             fd.write("\tradial_coeffs\n")
             for k0, k1 in itertools.product(range(species_count), repeat=2):
                 value = data["radial_coeffs"][k0, k1]
@@ -133,5 +135,5 @@ def write_mtp(file: os.PathLike, data: MTPData) -> None:
                 for _ in range(data["radial_funcs_count"]):
                     fd.write(f"\t\t\t{_format_list(value[_])}\n")
         for key in keys2:
-            if key in data:
+            if data[key] is not None:
                 fd.write(f"{key} = {_format_value(data[key])}\n")
