@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from motep.potentials.mtp.data import MTPData
 from motep.potentials.mtp.numpy.chebyshev import (
     ChebyshevArrayRadialBasis,
     ChebyshevPolynomialRadialBasis,
@@ -51,13 +52,13 @@ def test_radial_funcs(
     r_ijs: np.ndarray,
     jtypes: list[int],
 ):
-    mtp_data = {
-        "scaling": 1.0,
-        "min_dist": 2.0,
-        "max_dist": 5.0,
-        "radial_funcs_count": radial_coeffs.shape[2],
-        "radial_basis_size": radial_coeffs.shape[3],
-    }
+    mtp_data = MTPData(
+        scaling=1.0,
+        min_dist=2.0,
+        max_dist=5.0,
+        radial_funcs_count=radial_coeffs.shape[2],
+        radial_basis_size=radial_coeffs.shape[3],
+    )
     rb: RadialBasisBase = radial_basis_class(mtp_data)
     rb.update_coeffs(radial_coeffs)
     r_abs = np.sqrt(np.add.reduce(r_ijs**2, axis=1))

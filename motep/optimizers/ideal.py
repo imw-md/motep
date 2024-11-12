@@ -54,10 +54,10 @@ class NoInteractionOptimizer(OptimizerBase):
 
         species_coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
 
-        self.loss.mtp_data["scaling"] = 1.0
-        self.loss.mtp_data["moment_coeffs"][...] = 0.0
-        self.loss.mtp_data["radial_coeffs"][...] = 0.0
-        self.loss.mtp_data["species_coeffs"] = species_coeffs
+        self.loss.mtp_data.scaling = 1.0
+        self.loss.mtp_data.moment_coeffs[...] = 0.0
+        self.loss.mtp_data.radial_coeffs[...] = 0.0
+        self.loss.mtp_data.species_coeffs = species_coeffs
 
         parameters = self.loss.mtp_data.parameters
 
@@ -77,7 +77,7 @@ class NoInteractionOptimizer(OptimizerBase):
     def _calc_matrix(self) -> np.ndarray:
         """Calculate the matrix for linear least squares (LLS)."""
         loss = self.loss
-        species = loss.mtp_data["species"]
+        species = loss.mtp_data.species
         images = loss.images
         counts = np.full((len(images), len(species)), np.nan)
         for i, atoms in enumerate(images):

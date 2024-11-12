@@ -38,10 +38,10 @@ class MomentBasisData:
 
     def initialize(self, natoms: int, mtp_data: MTPData) -> None:
         """Initialize moment basis properties."""
-        spc = mtp_data["species_count"]
-        rfc = mtp_data["radial_funcs_count"]
-        rbs = mtp_data["radial_basis_size"]
-        asm = mtp_data["alpha_scalar_moments"]
+        spc = mtp_data.species_count
+        rfc = mtp_data.radial_funcs_count
+        rbs = mtp_data.radial_basis_size
+        asm = mtp_data.alpha_scalar_moments
 
         self.values = np.full((asm), np.nan)
         self.dbdris = np.full((asm, natoms, 3), np.nan)
@@ -79,8 +79,8 @@ class RadialBasisData:
 
     def initialize(self, natoms: int, mtp_data: MTPData) -> None:
         """Initialize radial basis properties."""
-        spc = mtp_data["species_count"]
-        rbs = mtp_data["radial_basis_size"]
+        spc = mtp_data.species_count
+        rbs = mtp_data.radial_basis_size
 
         self.values = np.full((spc, spc, rbs), np.nan)
         self.dqdris = np.full((spc, spc, rbs, natoms, 3), np.nan)
@@ -140,8 +140,8 @@ class EngineBase:
     def update(self, mtp_data: MTPData) -> None:
         """Update MTP parameters."""
         self.mtp_data = mtp_data
-        if "species" not in self.mtp_data:
-            self.mtp_data["species"] = list(range(self.mtp_data["species_count"]))
+        if self.mtp_data.species is None:
+            self.mtp_data.species = list(range(self.mtp_data.species_count))
 
     def update_neighbor_list(self, atoms: Atoms) -> None:
         """Update the ASE `PrimitiveNeighborList` object."""
@@ -153,7 +153,7 @@ class EngineBase:
     def _initiate_neighbor_list(self, atoms: Atoms) -> None:
         """Initialize the ASE `PrimitiveNeighborList` object."""
         self._neighbor_list = PrimitiveNeighborList(
-            cutoffs=[0.5 * self.mtp_data["max_dist"]] * len(atoms),
+            cutoffs=[0.5 * self.mtp_data.max_dist] * len(atoms),
             skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
             self_interaction=False,  # Exclude [0, 0, 0]
             bothways=True,  # return both ij and ji
@@ -196,14 +196,15 @@ class EngineBase:
 
     def jac_energy(self, atoms: Atoms) -> MTPData:
         """Calculate the Jacobian of the energy with respect to the MTP parameters."""
-        sps = self.mtp_data["species"]
+        sps = self.mtp_data.species
         nbs = list(atoms.numbers)
 
-        jac = MTPData()  # placeholder of the Jacobian with respect to the parameters
-        jac["scaling"] = 0.0
-        jac["moment_coeffs"] = self.mbd.values.copy()
-        jac["species_coeffs"] = np.fromiter((nbs.count(s) for s in sps), dtype=float)
-        jac["radial_coeffs"] = self.mbd.dedcs.copy()
+        jac = MTPData(
+            scaling=0.0,
+            moment_coeffs=self.mbd.values.copy(),
+            species_coeffs=np.fromiter((nbs.count(s) for s in sps), dtype=float),
+            radial_coeffs=self.mbd.dedcs.copy(),
+        )  # placeholder of the Jacobian with respect to the parameters
 
         return jac
 
@@ -213,7 +214,7 @@ class EngineBase:
         `jac.parameters` have the shape of `(nparams, natoms, 3)`.
 
         """
-        spc = self.mtp_data["species_count"]
+        spc = self.mtp_data.species_count
         number_of_atoms = len(atoms)
 
         jac = Jac()  # placeholder of the Jacobian with respect to the parameters
@@ -230,7 +231,7 @@ class EngineBase:
         `jac.parameters` have the shape of `(nparams, natoms, 3)`.
 
         """
-        spc = self.mtp_data["species_count"]
+        spc = self.mtp_data.species_count
 
         jac = Jac()  # placeholder of the Jacobian with respect to the parameters
         jac["scaling"] = np.zeros((1, 3, 3))

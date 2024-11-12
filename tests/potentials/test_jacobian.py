@@ -2,6 +2,7 @@
 
 import copy
 import pathlib
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
@@ -10,6 +11,9 @@ from ase import Atoms
 from motep.calculator import MTP
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
+
+if TYPE_CHECKING:
+    from motep.potentials.mtp.data import MTPData
 
 
 def make_atoms(engine: str, level: int, data_path: pathlib.Path) -> Atoms:
@@ -40,29 +44,30 @@ def test_jac_energy(
 
     dx = 1e-6
 
-    jac_nmr = np.full_like(jac_anl[coeffs], np.nan)
+    jac_nmr = np.full_like(getattr(jac_anl, coeffs), np.nan)
 
-    mtp_data = copy.deepcopy(atoms.calc.engine.mtp_data)
+    mtp_data: MTPData = copy.deepcopy(atoms.calc.engine.mtp_data)
+    array = getattr(mtp_data, coeffs)
 
     for i in range(jac_nmr.size):
-        orig = mtp_data[coeffs].flat[i]
+        orig = array.flat[i]
 
-        mtp_data[coeffs].flat[i] = orig + dx
+        array.flat[i] = orig + dx
         atoms.calc.update_parameters(mtp_data)
         ep = atoms.get_potential_energy()
 
-        mtp_data[coeffs].flat[i] = orig - dx
+        array.flat[i] = orig - dx
         atoms.calc.update_parameters(mtp_data)
         em = atoms.get_potential_energy()
 
         jac_nmr.flat[i] = (ep - em) / (2.0 * dx)
 
-        mtp_data[coeffs].flat[i] = orig
+        array.flat[i] = orig
 
     print(jac_nmr)
-    print(jac_anl[coeffs])
+    print(getattr(jac_anl, coeffs))
 
-    np.testing.assert_allclose(jac_nmr, jac_anl[coeffs], atol=1e-4)
+    np.testing.assert_allclose(jac_nmr, getattr(jac_anl, coeffs), atol=1e-4)
 
 
 @pytest.mark.parametrize("coeffs", ["moment_coeffs", "species_coeffs", "radial_coeffs"])
@@ -84,20 +89,21 @@ def test_jac_forces(
 
     jac_nmr = np.full_like(jac_anl[coeffs], np.nan)
 
-    mtp_data = copy.deepcopy(atoms.calc.engine.mtp_data)
+    mtp_data: MTPData = copy.deepcopy(atoms.calc.engine.mtp_data)
+    array = getattr(mtp_data, coeffs)
 
-    for indices, orig in np.ndenumerate(mtp_data[coeffs]):
-        mtp_data[coeffs][indices] = orig + dx
+    for indices, orig in np.ndenumerate(array):
+        array[indices] = orig + dx
         atoms.calc.update_parameters(mtp_data)
         fp = atoms.get_forces()
 
-        mtp_data[coeffs][indices] = orig - dx
+        array[indices] = orig - dx
         atoms.calc.update_parameters(mtp_data)
         fm = atoms.get_forces()
 
         jac_nmr[indices] = (fp - fm) / (2.0 * dx)
 
-        mtp_data[coeffs][indices] = orig
+        array[indices] = orig
 
     print(jac_nmr)
     print(jac_anl[coeffs])
@@ -124,20 +130,21 @@ def test_jac_stress(
 
     jac_nmr = np.full_like(jac_anl[coeffs], np.nan)
 
-    mtp_data = copy.deepcopy(atoms.calc.engine.mtp_data)
+    mtp_data: MTPData = copy.deepcopy(atoms.calc.engine.mtp_data)
+    array = getattr(mtp_data, coeffs)
 
-    for indices, orig in np.ndenumerate(mtp_data[coeffs]):
-        mtp_data[coeffs][indices] = orig + dx
+    for indices, orig in np.ndenumerate(array):
+        array[indices] = orig + dx
         atoms.calc.update_parameters(mtp_data)
         sp = atoms.get_stress(voigt=False)
 
-        mtp_data[coeffs][indices] = orig - dx
+        array[indices] = orig - dx
         atoms.calc.update_parameters(mtp_data)
         sm = atoms.get_stress(voigt=False)
 
         jac_nmr[indices] = (sp - sm) / (2.0 * dx)
 
-        mtp_data[coeffs][indices] = orig
+        array[indices] = orig
 
     print(jac_nmr)
     print(jac_anl[coeffs])

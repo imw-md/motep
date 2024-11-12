@@ -26,8 +26,8 @@ class NumpyMTPEngine(EngineBase):
     def update(self, mtp_data: MTPData) -> None:
         """Update MTP parameters."""
         super().update(mtp_data)
-        if "radial_coeffs" in self.mtp_data:
-            self.rb.update_coeffs(self.mtp_data["radial_coeffs"])
+        if self.mtp_data.radial_coeffs is not None:
+            self.rb.update_coeffs(self.mtp_data.radial_coeffs)
 
     def _calc_basis(
         self,
@@ -53,13 +53,13 @@ class NumpyMTPEngine(EngineBase):
     def calculate(self, atoms: Atoms) -> tuple:
         """Calculate properties of the given system."""
         self.update_neighbor_list(atoms)
-        itypes = get_types(atoms, self.mtp_data["species"])
-        energies = self.mtp_data["species_coeffs"][itypes]
+        itypes = get_types(atoms, self.mtp_data.species)
+        energies = self.mtp_data.species_coeffs[itypes]
 
         self.mbd.clean()
         self.rbd.clean()
 
-        moment_coeffs = self.mtp_data["moment_coeffs"]
+        moment_coeffs = self.mtp_data.moment_coeffs
 
         for i, itype in enumerate(itypes):
             js, r_ijs = self._get_distances(atoms, i)

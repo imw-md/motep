@@ -36,7 +36,8 @@ class OptimizerBase(ABC):
         elif all(_ in self.optimized_allowed for _ in kwargs["optimized"]):
             self.optimized = kwargs["optimized"]
         else:
-            raise ValueError(f"Some keywords cannot be optimized in {__name__}.")
+            msg = f"Some keywords cannot be optimized in {__name__}."
+            raise ValueError(msg)
 
     @abstractmethod
     def optimize(

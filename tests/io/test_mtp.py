@@ -1,6 +1,7 @@
 """Tests for `mtp.py`."""
 
 import pathlib
+from dataclasses import asdict
 
 import numpy as np
 import pytest
@@ -14,6 +15,10 @@ def test_mtp(data_path: pathlib.Path, tmp_path: pathlib.Path) -> None:
     d_ref = read_mtp(path / "initial.mtp")
     write_mtp(tmp_path / "final.mtp", d_ref)
     d = read_mtp(tmp_path / "final.mtp")
+
+    d_ref = asdict(d_ref)
+    d = asdict(d)
+
     for key, value in d_ref.items():
         if isinstance(value, np.ndarray):
             np.testing.assert_array_equal(d[key], value)
@@ -26,5 +31,5 @@ def test_alpha_index_times(level: int, data_path: pathlib.Path) -> None:
     """Test shape of `alpha_index_times`."""
     path = data_path / f"fitting/molecules/291/{level:02d}"
     mtp_data = read_mtp(path / "initial.mtp")
-    assert mtp_data["alpha_index_times"].ndim == 2
-    assert mtp_data["alpha_index_times"].shape[-1] == 4
+    assert mtp_data.alpha_index_times.ndim == 2
+    assert mtp_data.alpha_index_times.shape[-1] == 4
