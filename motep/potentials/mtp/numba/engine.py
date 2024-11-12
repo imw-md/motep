@@ -159,28 +159,12 @@ class NumbaMTPEngine(EngineBase):
 
             energies[i] += moment_coeffs @ basis_values
 
-            _update_moment_basis_data_props(
-                i,
-                js,
-                r_ijs,
-                self.mbd.values,
-                self.mbd.dbdris,
-                self.mbd.dbdeps,
-                basis_values,
-                basis_jac_rs,
-            )
-
-            _update_moment_basis_data_dcs(
-                i,
-                itype,
-                js,
-                r_ijs,
-                self.mbd.dedcs,
-                self.mbd.dgdcs,
-                self.mbd.dsdcs,
-                dedcs,
-                dgdcs,
-            )
+            _update_mbd_values(self.mbd.values, basis_values)
+            _update_mbd_dbdris(i, js, self.mbd.dbdris, basis_jac_rs)
+            _update_mbd_dbdeps(js, r_ijs, self.mbd.dbdeps, basis_jac_rs)
+            _update_mbd_dedcs(itype, self.mbd.dedcs, dedcs)
+            _update_mbd_dgdcs(i, itype, js, self.mbd.dgdcs, dgdcs)
+            _update_mbd_dsdcs(itype, js, r_ijs, self.mbd.dsdcs, dgdcs)
 
         energy = energies.sum()
         forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1).T * -1.0
@@ -203,48 +187,107 @@ def _nb_linalg_norm(r_ijs: np.ndarray) -> np.ndarray:
     return np.sqrt((r_ijs**2).sum(axis=1))
 
 
-@nb.njit
-def _update_moment_basis_data_props(
+@nb.njit((nb.float64[:], nb.float64[:]))
+def _update_mbd_values(
+    mbd_values: npt.NDArray[np.float64],
+    basis_values: npt.NDArray[np.float64],
+) -> None:
+    for iamc in range(mbd_values.size):
+        mbd_values[iamc] += basis_values[iamc]
+
+
+@nb.njit((nb.int64, nb.int64[:], nb.float64[:, :, :], nb.float64[:, :, :]))
+def _update_mbd_dbdris(
     i: np.int64,
     js: npt.NDArray[np.int64],
-    r_ijs: npt.NDArray[np.float64],
-    mbd_values: npt.NDArray[np.float64],
     mbd_dbdris: npt.NDArray[np.float64],
-    mbd_dbdeps: npt.NDArray[np.float64],
-    basis_values: npt.NDArray[np.float64],
     basis_jac_rs: npt.NDArray[np.float64],
-):
-    """Update `MomentBasisData` energies, gradients, and stresses."""
-    mbd_values += basis_values
-    for k, j in enumerate(js):
-        mbd_dbdris[:, i] -= basis_jac_rs[:, k]
-        mbd_dbdris[:, j] += basis_jac_rs[:, k]
-        for ixyz0 in range(3):
-            for ixyz1 in range(3):
-                mbd_dbdeps[:, ixyz0, ixyz1] += (
-                    r_ijs[k, ixyz0] * basis_jac_rs[:, k, ixyz1]
-                )
+) -> None:
+    for iamc in range(mbd_dbdris.shape[0]):
+        for k, j in enumerate(js):
+            for ixyz0 in range(3):
+                mbd_dbdris[iamc, i, ixyz0] -= basis_jac_rs[iamc, k, ixyz0]
+                mbd_dbdris[iamc, j, ixyz0] += basis_jac_rs[iamc, k, ixyz0]
 
 
-@nb.njit
-def _update_moment_basis_data_dcs(
+@nb.njit((nb.int64[:], nb.float64[:, :], nb.float64[:, :, :], nb.float64[:, :, :]))
+def _update_mbd_dbdeps(
+    js: npt.NDArray[np.int64],
+    r_ijs: npt.NDArray[np.float64],
+    mbd_dbdeps: npt.NDArray[np.float64],
+    basis_jac_rs: npt.NDArray[np.float64],
+) -> None:
+    for iamc in range(mbd_dbdeps.shape[0]):
+        for k in range(js.size):
+            for ixyz0 in range(3):
+                for ixyz1 in range(3):
+                    mbd_dbdeps[iamc, ixyz0, ixyz1] += (
+                        r_ijs[k, ixyz0] * basis_jac_rs[iamc, k, ixyz1]
+                    )
+
+
+@nb.njit((nb.int64, nb.float64[:, :, :, :], nb.float64[:, :, :]))
+def _update_mbd_dedcs(
+    itype: np.int64,
+    mbd_dedcs: npt.NDArray[np.float64],
+    tmp_dedcs: npt.NDArray[np.float64],
+) -> None:
+    _, s1, s2, s3 = mbd_dedcs.shape
+    for i1 in range(s1):
+        for i2 in range(s2):
+            for i3 in range(s3):
+                mbd_dedcs[itype, i1, i2, i3] += tmp_dedcs[i1, i2, i3]
+
+
+@nb.njit(
+    (
+        nb.int64,
+        nb.int64,
+        nb.int64[:],
+        nb.float64[:, :, :, :, :, :],
+        nb.float64[:, :, :, :, :],
+    ),
+)
+def _update_mbd_dgdcs(
     i: np.int64,
     itype: np.int64,
     js: npt.NDArray[np.int64],
-    r_ijs: npt.NDArray[np.float64],
-    mbd_dedcs: npt.NDArray[np.float64],
     mbd_dgdcs: npt.NDArray[np.float64],
-    mbd_dsdcs: npt.NDArray[np.float64],
-    tmp_dedcs: npt.NDArray[np.float64],
     tmp_dgdcs: npt.NDArray[np.float64],
 ) -> None:
-    """Update `MomentBasisData` Jacobians with respect to radial coefficients."""
-    mbd_dedcs[itype] += tmp_dedcs
-    for k, j in enumerate(js):
-        mbd_dgdcs[itype, :, :, :, i] -= tmp_dgdcs[:, :, :, k]
-        mbd_dgdcs[itype, :, :, :, j] += tmp_dgdcs[:, :, :, k]
-        for ixyz0 in range(3):
-            for ixyz1 in range(3):
-                mbd_dsdcs[itype, :, :, :, ixyz0, ixyz1] += (
-                    r_ijs[k, ixyz0] * tmp_dgdcs[:, :, :, k, ixyz1]
-                )
+    s1, s2, s3 = mbd_dgdcs.shape[1:4]
+    for i1 in range(s1):
+        for i2 in range(s2):
+            for i3 in range(s3):
+                for k, j in enumerate(js):
+                    for ixyz0 in range(3):
+                        v = tmp_dgdcs[i1, i2, i3, k, ixyz0]
+                        mbd_dgdcs[itype, i1, i2, i3, i, ixyz0] -= v
+                        mbd_dgdcs[itype, i1, i2, i3, j, ixyz0] += v
+
+
+@nb.njit(
+    (
+        nb.int64,
+        nb.int64[:],
+        nb.float64[:, :],
+        nb.float64[:, :, :, :, :, :],
+        nb.float64[:, :, :, :, :],
+    ),
+)
+def _update_mbd_dsdcs(
+    itype: np.int64,
+    js: npt.NDArray[np.int64],
+    r_ijs: npt.NDArray[np.float64],
+    mbd_dsdcs: npt.NDArray[np.float64],
+    tmp_dgdcs: npt.NDArray[np.float64],
+) -> None:
+    s1, s2, s3 = mbd_dsdcs.shape[1:4]
+    for i1 in range(s1):
+        for i2 in range(s2):
+            for i3 in range(s3):
+                for k in range(js.size):
+                    for ixyz0 in range(3):
+                        for ixyz1 in range(3):
+                            v = r_ijs[k, ixyz0] * tmp_dgdcs[i1, i2, i3, k, ixyz1]
+                            mbd_dsdcs[itype, i1, i2, i3, ixyz0, ixyz1] += v
