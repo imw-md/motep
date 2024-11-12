@@ -501,6 +501,24 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
                     moment_jac_rc[aib_i, jtype, mu, ib, j, k] += der[k]
 
 
+@nb.njit(nb.float64[:, :, :](nb.int64[:], nb.float64[:], nb.float64[:, :, :, :]))
+def _calc_dedcs(
+    alpha_moment_mapping: np.ndarray,
+    moment_coeffs: np.ndarray,
+    moment_jac_cs: np.ndarray,
+) -> None:
+    spc, rfc, rbs = moment_jac_cs.shape[1:]
+    dedcs = np.zeros((spc, rfc, rbs))
+    for i, j in enumerate(alpha_moment_mapping):
+        for ispc in range(spc):
+            for irfc in range(rfc):
+                for irbs in range(rbs):
+                    dedcs[ispc, irfc, irbs] += (
+                        moment_jac_cs[j, ispc, irfc, irbs] * moment_coeffs[i]
+                    )
+    return dedcs
+
+
 @nb.njit(
     nb.float64[:, :, :, :, :](
         nb.int64[:, :],
@@ -627,9 +645,7 @@ def _nb_calc_moment(
         moment_jac_cs,
     )
 
-    dedcs = np.zeros((species_count, rfs, rbs))
-    for i, j in enumerate(alpha_moment_mapping):
-        dedcs += moment_jac_cs[j] * moment_coeffs[i]
+    dedcs = _calc_dedcs(alpha_moment_mapping, moment_coeffs, moment_jac_cs)
 
     dgdcs = _calc_site_energy_jacobian(
         alpha_index_times,
