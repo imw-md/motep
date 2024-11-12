@@ -132,7 +132,7 @@ class ScipyNelderMeadOptimizer(ScipyMinimizeOptimizer):
         )
 
 
-class ScipyBFGSOptimizer(ScipyMinimizeOptimizer):
+class ScipyLBFGSBOptimizer(ScipyMinimizeOptimizer):
     def optimize(
         self,
         initial_guess: np.ndarray,
