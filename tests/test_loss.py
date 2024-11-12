@@ -83,7 +83,7 @@ def test_jac(
     if not (path / "pot.mtp").exists():
         pytest.skip()
     mtp_data = read_mtp(path / "pot.mtp")
-    images = read_cfg(path / "out.cfg", index=":")[::1000]
+    images = [read_cfg(path / "out.cfg", index=-1)]
 
     setting = LossSetting(
         energy_weight=1.0,
