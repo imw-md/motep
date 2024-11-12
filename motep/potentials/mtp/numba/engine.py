@@ -235,6 +235,19 @@ def _update_mbd_dbdeps(
                     )
 
 
+@nb.njit((nb.int64, nb.float64[:, :, :, :], nb.float64[:, :, :]))
+def _update_mbd_dedcs(
+    itype: np.int64,
+    mbd_dedcs: npt.NDArray[np.float64],
+    tmp_dedcs: npt.NDArray[np.float64],
+) -> None:
+    _, s1, s2, s3 = mbd_dedcs.shape
+    for i1 in range(s1):
+        for i2 in range(s2):
+            for i3 in range(s3):
+                mbd_dedcs[itype, i1, i2, i3] += tmp_dedcs[i1, i2, i3]
+
+
 @nb.njit
 def _update_moment_basis_data_dcs(
     i: np.int64,
@@ -248,7 +261,7 @@ def _update_moment_basis_data_dcs(
     tmp_dgdcs: npt.NDArray[np.float64],
 ) -> None:
     """Update `MomentBasisData` Jacobians with respect to radial coefficients."""
-    mbd_dedcs[itype] += tmp_dedcs
+    _update_mbd_dedcs(itype, mbd_dedcs, tmp_dedcs)
     for k, j in enumerate(js):
         mbd_dgdcs[itype, :, :, :, i] -= tmp_dgdcs[:, :, :, k]
         mbd_dgdcs[itype, :, :, :, j] += tmp_dgdcs[:, :, :, k]
