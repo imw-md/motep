@@ -501,7 +501,17 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
                     moment_jac_rc[aib_i, jtype, mu, ib, j, k] += der[k]
 
 
-@nb.njit
+@nb.njit(
+    nb.float64[:, :, :, :, :](
+        nb.int64[:, :],
+        nb.int64[:],
+        nb.float64[:],
+        nb.float64[:],
+        nb.float64[:, :, :],
+        nb.float64[:, :, :, :],
+        nb.float64[:, :, :, :, :, :],
+    ),
+)
 def _calc_site_energy_jacobian(
     alpha_index_times: np.ndarray,
     alpha_moment_mapping: np.ndarray,
@@ -520,8 +530,8 @@ def _calc_site_energy_jacobian(
 
     """
     tmp0 = np.zeros_like(moment_values)
-    tmp1 = np.zeros_like(moment_jac_rs)
     tmp0[alpha_moment_mapping] = moment_coeffs  # dV/dB
+    tmp1 = np.zeros_like(moment_jac_rs)
     for ait in alpha_index_times[::-1]:
         i1, i2, mult, i3 = ait
         tmp0[i1] += mult * tmp0[i3] * moment_values[i2]
@@ -530,11 +540,21 @@ def _calc_site_energy_jacobian(
         i1, i2, mult, i3 = ait
         tmp1[i1] += mult * tmp0[i3] * moment_jac_rs[i2]
         tmp1[i2] += mult * tmp0[i3] * moment_jac_rs[i1]
+
     dgdcs = np.zeros(moment_jac_rc.shape[1:])
-    amc = moment_jac_rc.shape[0]
-    for i in range(amc):
-        dgdcs += moment_jac_rc[i] * tmp0[i]
-    dgdcs += (moment_jac_cs[:, ..., None, None] * tmp1[:, None, None, None]).sum(axis=0)
+    amc, spc, rfc, rbs, nns, _ = moment_jac_rc.shape
+    for iamc in range(amc):
+        for ispc in range(spc):
+            for irfc in range(rfc):
+                for irbs in range(rbs):
+                    for j in range(nns):
+                        for ixyz0 in range(3):
+                            v0 = moment_jac_rc[iamc, ispc, irfc, irbs, j, ixyz0]
+                            v1 = tmp0[iamc]
+                            dgdcs[ispc, irfc, irbs, j, ixyz0] += v0 * v1
+                            v0 = moment_jac_cs[iamc, ispc, irfc, irbs]
+                            v1 = tmp1[iamc, j, ixyz0]
+                            dgdcs[ispc, irfc, irbs, j, ixyz0] += v0 * v1
     return dgdcs
 
 
