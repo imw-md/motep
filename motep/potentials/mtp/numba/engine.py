@@ -162,18 +162,9 @@ class NumbaMTPEngine(EngineBase):
             _update_mbd_values(self.mbd.values, basis_values)
             _update_mbd_dbdris(i, js, self.mbd.dbdris, basis_jac_rs)
             _update_mbd_dbdeps(js, r_ijs, self.mbd.dbdeps, basis_jac_rs)
-
-            _update_moment_basis_data_dcs(
-                i,
-                itype,
-                js,
-                r_ijs,
-                self.mbd.dedcs,
-                self.mbd.dgdcs,
-                self.mbd.dsdcs,
-                dedcs,
-                dgdcs,
-            )
+            _update_mbd_dedcs(itype, self.mbd.dedcs, dedcs)
+            _update_mbd_dgdcs(i, itype, js, self.mbd.dgdcs, dgdcs)
+            _update_mbd_dsdcs(itype, js, r_ijs, self.mbd.dsdcs, dgdcs)
 
         energy = energies.sum()
         forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1).T * -1.0
@@ -248,25 +239,55 @@ def _update_mbd_dedcs(
                 mbd_dedcs[itype, i1, i2, i3] += tmp_dedcs[i1, i2, i3]
 
 
-@nb.njit
-def _update_moment_basis_data_dcs(
+@nb.njit(
+    (
+        nb.int64,
+        nb.int64,
+        nb.int64[:],
+        nb.float64[:, :, :, :, :, :],
+        nb.float64[:, :, :, :, :],
+    ),
+)
+def _update_mbd_dgdcs(
     i: np.int64,
     itype: np.int64,
     js: npt.NDArray[np.int64],
-    r_ijs: npt.NDArray[np.float64],
-    mbd_dedcs: npt.NDArray[np.float64],
     mbd_dgdcs: npt.NDArray[np.float64],
-    mbd_dsdcs: npt.NDArray[np.float64],
-    tmp_dedcs: npt.NDArray[np.float64],
     tmp_dgdcs: npt.NDArray[np.float64],
 ) -> None:
-    """Update `MomentBasisData` Jacobians with respect to radial coefficients."""
-    _update_mbd_dedcs(itype, mbd_dedcs, tmp_dedcs)
-    for k, j in enumerate(js):
-        mbd_dgdcs[itype, :, :, :, i] -= tmp_dgdcs[:, :, :, k]
-        mbd_dgdcs[itype, :, :, :, j] += tmp_dgdcs[:, :, :, k]
-        for ixyz0 in range(3):
-            for ixyz1 in range(3):
-                mbd_dsdcs[itype, :, :, :, ixyz0, ixyz1] += (
-                    r_ijs[k, ixyz0] * tmp_dgdcs[:, :, :, k, ixyz1]
-                )
+    s1, s2, s3 = mbd_dgdcs.shape[1:4]
+    for i1 in range(s1):
+        for i2 in range(s2):
+            for i3 in range(s3):
+                for k, j in enumerate(js):
+                    for ixyz0 in range(3):
+                        v = tmp_dgdcs[i1, i2, i3, k, ixyz0]
+                        mbd_dgdcs[itype, i1, i2, i3, i, ixyz0] -= v
+                        mbd_dgdcs[itype, i1, i2, i3, j, ixyz0] += v
+
+
+@nb.njit(
+    (
+        nb.int64,
+        nb.int64[:],
+        nb.float64[:, :],
+        nb.float64[:, :, :, :, :, :],
+        nb.float64[:, :, :, :, :],
+    ),
+)
+def _update_mbd_dsdcs(
+    itype: np.int64,
+    js: npt.NDArray[np.int64],
+    r_ijs: npt.NDArray[np.float64],
+    mbd_dsdcs: npt.NDArray[np.float64],
+    tmp_dgdcs: npt.NDArray[np.float64],
+) -> None:
+    s1, s2, s3 = mbd_dsdcs.shape[1:4]
+    for i1 in range(s1):
+        for i2 in range(s2):
+            for i3 in range(s3):
+                for k in range(js.size):
+                    for ixyz0 in range(3):
+                        for ixyz1 in range(3):
+                            v = r_ijs[k, ixyz0] * tmp_dgdcs[i1, i2, i3, k, ixyz1]
+                            mbd_dsdcs[itype, i1, i2, i3, ixyz0, ixyz1] += v
