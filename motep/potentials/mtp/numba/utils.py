@@ -529,6 +529,8 @@ def _calc_site_energy_jacobian(
         d(dV/dr)/dc.
 
     """
+    amc, spc, rfc, rbs, nns, _ = moment_jac_rc.shape
+
     tmp0 = np.zeros_like(moment_values)
     tmp0[alpha_moment_mapping] = moment_coeffs  # dV/dB
     tmp1 = np.zeros_like(moment_jac_rs)
@@ -538,11 +540,12 @@ def _calc_site_energy_jacobian(
         tmp0[i2] += mult * tmp0[i3] * moment_values[i1]
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
-        tmp1[i1] += mult * tmp0[i3] * moment_jac_rs[i2]
-        tmp1[i2] += mult * tmp0[i3] * moment_jac_rs[i1]
+        for j in range(nns):
+            for ixyz0 in range(3):
+                tmp1[i1, j, ixyz0] += mult * tmp0[i3] * moment_jac_rs[i2, j, ixyz0]
+                tmp1[i2, j, ixyz0] += mult * tmp0[i3] * moment_jac_rs[i1, j, ixyz0]
 
     dgdcs = np.zeros(moment_jac_rc.shape[1:])
-    amc, spc, rfc, rbs, nns, _ = moment_jac_rc.shape
     for iamc in range(amc):
         for ispc in range(spc):
             for irfc in range(rfc):
