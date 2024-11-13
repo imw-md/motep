@@ -128,11 +128,11 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         radial_basis_size = self.loss.mtp_data.radial_basis_size
         size = species_count * species_count * radial_basis_size
 
-        if not self.loss.idcs_frc.size:
+        if not self.loss.loss_forces.idcs_frc.size:
             return np.empty((0, size))
 
         images = self.loss.images
-        idcs = self.loss.idcs_frc
+        idcs = self.loss.loss_forces.idcs_frc
 
         if self.loss.setting.forces_per_atom:
             matrix = np.hstack(

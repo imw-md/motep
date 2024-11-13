@@ -127,11 +127,11 @@ class LLSOptimizerBase(OptimizerBase):
         )
 
     def _calc_vector_forces(self) -> np.ndarray:
-        if not self.loss.idcs_frc.size:
+        if not self.loss.loss_forces.idcs_frc.size:
             return np.empty(0)
         key = "forces"
         images = self.loss.images
-        idcs_frc = self.loss.idcs_frc
+        idcs_frc = self.loss.loss_forces.idcs_frc
         if self.loss.setting.forces_per_atom:
             vector = -1.0 * np.hstack(
                 [
@@ -261,10 +261,10 @@ class LLSOptimizer(LLSOptimizerBase):
         return matrix
 
     def _calc_matrix_forces(self) -> np.ndarray:
-        if not self.loss.idcs_frc.size:
+        if not self.loss.loss_forces.idcs_frc.size:
             return np.empty((0, self.loss.mtp_data.alpha_scalar_moments))
         images = self.loss.images
-        idcs_frc = self.loss.idcs_frc
+        idcs_frc = self.loss.loss_forces.idcs_frc
         if self.loss.setting.forces_per_atom:
             matrix = np.vstack(
                 [
