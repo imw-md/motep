@@ -87,7 +87,7 @@ def test_jac_forces(
 
     dx = 1e-6
 
-    jac_nmr = np.full_like(jac_anl[coeffs], np.nan)
+    jac_nmr = np.full_like(getattr(jac_anl, coeffs), np.nan)
 
     mtp_data: MTPData = copy.deepcopy(atoms.calc.engine.mtp_data)
     array = getattr(mtp_data, coeffs)
@@ -106,9 +106,9 @@ def test_jac_forces(
         array[indices] = orig
 
     print(jac_nmr)
-    print(jac_anl[coeffs])
+    print(getattr(jac_anl, coeffs))
 
-    np.testing.assert_allclose(jac_nmr, jac_anl[coeffs], atol=1e-4)
+    np.testing.assert_allclose(jac_nmr, getattr(jac_anl, coeffs), atol=1e-4)
 
 
 @pytest.mark.parametrize("coeffs", ["moment_coeffs", "species_coeffs", "radial_coeffs"])
@@ -128,7 +128,7 @@ def test_jac_stress(
 
     dx = 1e-6
 
-    jac_nmr = np.full_like(jac_anl[coeffs], np.nan)
+    jac_nmr = np.full_like(getattr(jac_anl, coeffs), np.nan)
 
     mtp_data: MTPData = copy.deepcopy(atoms.calc.engine.mtp_data)
     array = getattr(mtp_data, coeffs)
@@ -147,6 +147,6 @@ def test_jac_stress(
         array[indices] = orig
 
     print(jac_nmr)
-    print(jac_anl[coeffs])
+    print(getattr(jac_anl, coeffs))
 
-    np.testing.assert_allclose(jac_nmr, jac_anl[coeffs], atol=1e-4)
+    np.testing.assert_allclose(jac_nmr, getattr(jac_anl, coeffs), atol=1e-4)

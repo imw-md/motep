@@ -1,7 +1,6 @@
 """Initializer."""
 
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
@@ -32,6 +31,9 @@ class MTPData:
     species_coeffs: npt.NDArray[np.float64] | None = None
     moment_coeffs: npt.NDArray[np.float64] | None = None
     species: npt.NDArray[np.int64] | None = None
+    optimized: list[str] = field(
+        default_factory=lambda: ["species_coeffs", "moment_coeffs", "radial_coeffs"],
+    )
 
     def initialize(
         self,
@@ -88,14 +90,16 @@ class MTPData:
     @property
     def parameters(self) -> np.ndarray:
         """Serialized parameters."""
-        return np.hstack(
-            (
-                np.atleast_1d(self.scaling),
-                self.moment_coeffs,
-                self.species_coeffs,
-                self.radial_coeffs.reshape(-1),
-            ),
-        )
+        tmp = []
+        if "scaling" in self.optimized:
+            tmp.append(np.atleast_1d(self.scaling))
+        if "moment_coeffs" in self.optimized:
+            tmp.append(self.moment_coeffs)
+        if "species_coeffs" in self.optimized:
+            tmp.append(self.species_coeffs)
+        if "radial_coeffs" in self.optimized:
+            tmp.append(self.radial_coeffs.flat)
+        return np.hstack(tmp)
 
     @parameters.setter
     def parameters(self, parameters: list[float]) -> None:
@@ -112,12 +116,20 @@ class MTPData:
         rbs = self.radial_basis_size
         asm = self.alpha_scalar_moments
 
-        self.scaling = parameters[0]
-        self.moment_coeffs = parameters[1 : asm + 1]
-        self.species_coeffs = parameters[asm + 1 : asm + 1 + species_count]
-        total_radial = parameters[asm + 1 + species_count :]
-        shape = species_count, species_count, rfc, rbs
-        self.radial_coeffs = np.array(total_radial).reshape(shape)
+        n = 0
+        if "scaling" in self.optimized:
+            self.scaling = parameters[n]
+            n += 1
+        if "moment_coeffs" in self.optimized:
+            self.moment_coeffs = parameters[n : asm + n]
+            n += asm
+        if "species_coeffs" in self.optimized:
+            self.species_coeffs = parameters[n : n + species_count]
+            n += species_count
+        if "radial_coeffs" in self.optimized:
+            total_radial = parameters[n:]
+            shape = species_count, species_count, rfc, rbs
+            self.radial_coeffs = np.array(total_radial).reshape(shape)
 
     def print(self) -> None:
         """Print parameters."""

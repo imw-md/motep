@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
@@ -93,18 +93,30 @@ class RadialBasisData:
         self.dqdeps[...] = 0.0
 
 
-class Jac(dict):
+@dataclass
+class Jac:
+    scaling: float = 1.0
+    radial_coeffs: npt.NDArray[np.float64] | None = None
+    species_coeffs: npt.NDArray[np.float64] | None = None
+    moment_coeffs: npt.NDArray[np.float64] | None = None
+    optimized: list[str] = field(
+        default_factory=lambda: ["species_coeffs", "moment_coeffs", "radial_coeffs"],
+    )
+
     @property
     def parameters(self) -> npt.NDArray[np.float64]:
-        shape = self["radial_coeffs"].shape
-        return np.concatenate(
-            (
-                self["scaling"],
-                self["moment_coeffs"],
-                self["species_coeffs"],
-                self["radial_coeffs"].reshape(-1, *shape[4::]),
-            ),
-        )
+        """Serialized parameters."""
+        tmp = []
+        if "scaling" in self.optimized:
+            tmp.append(np.atleast_1d(self.scaling))
+        if "moment_coeffs" in self.optimized:
+            tmp.append(self.moment_coeffs)
+        if "species_coeffs" in self.optimized:
+            tmp.append(self.species_coeffs)
+        if "radial_coeffs" in self.optimized:
+            shape = self.radial_coeffs.shape
+            tmp.append(self.radial_coeffs.reshape(-1, *shape[4::]))
+        return np.concatenate(tmp)
 
 
 class EngineBase:
@@ -205,7 +217,7 @@ class EngineBase:
             species_coeffs=np.fromiter((nbs.count(s) for s in sps), dtype=float),
             radial_coeffs=self.mbd.dedcs.copy(),
         )  # placeholder of the Jacobian with respect to the parameters
-
+        jac.optimized = self.mtp_data.optimized
         return jac
 
     def jac_forces(self, atoms: Atoms) -> MTPData:
@@ -217,12 +229,13 @@ class EngineBase:
         spc = self.mtp_data.species_count
         number_of_atoms = len(atoms)
 
-        jac = Jac()  # placeholder of the Jacobian with respect to the parameters
-        jac["scaling"] = np.zeros((1, number_of_atoms, 3))
-        jac["moment_coeffs"] = self.mbd.dbdris * -1.0
-        jac["species_coeffs"] = np.zeros((spc, number_of_atoms, 3))
-        jac["radial_coeffs"] = self.mbd.dgdcs * -1.0
-
+        jac = Jac(
+            scaling=np.zeros((1, number_of_atoms, 3)),
+            moment_coeffs=self.mbd.dbdris * -1.0,
+            species_coeffs=np.zeros((spc, number_of_atoms, 3)),
+            radial_coeffs=self.mbd.dgdcs * -1.0,
+        )  # placeholder of the Jacobian with respect to the parameters
+        jac.optimized = self.mtp_data.optimized
         return jac
 
     def jac_stress(self, atoms: Atoms) -> MTPData:
@@ -233,12 +246,13 @@ class EngineBase:
         """
         spc = self.mtp_data.species_count
 
-        jac = Jac()  # placeholder of the Jacobian with respect to the parameters
-        jac["scaling"] = np.zeros((1, 3, 3))
-        jac["moment_coeffs"] = self.mbd.dbdeps.copy()
-        jac["species_coeffs"] = np.zeros((spc, 3, 3))
-        jac["radial_coeffs"] = self.mbd.dsdcs.copy()
-
+        jac = Jac(
+            scaling=np.zeros((1, 3, 3)),
+            moment_coeffs=self.mbd.dbdeps.copy(),
+            species_coeffs=np.zeros((spc, 3, 3)),
+            radial_coeffs=self.mbd.dsdcs.copy(),
+        )  # placeholder of the Jacobian with respect to the parameters
+        jac.optimized = self.mtp_data.optimized
         return jac
 
 
