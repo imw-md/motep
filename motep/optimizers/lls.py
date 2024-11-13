@@ -153,11 +153,11 @@ class LLSOptimizerBase(OptimizerBase):
     def _calc_vector_stress(self) -> np.ndarray:
         key = "stress"
         images = self.loss.images
-        idcs_str = self.loss.idcs_str
+        idcs_str = self.loss.loss_stress.idcs_str
         f = voigt_6_to_full_3x3_stress
         stresses = np.array([f(images[i].calc.targets[key]) for i in idcs_str])
         if self.loss.setting.stress_times_volume:
-            stresses = (stresses.T * self.loss.volumes[idcs_str]).T
+            stresses = (stresses.T * self.loss.loss_stress.volumes[idcs_str]).T
         if self.loss.setting.stress_per_conf:
             stresses /= sqrt(len(images))
         return stresses.flat
@@ -283,10 +283,10 @@ class LLSOptimizer(LLSOptimizerBase):
 
     def _calc_matrix_stress(self) -> np.ndarray:
         images = self.loss.images
-        idcs_str = self.loss.idcs_str
+        idcs_str = self.loss.loss_stress.idcs_str
         matrix = np.array([images[i].calc.engine.mbd.dbdeps.T for i in idcs_str])
         if self.loss.setting.stress_times_volume:
-            matrix = (matrix.T * self.loss.volumes[idcs_str]).T
+            matrix = (matrix.T * self.loss.loss_stress.volumes[idcs_str]).T
         if self.loss.setting.stress_per_conf:
             matrix /= sqrt(len(images))
         return matrix.reshape((-1, self.loss.mtp_data.alpha_scalar_moments))

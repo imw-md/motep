@@ -10,6 +10,7 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss import LossFunction
 from motep.optimizers.scipy import ScipyMinimizeOptimizer
+from motep.setting import LossSetting
 
 
 def test_scaling_vs_jac(data_path: pathlib.Path) -> None:
@@ -24,14 +25,7 @@ def test_scaling_vs_jac(data_path: pathlib.Path) -> None:
     mtp_data = read_mtp(fitting_path / "initial.mtp")
     images = read_cfg(original_path / "training.cfg", index=":")[::500]
 
-    setting = {
-        "energy-weight": 1.0,
-        "force-weight": 0.01,
-        "stress-weight": 0.001,
-        "steps": [
-            {"method": "L-BFGS-B", "kwargs": {"jac": True, "options": {"maxiter": 10}}},
-        ],
-    }
+    setting = LossSetting(energy_weight=1.0, forces_weight=0.01, stress_weight=0.001)
 
     optimized = ["scaling"]
 
@@ -48,7 +42,7 @@ def test_scaling_vs_jac(data_path: pathlib.Path) -> None:
         rng=np.random.default_rng(42),
     )
 
-    step = setting["steps"][0]
+    step = {"method": "L-BFGS-B", "kwargs": {"jac": True, "options": {"maxiter": 10}}}
 
     optimizer = ScipyMinimizeOptimizer(loss, optimized=optimized, **step)
 

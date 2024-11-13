@@ -157,7 +157,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
 
     def _calc_matrix_stress(self) -> np.ndarray:
         images = self.loss.images
-        idcs = self.loss.idcs_str
+        idcs = self.loss.loss_stress.idcs_str
 
         species_count = self.loss.mtp_data.species_count
         radial_basis_size = self.loss.mtp_data.radial_basis_size
@@ -165,7 +165,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
 
         matrix = np.array([images[i].calc.engine.rbd.dqdeps.T for i in idcs])
         if self.loss.setting.stress_times_volume:
-            matrix = (matrix.T * self.loss.volumes[idcs]).T
+            matrix = (matrix.T * self.loss.loss_stress.volumes[idcs]).T
         if self.loss.setting.stress_per_conf:
             matrix /= sqrt(len(images))
         return matrix.reshape((-1, size))
