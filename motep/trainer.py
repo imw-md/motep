@@ -84,8 +84,6 @@ def run(args: argparse.Namespace) -> None:
                 print(step["method"])
                 print()
 
-            mtp_data.optimized = step["optimized"]
-
             # Print parameters before optimization.
             mtp_data.initialize(setting.rng)
             if rank == 0:
@@ -93,18 +91,11 @@ def run(args: argparse.Namespace) -> None:
 
             # Instantiate an `Optimizer` class
             optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
-
-            kwargs = step.get("kwargs", {})
-            parameters = optimizer.optimize(
-                mtp_data.parameters,
-                mtp_data.get_bounds(),
-                **kwargs,
-            )
+            optimizer.optimize()
             if rank == 0:
                 print()
 
             # Print parameters after optimization.
-            mtp_data.parameters = parameters
             if rank == 0:
                 mtp_data.print()
 
@@ -112,7 +103,6 @@ def run(args: argparse.Namespace) -> None:
             if rank == 0:
                 ErrorPrinter(loss).print()
 
-    mtp_data.parameters = parameters
     write_mtp(setting.potential_final, mtp_data)
 
     end_time = time.time()

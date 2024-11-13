@@ -182,30 +182,12 @@ class LLSOptimizer(LLSOptimizerBase):
     def optimized_allowed(self) -> list[str]:
         return ["species_coeffs", "moment_coeffs"]
 
-    def optimize(
-        self,
-        parameters: np.ndarray,
-        bounds: np.ndarray,
-        **kwargs,
-    ) -> np.ndarray:
-        """Optimize parameters.
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
+        """Optimize parameters."""
+        parameters = self.loss.mtp_data.parameters
 
-        Parameters
-        ----------
-        parameters : np.ndarray
-            Initial parameters.
-        bounds : np.ndarray
-            Lower and upper bounds for the parameters.
-            Not used in :class:`~motep.optimizers.lls.LLSOptimizer`.
-
-        Returns
-        -------
-        parameters : np.ndarray
-            Optimized parameters.
-
-        """
         # Calculate basis functions of `loss.images`
-        self.loss(parameters)
+        self.loss(self.loss.mtp_data.parameters)
 
         callback = Callback(self.loss)
 
@@ -230,7 +212,7 @@ class LLSOptimizer(LLSOptimizerBase):
         # Print the value of the loss function.
         callback(parameters)
 
-        return parameters
+        self.loss.mtp_data.parameters = parameters
 
     def _calc_matrix(self) -> np.ndarray:
         """Calculate the matrix for linear least squares (LLS)."""

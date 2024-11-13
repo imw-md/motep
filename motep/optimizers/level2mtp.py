@@ -1,6 +1,7 @@
 """Optimizer for Level 2 MTP."""
 
 from math import sqrt
+from typing import Any
 
 import numpy as np
 
@@ -27,28 +28,10 @@ class Level2MTPOptimizer(LLSOptimizerBase):
     def optimized_allowed(self) -> list[str]:
         return ["species_coeffs", "radial_coeffs"]
 
-    def optimize(
-        self,
-        parameters: np.ndarray,
-        bounds: np.ndarray,
-        **kwargs,
-    ) -> np.ndarray:
-        """Optimize parameters.
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
+        """Optimize parameters."""
+        parameters = self.loss.mtp_data.parameters
 
-        Parameters
-        ----------
-        parameters : np.ndarray
-            Initial parameters.
-        bounds : np.ndarray
-            Lower and upper bounds for the parameters.
-            Not used in this class.
-
-        Returns
-        -------
-        parameters : np.ndarray
-            Optimized parameters.
-
-        """
         # Calculate basis functions of `loss.images`
         self.loss(parameters)
 
@@ -71,7 +54,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         # Print the value of the loss function.
         callback(parameters)
 
-        return parameters
+        self.loss.mtp_data.parameters = parameters
 
     def _update_parameters(self, coeffs: np.ndarray) -> np.ndarray:
         mtp_data = self.loss.mtp_data

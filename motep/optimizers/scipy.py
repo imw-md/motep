@@ -55,37 +55,32 @@ class ScipyOptimizerBase(OptimizerBase):
 
 
 class ScipyDualAnnealingOptimizer(ScipyOptimizerBase):
-    def optimize(
-        self,
-        initial_guess: np.ndarray,
-        bounds: np.ndarray,
-        **kwargs: dict[str, Any],
-    ) -> np.ndarray:
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
+        parameters = self.loss.mtp_data.parameters
+        bounds = self.loss.mtp_data.get_bounds()
         callback = Callback(self.loss)
         result = dual_annealing(
             self.loss,
             bounds=bounds,
             callback=callback,
             seed=40,
-            x0=initial_guess,
+            x0=parameters,
         )
         self.print_result(result)
         return result.x
 
 
 class ScipyDifferentialEvolutionOptimizer(ScipyOptimizerBase):
-    def optimize(
-        self,
-        initial_guess: np.ndarray,
-        bounds: np.ndarray,
-        **kwargs: dict[str, Any],
-    ) -> np.ndarray:
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
+        parameters = self.loss.mtp_data.parameters
+        bounds = self.loss.mtp_data.get_bounds()
         callback = Callback(self.loss)
         result = differential_evolution(
             self.loss,
             bounds,
             popsize=30,
             callback=callback,
+            x0=parameters,
         )
         self.print_result(result)
         return result.x
@@ -94,13 +89,11 @@ class ScipyDifferentialEvolutionOptimizer(ScipyOptimizerBase):
 class ScipyMinimizeOptimizer(ScipyOptimizerBase):
     """`Optimizer` class using `scipy.minimize`."""
 
-    def optimize(
-        self,
-        initial_guess: np.ndarray,
-        bounds: np.ndarray,
-        **kwargs: dict[str, Any],
-    ) -> np.ndarray:
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
         """Optimizer using `scipy.optimize.minimize`."""
+        parameters = self.loss.mtp_data.parameters
+        bounds = self.loss.mtp_data.get_bounds()
+
         if kwargs.get("jac"):
             if "scaling" in self.optimized:
                 raise ValueError("`jac` cannot (so far) be used to optimize `scaling`.")
@@ -120,40 +113,20 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
         callback = Callback(self.loss)
         result = minimize(
             self.loss,
-            initial_guess,
+            parameters,
             bounds=bounds,
             callback=callback,
             **kwargs,
         )
         self.print_result(result)
-        return result.x
+        self.loss.mtp_data.parameters = result.x
 
 
 class ScipyNelderMeadOptimizer(ScipyMinimizeOptimizer):
-    def optimize(
-        self,
-        initial_guess: np.ndarray,
-        bounds: np.ndarray,
-        **kwargs: dict[str, Any],
-    ) -> np.ndarray:
-        return super().optimize(
-            initial_guess,
-            bounds,
-            method="Nelder-Mead",
-            **kwargs,
-        )
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
+        return super().optimize(method="Nelder-Mead", **kwargs)
 
 
 class ScipyLBFGSBOptimizer(ScipyMinimizeOptimizer):
-    def optimize(
-        self,
-        initial_guess: np.ndarray,
-        bounds: np.ndarray,
-        **kwargs: dict[str, Any],
-    ) -> np.ndarray:
-        return super().optimize(
-            initial_guess,
-            bounds,
-            method="L-BFGS-B",
-            **kwargs,
-        )
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
+        return super().optimize(method="L-BFGS-B", **kwargs)

@@ -79,10 +79,7 @@ def test_without_forces(data_path: pathlib.Path) -> None:
 
     mtp_data.optimized = optimized
     mtp_data.initialize(rng=rng)
-    parameters = mtp_data.parameters
-    bounds = mtp_data.get_bounds()
-
-    parameters = optimizer.optimize(parameters, bounds)
+    optimizer.optimize()
     print()
 
 
@@ -118,36 +115,29 @@ def test_molecules(
 
     mtp_data.optimized = ["species_coeffs"]
     mtp_data.initialize(rng=rng)
-    parameters = mtp_data.parameters
-    bounds = mtp_data.get_bounds()
-
-    parameters = optimizer.optimize(parameters, bounds)
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f_ref = loss(parameters)  # update paramters
+    f_ref = loss(mtp_data.parameters)  # update paramters
     ErrorPrinter(loss).print()
 
-    parameters_ref = np.array(parameters, copy=True)
+    parameters_ref = np.array(mtp_data.parameters, copy=True)
 
     optimized = ["radial_coeffs"]
 
     minimized = ["energy"]
     optimizer = Level2MTPOptimizer(loss, optimized=optimized, minimized=minimized)
-    mtp_data.optimized = optimized
-    parameters = mtp_data.parameters
-    parameters = optimizer.optimize(parameters, bounds)
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f_e00 = loss(parameters)  # update paramters
+    f_e00 = loss(mtp_data.parameters)  # update paramters
     ErrorPrinter(loss).print()
 
     # Check if `parameters` are updated.
-    assert (parameters.size != parameters_ref.size) or (
-        not np.allclose(parameters, parameters_ref)
+    assert (mtp_data.parameters.size != parameters_ref.size) or (
+        not np.allclose(mtp_data.parameters, parameters_ref)
     )
 
     # Check loss functions
@@ -217,8 +207,6 @@ def test_crystals(
 
     mtp_data.optimized = optimized
     mtp_data.initialize(rng=rng)
-    parameters = mtp_data.parameters
-    bounds = mtp_data.get_bounds()
 
     loss = LossFunction(
         images,
@@ -232,27 +220,22 @@ def test_crystals(
 
     mtp_data.optimized = ["species_coeffs"]
     mtp_data.initialize(rng=rng)
-    parameters = mtp_data.parameters
-    bounds = mtp_data.get_bounds()
-
-    parameters = optimizer.optimize(parameters, bounds)
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    loss(parameters)  # update parameters
+    loss(mtp_data.parameters)  # update parameters
     ErrorPrinter(loss).print()
 
-    parameters_ref = np.array(parameters, copy=True)
+    parameters_ref = np.array(mtp_data.parameters, copy=True)
 
     minimized = ["energy"]
     optimizer = Level2MTPOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(mtp_data.parameters, mtp_data.get_bounds())
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f0 = loss(parameters)  # update parameters
+    f0 = loss(mtp_data.parameters)  # update parameters
     errors0 = ErrorPrinter(loss).print()
 
     # Check if `parameters` are updated.
@@ -263,12 +246,11 @@ def test_crystals(
 
     minimized = ["energy", "forces"]
     optimizer = Level2MTPOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(mtp_data.parameters, mtp_data.get_bounds())
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f1 = loss(parameters)  # update parameters
+    f1 = loss(mtp_data.parameters)  # update parameters
     errors1 = ErrorPrinter(loss).print()
 
     # Check RMSEs
@@ -279,12 +261,11 @@ def test_crystals(
 
     minimized = ["energy", "forces", "stress"]
     optimizer = Level2MTPOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(mtp_data.parameters, mtp_data.get_bounds())
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f2 = loss(parameters)  # update parameters
+    f2 = loss(mtp_data.parameters)  # update parameters
     errors2 = ErrorPrinter(loss).print()
 
     # Check RMSEs
@@ -323,8 +304,6 @@ def test_species_coeffs(
 
     mtp_data.optimized = optimized
     mtp_data.initialize(rng=rng)
-    parameters = mtp_data.parameters
-    bounds = mtp_data.get_bounds()
 
     loss = LossFunction(
         images,
@@ -338,33 +317,27 @@ def test_species_coeffs(
 
     mtp_data.optimized = ["species_coeffs"]
     mtp_data.initialize(rng=rng)
-    parameters = mtp_data.parameters
-    bounds = mtp_data.get_bounds()
-
-    parameters = optimizer.optimize(parameters, bounds)
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    loss(parameters)  # update parameters
+    loss(mtp_data.parameters)  # update parameters
 
     optimized = ["radial_coeffs"]
     optimizer = Level2MTPOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(mtp_data.parameters, mtp_data.get_bounds())
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f0 = loss(parameters)  # update parameters
+    f0 = loss(mtp_data.parameters)  # update parameters
 
     optimized = ["radial_coeffs", "species_coeffs"]
     optimizer = Level2MTPOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(mtp_data.parameters, mtp_data.get_bounds())
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f1 = loss(parameters)  # update parameters
+    f1 = loss(mtp_data.parameters)  # update parameters
 
     # Check loss functions
     assert f0 > f1

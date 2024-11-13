@@ -260,17 +260,13 @@ def elite_callback(gen: int, elite: float) -> None:
 class GeneticAlgorithmOptimizer(OptimizerBase):
     """Optimizer based on genetic algorithm (GA)."""
 
-    def optimize(
-        self,
-        initial_guess: np.ndarray,
-        bounds: np.ndarray,
-        **kwargs: dict[str, Any],
-    ) -> np.ndarray:
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
         """Optimize parameters."""
-        bounds = _limit_bounds(bounds)
+        parameters = self.loss.mtp_data.parameters
+        bounds = _limit_bounds(self.loss.mtp_data.get_bounds())
         ga = GeneticAlgorithm(
             self.loss,
-            initial_guess,
+            parameters,
             lower_bound=bounds[:, 0],
             upper_bound=bounds[:, 1],
             population_size=30,
@@ -280,7 +276,7 @@ class GeneticAlgorithmOptimizer(OptimizerBase):
             superhuman=True,
         )
         ga.initialize_population()
-        return ga.evolve_with_mix(
+        self.loss.mtp_data.parameters = ga.evolve_with_mix(
             self.loss,
             generations=30,
             elite_callback=elite_callback,
