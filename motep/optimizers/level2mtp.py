@@ -118,7 +118,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         size = species_count * species_count * radial_basis_size
         matrix = np.stack([atoms.calc.engine.rbd.values for atoms in images])
         if self.loss.setting.energy_per_atom:
-            matrix *= self.loss.inverse_numbers_of_atoms[:, None, None, None]
+            cs = self.loss.loss_energy.inverse_numbers_of_atoms
+            matrix *= cs[:, None, None, None]
         if self.loss.setting.energy_per_conf:
             matrix /= sqrt(len(images))
         return matrix.reshape(-1, size)
@@ -139,7 +140,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
                 [
                     (
                         images[i].calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0)
-                        * sqrt(self.loss.inverse_numbers_of_atoms[i])
+                        * sqrt(self.loss.loss_energy.inverse_numbers_of_atoms[i])
                     ).flat
                     for i in idcs
                 ],

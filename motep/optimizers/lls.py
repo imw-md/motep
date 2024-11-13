@@ -70,7 +70,7 @@ class LLSOptimizerBase(OptimizerBase):
             for j, s in enumerate(species):
                 counts[i, j] = list(atoms.numbers).count(s)
         if self.loss.setting.energy_per_atom:
-            counts *= self.loss.inverse_numbers_of_atoms[:, None]
+            counts *= self.loss.loss_energy.inverse_numbers_of_atoms[:, None]
         if self.loss.setting.energy_per_conf:
             counts /= sqrt(len(images))
         return counts
@@ -112,7 +112,7 @@ class LLSOptimizerBase(OptimizerBase):
             )
             energies -= np.fromiter(iterable, dtype=float, count=len(images))
         if self.loss.setting.energy_per_atom:
-            energies *= self.loss.inverse_numbers_of_atoms
+            energies *= self.loss.loss_energy.inverse_numbers_of_atoms
         if self.loss.setting.energy_per_conf:
             energies /= sqrt(len(images))
         return energies
@@ -137,7 +137,7 @@ class LLSOptimizerBase(OptimizerBase):
                 [
                     (
                         images[i].calc.targets[key]
-                        * sqrt(self.loss.inverse_numbers_of_atoms[i])
+                        * sqrt(self.loss.loss_forces.inverse_numbers_of_atoms[i])
                     ).flat
                     for i in idcs_frc
                 ],
@@ -255,7 +255,7 @@ class LLSOptimizer(LLSOptimizerBase):
         images = self.loss.images
         matrix = np.array([atoms.calc.engine.mbd.values for atoms in images])
         if self.loss.setting.energy_per_atom:
-            matrix *= self.loss.inverse_numbers_of_atoms[:, None]
+            matrix *= self.loss.loss_energy.inverse_numbers_of_atoms[:, None]
         if self.loss.setting.energy_per_conf:
             matrix /= sqrt(len(images))
         return matrix
@@ -269,7 +269,7 @@ class LLSOptimizer(LLSOptimizerBase):
             matrix = np.vstack(
                 [
                     images[i].calc.engine.mbd.dbdris.transpose(1, 2, 0)
-                    * sqrt(self.loss.inverse_numbers_of_atoms[i])
+                    * sqrt(self.loss.loss_forces.inverse_numbers_of_atoms[i])
                     for i in idcs_frc
                 ],
             )

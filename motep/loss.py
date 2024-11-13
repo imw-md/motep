@@ -78,6 +78,70 @@ def _calc_errors_from_diff(diff: np.ndarray) -> dict[str, float]:
     }
 
 
+class LossFunctionEnergy:
+    """Energy contribution to the loss function."""
+
+    def __init__(
+        self,
+        images: list[Atoms],
+        *,
+        energy_per_atom: bool = False,
+        energy_per_conf: bool = True,
+    ) -> None:
+        """Initialize."""
+        self.images = images
+        self.energy_per_atom = energy_per_atom
+        self.energy_per_conf = energy_per_conf
+
+        numbers_of_atoms = np.fromiter(
+            (len(atoms) for atoms in images),
+            dtype=float,
+            count=len(images),
+        )
+        self.inverse_numbers_of_atoms = 1.0 / numbers_of_atoms
+
+        self.configuration_weight = np.ones(len(self.images))
+
+    @property
+    def target(self) -> np.float64:
+        """Return target values."""
+        iterable = (atoms.calc.targets["energy"] for atoms in self.images)
+        energies = np.fromiter(iterable, dtype=float, count=len(self.images))
+        if self.energy_per_atom:
+            energies *= self.inverse_numbers_of_atoms
+        return energies
+
+    @property
+    def result(self) -> np.float64:
+        """Return result values."""
+        iterable = (atoms.calc.results["energy"] for atoms in self.images)
+        energies = np.fromiter(iterable, dtype=float, count=len(self.images))
+        if self.energy_per_atom:
+            energies *= self.inverse_numbers_of_atoms
+        return energies
+
+    def calculate(self) -> np.float64:
+        """Calculate the contribution to the loss function."""
+        energy_ses = (self.result - self.target) ** 2
+        loss = self.configuration_weight @ energy_ses
+        return loss / len(self.images) if self.energy_per_conf else loss
+
+    def jac(self) -> npt.NDArray[np.float64]:
+        """Calculate the contribution to the loss function Jacobian."""
+
+        def per_configuration(atoms: Atoms) -> np.float64:
+            return 2.0 * (
+                (atoms.calc.results["energy"] - atoms.calc.targets["energy"])
+                * atoms.calc.engine.jac_energy(atoms).parameters
+            )
+
+        jacs = np.array([per_configuration(atoms) for atoms in self.images])
+        if self.energy_per_atom:
+            jacs *= self.inverse_numbers_of_atoms[:, None] ** 2
+        jac = self.configuration_weight @ jacs
+        return jac / len(self.images) if self.energy_per_conf else jac
+
+
 class LossFunctionForces:
     """Forces contribution to the loss function.
 
@@ -243,13 +307,11 @@ class LossFunctionBase(ABC):
         self.setting = setting
         self.comm = comm
 
-        numbers_of_atoms = np.fromiter(
-            (len(atoms) for atoms in images),
-            dtype=float,
-            count=len(images),
+        self.loss_energy = LossFunctionEnergy(
+            self.images,
+            energy_per_atom=self.setting.energy_per_atom,
+            energy_per_conf=self.setting.energy_per_conf,
         )
-        self.inverse_numbers_of_atoms = 1.0 / numbers_of_atoms
-
         self.loss_forces = LossFunctionForces(
             self.images,
             forces_per_atom=self.setting.forces_per_atom,
@@ -261,23 +323,9 @@ class LossFunctionBase(ABC):
             stress_per_conf=self.setting.stress_per_conf,
         )
 
-        self.configuration_weight = np.ones(len(self.images))
-
     @abstractmethod
     def __call__(self, parameters: npt.NDArray[np.float64]) -> np.float64:
         """Evaluate the loss function."""
-
-    def _calc_loss_energy(self) -> np.float64:
-        iterable = (
-            atoms.calc.results["energy"] - atoms.calc.targets["energy"]
-            for atoms in self.images
-        )
-        energy_ses = np.fromiter(iterable, dtype=float, count=len(self.images))
-        energy_ses **= 2
-        if self.setting.energy_per_atom:
-            energy_ses *= self.inverse_numbers_of_atoms**2
-        loss = self.configuration_weight @ energy_ses
-        return loss / len(self.images) if self.setting.energy_per_conf else loss
 
     def _run_calculations(self) -> None:
         """Run calculations of the properties."""
@@ -299,27 +347,14 @@ class LossFunctionBase(ABC):
         """Calculate the value of the loss function."""
         self._run_calculations()
         return (
-            self.setting.energy_weight * self._calc_loss_energy()
+            self.setting.energy_weight * self.loss_energy.calculate()
             + self.setting.forces_weight * self.loss_forces.calculate()
             + self.setting.stress_weight * self.loss_stress.calculate()
         )
 
-    def _jac_energy(self) -> npt.NDArray[np.float64]:
-        def per_configuration(atoms: Atoms) -> np.float64:
-            return 2.0 * (
-                (atoms.calc.results["energy"] - atoms.calc.targets["energy"])
-                * atoms.calc.engine.jac_energy(atoms).parameters
-            )
-
-        jacs = np.array([per_configuration(atoms) for atoms in self.images])
-        if self.setting.energy_per_atom:
-            jacs *= self.inverse_numbers_of_atoms[:, None] ** 2
-        jac = self.configuration_weight @ jacs
-        return jac / len(self.images) if self.setting.energy_per_conf else jac
-
     def jac(self, parameters: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         """Calculate the Jacobian of the loss function."""
-        jac = self.setting.energy_weight * self._jac_energy()
+        jac = self.setting.energy_weight * self.loss_energy.jac()
         if self.loss_forces.idcs_frc.size and self.setting.forces_weight:
             jac += self.setting.forces_weight * self.loss_forces.jac()
         if self.loss_stress.idcs_str.size and self.setting.stress_weight:
