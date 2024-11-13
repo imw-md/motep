@@ -75,7 +75,7 @@ def parse_setting(filename: str) -> Setting:
     for i, value in enumerate(setting_overwritten["steps"]):
         if not isinstance(value, dict):
             setting_overwritten["steps"][i] = {"method": value}
-        if value["method"] in scipy_minimize_methods:
+        if value["method"].lower() in scipy_minimize_methods:
             if "kwargs" not in value:
                 value["kwargs"] = {}
             value["kwargs"]["method"] = value["method"]
