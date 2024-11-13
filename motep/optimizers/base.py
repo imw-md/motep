@@ -3,8 +3,6 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-import numpy as np
-
 from motep.loss import LossFunctionBase
 
 
@@ -39,30 +37,11 @@ class OptimizerBase(ABC):
             msg = f"Some keywords cannot be optimized in {__name__}."
             raise ValueError(msg)
 
+        self.loss.mtp_data.optimized = self.optimized
+
     @abstractmethod
-    def optimize(
-        self,
-        parameters: np.ndarray,
-        bounds: np.ndarray,
-        **kwargs: dict[str, Any],
-    ) -> np.ndarray:
-        """Optimize parameters.
-
-        Parameters
-        ----------
-        parameters : np.ndarray
-            Initial parameters.
-        bounds : np.ndarray
-            Lower and upper bounds for the parameters.
-        **kwargs : dict[str, Any]
-            Other keyward arguments passed to the actual optimization function.
-
-        Returns
-        -------
-        parameters : np.ndarray
-            Optimized parameters.
-
-        """
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
+        """Optimize parameters."""
 
     @property
     @abstractmethod

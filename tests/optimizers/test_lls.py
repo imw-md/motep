@@ -65,8 +65,9 @@ def test_without_forces(data_path: pathlib.Path) -> None:
 
     optimized = ["moment_coeffs"]
 
-    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
-    mtp_data.parameters = parameters
+    mtp_data.optimized = optimized
+    mtp_data.initialize(rng=rng)
+
     mtp_data.print()
 
     loss = LossFunction(
@@ -76,14 +77,9 @@ def test_without_forces(data_path: pathlib.Path) -> None:
         comm=MPI.COMM_WORLD,
         engine=engine,
     )
-
-    parameters_ref = np.array(parameters, copy=True)
-    loss(parameters_ref)  # update paramters
-    ErrorPrinter(loss).print()
-
     minimized = ["energy", "forces"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(parameters, bounds)
+    optimizer.optimize()
     print()
 
 
@@ -109,8 +105,9 @@ def test_molecules(
 
     optimized = ["moment_coeffs"]
 
-    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
-    mtp_data.parameters = parameters
+    mtp_data.optimized = optimized
+    mtp_data.initialize(rng=rng)
+
     mtp_data.print()
 
     loss = LossFunction(
@@ -121,31 +118,31 @@ def test_molecules(
         engine=engine,
     )
 
-    parameters_ref = np.array(parameters, copy=True)
+    parameters_ref = np.array(mtp_data.parameters, copy=True)
     loss(parameters_ref)  # update paramters
     ErrorPrinter(loss).print()
 
     minimized = ["energy"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(parameters, bounds)
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f0 = loss(parameters)  # update paramters
+    f0 = loss(mtp_data.parameters)  # update paramters
     errors0 = ErrorPrinter(loss).print()
 
     # Check if `parameters` are updated.
-    assert not np.allclose(parameters, parameters_ref)
+    assert (mtp_data.parameters.size != parameters_ref.size) or (
+        not np.allclose(mtp_data.parameters, parameters_ref)
+    )
 
     minimized = ["energy", "forces"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(parameters, bounds)
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f1 = loss(parameters)  # update parameters
+    f1 = loss(mtp_data.parameters)  # update parameters
     errors1 = ErrorPrinter(loss).print()
 
     # Check loss functions
@@ -218,8 +215,8 @@ def test_crystals(
 
     rng = np.random.default_rng(42)
 
-    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
-    mtp_data.parameters = parameters
+    mtp_data.optimized = optimized
+    mtp_data.initialize(rng=rng)
 
     loss = LossFunction(
         images,
@@ -229,33 +226,32 @@ def test_crystals(
         engine=engine,
     )
 
-    parameters_ref = np.array(parameters, copy=True)
-    mtp_data.parameters = parameters
+    parameters_ref = np.array(mtp_data.parameters, copy=True)
     mtp_data.print()
     loss(parameters_ref)  # update parameters
     ErrorPrinter(loss).print()
 
     minimized = ["energy"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(parameters, bounds)
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f0 = loss(parameters)  # update parameters
+    f0 = loss(mtp_data.parameters)  # update parameters
     errors0 = ErrorPrinter(loss).print()
 
     # Check if `parameters` are updated.
-    assert not np.allclose(parameters, parameters_ref)
+    assert (mtp_data.parameters.size != parameters_ref.size) or (
+        not np.allclose(mtp_data.parameters, parameters_ref)
+    )
 
     minimized = ["energy", "forces"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(parameters, bounds)
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f1 = loss(parameters)  # update parameters
+    f1 = loss(mtp_data.parameters)  # update parameters
     errors1 = ErrorPrinter(loss).print()
 
     # Check RMSEs
@@ -266,12 +262,11 @@ def test_crystals(
 
     minimized = ["energy", "forces", "stress"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(parameters, bounds)
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f2 = loss(parameters)  # update parameters
+    f2 = loss(mtp_data.parameters)  # update parameters
     errors2 = ErrorPrinter(loss).print()
 
     # Check RMSEs
@@ -306,8 +301,9 @@ def test_species_coeffs(
     rng = np.random.default_rng(42)
 
     optimized = ["moment_coeffs", "species_coeffs"]
-    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
-    mtp_data.parameters = parameters
+
+    mtp_data.optimized = optimized
+    mtp_data.initialize(rng=rng)
 
     loss = LossFunction(
         images,
@@ -319,21 +315,19 @@ def test_species_coeffs(
 
     optimized = ["moment_coeffs"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(parameters, bounds)
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f0 = loss(parameters)  # update parameters
+    f0 = loss(mtp_data.parameters)  # update parameters
 
     optimized = ["moment_coeffs", "species_coeffs"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(parameters, bounds)
+    optimizer.optimize()
     print()
 
-    mtp_data.parameters = parameters
     mtp_data.print()
-    f1 = loss(parameters)  # update parameters
+    f1 = loss(mtp_data.parameters)  # update parameters
 
     # Check loss functions
     assert f0 > f1

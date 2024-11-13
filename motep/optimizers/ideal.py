@@ -11,33 +11,16 @@ from motep.optimizers.scipy import Callback
 class NoInteractionOptimizer(OptimizerBase):
     """Optimizer assuming no atomic interaction."""
 
-    def optimize(
-        self,
-        parameters: np.ndarray,
-        bounds: np.ndarray,
-        **kwargs: dict[str, Any],
-    ) -> np.ndarray:
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
         """Optimize `species_coeffs`.
 
         The values are determined using the least-square method.
         Note that, if there are no composition varieties in the training set,
         the values are physically less meaningful.
 
-        Parameters
-        ----------
-        parameters : np.ndarray
-            Initial parameters.
-        bounds : np.ndarray
-            Lower and upper bounds for the parameters.
-        **kwargs : dict[str, Any]
-            Other keyward arguments passed to the actual optimization function.
-
-        Returns
-        -------
-        parameters : np.ndarray
-            Optimized parameters.
-
         """
+        parameters = self.loss.mtp_data.parameters
+
         # Calculate basis functions of `fitness.images`
         self.loss(parameters)
 
@@ -64,7 +47,7 @@ class NoInteractionOptimizer(OptimizerBase):
         # Print the value of the loss function.
         callback(parameters)
 
-        return parameters
+        self.loss.mtp_data.parameters = parameters
 
     @property
     def optimized_default(self) -> list[str]:

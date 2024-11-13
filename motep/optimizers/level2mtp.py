@@ -1,6 +1,7 @@
 """Optimizer for Level 2 MTP."""
 
 from math import sqrt
+from typing import Any
 
 import numpy as np
 
@@ -27,28 +28,10 @@ class Level2MTPOptimizer(LLSOptimizerBase):
     def optimized_allowed(self) -> list[str]:
         return ["species_coeffs", "radial_coeffs"]
 
-    def optimize(
-        self,
-        parameters: np.ndarray,
-        bounds: np.ndarray,
-        **kwargs,
-    ) -> None:
-        """Optimize parameters.
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
+        """Optimize parameters."""
+        parameters = self.loss.mtp_data.parameters
 
-        Parameters
-        ----------
-        parameters : np.ndarray
-            Initial parameters.
-        bounds : np.ndarray
-            Lower and upper bounds for the parameters.
-            Not used in this class.
-
-        Returns
-        -------
-        parameters : np.ndarray
-            Optimized parameters.
-
-        """
         # Calculate basis functions of `loss.images`
         self.loss(parameters)
 
@@ -71,7 +54,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         # Print the value of the loss function.
         callback(parameters)
 
-        return parameters
+        self.loss.mtp_data.parameters = parameters
 
     def _update_parameters(self, coeffs: np.ndarray) -> np.ndarray:
         mtp_data = self.loss.mtp_data
@@ -118,7 +101,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         size = species_count * species_count * radial_basis_size
         matrix = np.stack([atoms.calc.engine.rbd.values for atoms in images])
         if self.loss.setting.energy_per_atom:
-            matrix *= self.loss.inverse_numbers_of_atoms[:, None, None, None]
+            cs = self.loss.loss_energy.inverse_numbers_of_atoms
+            matrix *= cs[:, None, None, None]
         if self.loss.setting.energy_per_conf:
             matrix /= sqrt(len(images))
         return matrix.reshape(-1, size)
@@ -128,18 +112,18 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         radial_basis_size = self.loss.mtp_data.radial_basis_size
         size = species_count * species_count * radial_basis_size
 
-        if not self.loss.idcs_frc.size:
+        if not self.loss.loss_forces.idcs_frc.size:
             return np.empty((0, size))
 
         images = self.loss.images
-        idcs = self.loss.idcs_frc
+        idcs = self.loss.loss_forces.idcs_frc
 
         if self.loss.setting.forces_per_atom:
             matrix = np.hstack(
                 [
                     (
                         images[i].calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0)
-                        * sqrt(self.loss.inverse_numbers_of_atoms[i])
+                        * sqrt(self.loss.loss_energy.inverse_numbers_of_atoms[i])
                     ).flat
                     for i in idcs
                 ],
@@ -157,7 +141,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
 
     def _calc_matrix_stress(self) -> np.ndarray:
         images = self.loss.images
-        idcs = self.loss.idcs_str
+        idcs = self.loss.loss_stress.idcs_str
 
         species_count = self.loss.mtp_data.species_count
         radial_basis_size = self.loss.mtp_data.radial_basis_size
@@ -165,7 +149,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
 
         matrix = np.array([images[i].calc.engine.rbd.dqdeps.T for i in idcs])
         if self.loss.setting.stress_times_volume:
-            matrix = (matrix.T * self.loss.volumes[idcs]).T
+            matrix = (matrix.T * self.loss.loss_stress.volumes[idcs]).T
         if self.loss.setting.stress_per_conf:
             matrix /= sqrt(len(images))
         return matrix.reshape((-1, size))

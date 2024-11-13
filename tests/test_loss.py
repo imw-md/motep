@@ -114,11 +114,6 @@ def test_jac(
     parameters = mtp_data.parameters
 
     for i, orig in enumerate(parameters):
-        # skip `scaling`
-        if i == 0:
-            jac_nmr[i] = 0.0
-            continue
-
         parameters[i] = orig + dx
         lp = loss(parameters)
 

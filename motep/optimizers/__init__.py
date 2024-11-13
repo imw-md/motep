@@ -9,9 +9,7 @@ from motep.optimizers.randomizer import Randomizer
 from motep.optimizers.scipy import (
     ScipyDifferentialEvolutionOptimizer,
     ScipyDualAnnealingOptimizer,
-    ScipyLBFGSBOptimizer,
     ScipyMinimizeOptimizer,
-    ScipyNelderMeadOptimizer,
 )
 
 
@@ -22,8 +20,6 @@ def make_optimizer(optimizer: str) -> OptimizerBase:
         "NI": NoInteractionOptimizer,
         "Level2MTP": Level2MTPOptimizer,
         "minimize": ScipyMinimizeOptimizer,
-        "Nelder-Mead": ScipyNelderMeadOptimizer,
-        "L-BFGS-B": ScipyLBFGSBOptimizer,
         "DA": ScipyDualAnnealingOptimizer,
         "DE": ScipyDifferentialEvolutionOptimizer,
         "LLS": LLSOptimizer,

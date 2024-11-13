@@ -81,25 +81,21 @@ def run(args: argparse.Namespace) -> None:
     with cd(folder_name):
         for i, step in enumerate(setting.steps):
             if rank == 0:
-                print(step["method"])
+                pprint(step, sort_dicts=False)
                 print()
 
             # Print parameters before optimization.
-            parameters, bounds = mtp_data.initialize(step["optimized"], setting.rng)
-            mtp_data.parameters = parameters
+            mtp_data.initialize(setting.rng)
             if rank == 0:
                 mtp_data.print()
 
             # Instantiate an `Optimizer` class
             optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
-
-            kwargs = step.get("kwargs", {})
-            parameters = optimizer.optimize(parameters, bounds, **kwargs)
+            optimizer.optimize(**step.get("kwargs", {}))
             if rank == 0:
                 print()
 
             # Print parameters after optimization.
-            mtp_data.parameters = parameters
             if rank == 0:
                 mtp_data.print()
 
@@ -107,7 +103,6 @@ def run(args: argparse.Namespace) -> None:
             if rank == 0:
                 ErrorPrinter(loss).print()
 
-    mtp_data.parameters = parameters
     write_mtp(setting.potential_final, mtp_data)
 
     end_time = time.time()

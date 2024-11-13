@@ -70,7 +70,7 @@ class LLSOptimizerBase(OptimizerBase):
             for j, s in enumerate(species):
                 counts[i, j] = list(atoms.numbers).count(s)
         if self.loss.setting.energy_per_atom:
-            counts *= self.loss.inverse_numbers_of_atoms[:, None]
+            counts *= self.loss.loss_energy.inverse_numbers_of_atoms[:, None]
         if self.loss.setting.energy_per_conf:
             counts /= sqrt(len(images))
         return counts
@@ -112,7 +112,7 @@ class LLSOptimizerBase(OptimizerBase):
             )
             energies -= np.fromiter(iterable, dtype=float, count=len(images))
         if self.loss.setting.energy_per_atom:
-            energies *= self.loss.inverse_numbers_of_atoms
+            energies *= self.loss.loss_energy.inverse_numbers_of_atoms
         if self.loss.setting.energy_per_conf:
             energies /= sqrt(len(images))
         return energies
@@ -127,17 +127,17 @@ class LLSOptimizerBase(OptimizerBase):
         )
 
     def _calc_vector_forces(self) -> np.ndarray:
-        if not self.loss.idcs_frc.size:
+        if not self.loss.loss_forces.idcs_frc.size:
             return np.empty(0)
         key = "forces"
         images = self.loss.images
-        idcs_frc = self.loss.idcs_frc
+        idcs_frc = self.loss.loss_forces.idcs_frc
         if self.loss.setting.forces_per_atom:
             vector = -1.0 * np.hstack(
                 [
                     (
                         images[i].calc.targets[key]
-                        * sqrt(self.loss.inverse_numbers_of_atoms[i])
+                        * sqrt(self.loss.loss_forces.inverse_numbers_of_atoms[i])
                     ).flat
                     for i in idcs_frc
                 ],
@@ -153,11 +153,11 @@ class LLSOptimizerBase(OptimizerBase):
     def _calc_vector_stress(self) -> np.ndarray:
         key = "stress"
         images = self.loss.images
-        idcs_str = self.loss.idcs_str
+        idcs_str = self.loss.loss_stress.idcs_str
         f = voigt_6_to_full_3x3_stress
         stresses = np.array([f(images[i].calc.targets[key]) for i in idcs_str])
         if self.loss.setting.stress_times_volume:
-            stresses = (stresses.T * self.loss.volumes[idcs_str]).T
+            stresses = (stresses.T * self.loss.loss_stress.volumes[idcs_str]).T
         if self.loss.setting.stress_per_conf:
             stresses /= sqrt(len(images))
         return stresses.flat
@@ -182,30 +182,12 @@ class LLSOptimizer(LLSOptimizerBase):
     def optimized_allowed(self) -> list[str]:
         return ["species_coeffs", "moment_coeffs"]
 
-    def optimize(
-        self,
-        parameters: np.ndarray,
-        bounds: np.ndarray,
-        **kwargs,
-    ) -> np.ndarray:
-        """Optimize parameters.
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
+        """Optimize parameters."""
+        parameters = self.loss.mtp_data.parameters
 
-        Parameters
-        ----------
-        parameters : np.ndarray
-            Initial parameters.
-        bounds : np.ndarray
-            Lower and upper bounds for the parameters.
-            Not used in :class:`~motep.optimizers.lls.LLSOptimizer`.
-
-        Returns
-        -------
-        parameters : np.ndarray
-            Optimized parameters.
-
-        """
         # Calculate basis functions of `loss.images`
-        self.loss(parameters)
+        self.loss(self.loss.mtp_data.parameters)
 
         callback = Callback(self.loss)
 
@@ -230,7 +212,7 @@ class LLSOptimizer(LLSOptimizerBase):
         # Print the value of the loss function.
         callback(parameters)
 
-        return parameters
+        self.loss.mtp_data.parameters = parameters
 
     def _calc_matrix(self) -> np.ndarray:
         """Calculate the matrix for linear least squares (LLS)."""
@@ -255,21 +237,21 @@ class LLSOptimizer(LLSOptimizerBase):
         images = self.loss.images
         matrix = np.array([atoms.calc.engine.mbd.values for atoms in images])
         if self.loss.setting.energy_per_atom:
-            matrix *= self.loss.inverse_numbers_of_atoms[:, None]
+            matrix *= self.loss.loss_energy.inverse_numbers_of_atoms[:, None]
         if self.loss.setting.energy_per_conf:
             matrix /= sqrt(len(images))
         return matrix
 
     def _calc_matrix_forces(self) -> np.ndarray:
-        if not self.loss.idcs_frc.size:
+        if not self.loss.loss_forces.idcs_frc.size:
             return np.empty((0, self.loss.mtp_data.alpha_scalar_moments))
         images = self.loss.images
-        idcs_frc = self.loss.idcs_frc
+        idcs_frc = self.loss.loss_forces.idcs_frc
         if self.loss.setting.forces_per_atom:
             matrix = np.vstack(
                 [
                     images[i].calc.engine.mbd.dbdris.transpose(1, 2, 0)
-                    * sqrt(self.loss.inverse_numbers_of_atoms[i])
+                    * sqrt(self.loss.loss_forces.inverse_numbers_of_atoms[i])
                     for i in idcs_frc
                 ],
             )
@@ -283,10 +265,10 @@ class LLSOptimizer(LLSOptimizerBase):
 
     def _calc_matrix_stress(self) -> np.ndarray:
         images = self.loss.images
-        idcs_str = self.loss.idcs_str
+        idcs_str = self.loss.loss_stress.idcs_str
         matrix = np.array([images[i].calc.engine.mbd.dbdeps.T for i in idcs_str])
         if self.loss.setting.stress_times_volume:
-            matrix = (matrix.T * self.loss.volumes[idcs_str]).T
+            matrix = (matrix.T * self.loss.loss_stress.volumes[idcs_str]).T
         if self.loss.setting.stress_per_conf:
             matrix /= sqrt(len(images))
         return matrix.reshape((-1, self.loss.mtp_data.alpha_scalar_moments))

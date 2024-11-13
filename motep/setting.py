@@ -5,6 +5,24 @@ import tomllib
 from dataclasses import dataclass, field
 from typing import Any
 
+scipy_minimize_methods = {
+    "nelder-mead",
+    "powell",
+    "cg",
+    "bfgs",
+    "newton-cg",
+    "l-bfgs-b",
+    "tnc",
+    "cobyla",
+    "cobyqa",
+    "slsqp",
+    "trust-constr",
+    "dogleg",
+    "trust-ncg",
+    "trust-exact",
+    "trust-krylov",
+}
+
 
 @dataclass
 class LossSetting:
@@ -57,5 +75,10 @@ def parse_setting(filename: str) -> Setting:
     for i, value in enumerate(setting_overwritten["steps"]):
         if not isinstance(value, dict):
             setting_overwritten["steps"][i] = {"method": value}
+        if value["method"] in scipy_minimize_methods:
+            if "kwargs" not in value:
+                value["kwargs"] = {}
+            value["kwargs"]["method"] = value["method"]
+            value["method"] = "minimize"
 
     return Setting(**setting_overwritten)
