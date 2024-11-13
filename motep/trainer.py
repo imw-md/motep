@@ -81,7 +81,7 @@ def run(args: argparse.Namespace) -> None:
     with cd(folder_name):
         for i, step in enumerate(setting.steps):
             if rank == 0:
-                print(step["method"])
+                pprint(step, sort_dicts=False)
                 print()
 
             # Print parameters before optimization.
@@ -91,7 +91,7 @@ def run(args: argparse.Namespace) -> None:
 
             # Instantiate an `Optimizer` class
             optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
-            optimizer.optimize()
+            optimizer.optimize(**step.get("kwargs", {}))
             if rank == 0:
                 print()
 

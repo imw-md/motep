@@ -120,13 +120,3 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
         )
         self.print_result(result)
         self.loss.mtp_data.parameters = result.x
-
-
-class ScipyNelderMeadOptimizer(ScipyMinimizeOptimizer):
-    def optimize(self, **kwargs: dict[str, Any]) -> None:
-        return super().optimize(method="Nelder-Mead", **kwargs)
-
-
-class ScipyLBFGSBOptimizer(ScipyMinimizeOptimizer):
-    def optimize(self, **kwargs: dict[str, Any]) -> None:
-        return super().optimize(method="L-BFGS-B", **kwargs)
