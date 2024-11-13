@@ -37,10 +37,10 @@ def test_scaling_vs_jac(data_path: pathlib.Path) -> None:
         engine=engine,
     )
 
-    parameters, bounds = mtp_data.initialize(
-        optimized=optimized,
-        rng=np.random.default_rng(42),
-    )
+    mtp_data.optimized = optimized
+    mtp_data.initialize(rng=np.random.default_rng(42))
+    parameters = mtp_data.parameters
+    bounds = mtp_data.get_bounds()
 
     step = {"method": "L-BFGS-B", "kwargs": {"jac": True, "options": {"maxiter": 10}}}
 

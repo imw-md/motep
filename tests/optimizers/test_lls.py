@@ -65,8 +65,11 @@ def test_without_forces(data_path: pathlib.Path) -> None:
 
     optimized = ["moment_coeffs"]
 
-    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
-    mtp_data.parameters = parameters
+    mtp_data.optimized = optimized
+    mtp_data.initialize(rng=rng)
+    parameters = mtp_data.parameters
+    bounds = mtp_data.get_bounds()
+
     mtp_data.print()
 
     loss = LossFunction(
@@ -109,8 +112,11 @@ def test_molecules(
 
     optimized = ["moment_coeffs"]
 
-    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
-    mtp_data.parameters = parameters
+    mtp_data.optimized = optimized
+    mtp_data.initialize(rng=rng)
+    parameters = mtp_data.parameters
+    bounds = mtp_data.get_bounds()
+
     mtp_data.print()
 
     loss = LossFunction(
@@ -136,7 +142,9 @@ def test_molecules(
     errors0 = ErrorPrinter(loss).print()
 
     # Check if `parameters` are updated.
-    assert not np.allclose(parameters, parameters_ref)
+    assert (parameters.size != parameters_ref.size) or (
+        not np.allclose(parameters, parameters_ref)
+    )
 
     minimized = ["energy", "forces"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
@@ -218,8 +226,10 @@ def test_crystals(
 
     rng = np.random.default_rng(42)
 
-    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
-    mtp_data.parameters = parameters
+    mtp_data.optimized = optimized
+    mtp_data.initialize(rng=rng)
+    parameters = mtp_data.parameters
+    bounds = mtp_data.get_bounds()
 
     loss = LossFunction(
         images,
@@ -246,7 +256,9 @@ def test_crystals(
     errors0 = ErrorPrinter(loss).print()
 
     # Check if `parameters` are updated.
-    assert not np.allclose(parameters, parameters_ref)
+    assert (parameters.size != parameters_ref.size) or (
+        not np.allclose(parameters, parameters_ref)
+    )
 
     minimized = ["energy", "forces"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
@@ -306,8 +318,10 @@ def test_species_coeffs(
     rng = np.random.default_rng(42)
 
     optimized = ["moment_coeffs", "species_coeffs"]
-    parameters, bounds = mtp_data.initialize(optimized=optimized, rng=rng)
-    mtp_data.parameters = parameters
+
+    mtp_data.optimized = optimized
+    mtp_data.initialize(rng=rng)
+    parameters = mtp_data.parameters
 
     loss = LossFunction(
         images,
@@ -319,7 +333,7 @@ def test_species_coeffs(
 
     optimized = ["moment_coeffs"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(parameters, bounds)
+    parameters = optimizer.optimize(mtp_data.parameters, mtp_data.get_bounds())
     print()
 
     mtp_data.parameters = parameters
@@ -328,7 +342,7 @@ def test_species_coeffs(
 
     optimized = ["moment_coeffs", "species_coeffs"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
-    parameters = optimizer.optimize(parameters, bounds)
+    parameters = optimizer.optimize(mtp_data.parameters, mtp_data.get_bounds())
     print()
 
     mtp_data.parameters = parameters

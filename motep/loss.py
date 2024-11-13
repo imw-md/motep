@@ -343,15 +343,6 @@ class LossFunctionBase(ABC):
                 rbd = self.images[i].calc.engine.rbd
                 self.images[i].calc.engine.rbd = self.comm.bcast(rbd, root=i % size)
 
-    @property
-    def optimized(self) -> list[str]:
-        """Return parameter types to be optimized."""
-        return self.mtp_data.optimized
-
-    @optimized.setter
-    def optimized(self, optimized: list[str]) -> None:
-        self.mtp_data.optimized = optimized
-
     def calc_loss_function(self) -> float:
         """Calculate the value of the loss function."""
         self._run_calculations()

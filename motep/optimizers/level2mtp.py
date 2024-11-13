@@ -32,7 +32,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         parameters: np.ndarray,
         bounds: np.ndarray,
         **kwargs,
-    ) -> None:
+    ) -> np.ndarray:
         """Optimize parameters.
 
         Parameters

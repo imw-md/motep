@@ -39,6 +39,8 @@ class OptimizerBase(ABC):
             msg = f"Some keywords cannot be optimized in {__name__}."
             raise ValueError(msg)
 
+        self.loss.mtp_data.optimized = self.optimized
+
     @abstractmethod
     def optimize(
         self,
