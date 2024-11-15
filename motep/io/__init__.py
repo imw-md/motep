@@ -2,6 +2,7 @@
 
 import ase.io
 from ase import Atoms
+from ase.io.formats import parse_filename
 
 from motep.io.mlip.cfg import read_cfg
 
@@ -10,8 +11,14 @@ def read(filenames: list[str], species: list[int] | None = None) -> list[Atoms]:
     """Read images."""
     images = []
     for filename in filenames:
-        if isinstance(filename, str) and filename.endswith(".cfg"):
-            images.extend(read_cfg(filename, index=":", species=species))
+        filename_parsed, index = parse_filename(filename)
+        index = ":" if index is None else index
+        if isinstance(filename_parsed, str) and filename_parsed.endswith(".cfg"):
+            atoms = read_cfg(filename_parsed, index=index, species=species)
         else:
-            images.extend(ase.io.read(filename, index=":"))
+            atoms = ase.io.read(filename_parsed, index=index)
+        if isinstance(atoms, Atoms):
+            images.append(atoms)
+        else:
+            images.extend(atoms)
     return images
