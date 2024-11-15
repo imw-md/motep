@@ -14,7 +14,6 @@ from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
 from motep.setting import parse_setting
-from motep.utils import cd
 
 
 def _get_dummy_species(images: list[Atoms]) -> list[int]:
@@ -73,37 +72,31 @@ def run(args: argparse.Namespace) -> None:
             comm=comm,
         )
 
-    # Create folders for each rank
-    folder_name = f"rank_{rank}"
-    pathlib.Path(folder_name).mkdir(parents=True, exist_ok=True)
+    for i, step in enumerate(setting.steps):
+        if rank == 0:
+            pprint.pp(step)
+            print(flush=True)
 
-    # Change working directory to the created folder
-    with cd(folder_name):
-        for i, step in enumerate(setting.steps):
-            if rank == 0:
-                pprint.pp(step)
-                print(flush=True)
+        # Print parameters before optimization.
+        mtp_data.initialize(setting.rng)
+        if rank == 0:
+            mtp_data.print()
 
-            # Print parameters before optimization.
-            mtp_data.initialize(setting.rng)
-            if rank == 0:
-                mtp_data.print()
-
-            # Instantiate an `Optimizer` class
-            optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
-            optimizer.optimize(**step.get("kwargs", {}))
-            if rank == 0:
-                print(flush=True)
+        # Instantiate an `Optimizer` class
+        optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
+        optimizer.optimize(**step.get("kwargs", {}))
+        if rank == 0:
+            print(flush=True)
 
             # Print parameters after optimization.
-            if rank == 0:
-                mtp_data.print(flush=True)
+            mtp_data.print(flush=True)
 
             write_mtp(f"intermediate_{i}.mtp", mtp_data)
-            if rank == 0:
-                ErrorPrinter(loss).print(flush=True)
 
-    write_mtp(setting.potential_final, mtp_data)
+            ErrorPrinter(loss).print(flush=True)
+
+    if rank == 0:
+        write_mtp(setting.potential_final, mtp_data)
 
     end_time = time.time()
     if rank == 0:
