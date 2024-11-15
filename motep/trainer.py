@@ -3,7 +3,6 @@
 import argparse
 import pathlib
 import pprint
-import time
 
 import numpy as np
 from ase import Atoms
@@ -14,7 +13,7 @@ from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
 from motep.setting import parse_setting
-from motep.utils import cd
+from motep.utils import measure_time
 
 
 def _get_dummy_species(images: list[Atoms]) -> list[int]:
@@ -29,14 +28,10 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("setting")
 
 
-def run(args: argparse.Namespace) -> None:
-    """Run."""
-    start_time = time.time()
-
-    comm = MPI.COMM_WORLD
+def train(filename_setting: str, comm: MPI.Comm) -> None:
     rank = comm.Get_rank()
 
-    setting = parse_setting(args.setting)
+    setting = parse_setting(filename_setting)
     if rank == 0:
         pprint.pp(setting)
         print(flush=True)
@@ -49,21 +44,15 @@ def run(args: argparse.Namespace) -> None:
     species = setting.species or None
     images = read_cfg(cfg_file, index=":", species=species)
     if not setting.species:
-        setting.species = _get_dummy_species(images)
+        species = _get_dummy_species(images)
 
     mtp_data = read_mtp(untrained_mtp)
+    mtp_data.species = species
 
     if setting.engine == "mlippy":
         from motep.mlippy_loss import MlippyLossFunction
 
-        loss = MlippyLossFunction(
-            images,
-            mtp_data,
-            setting.loss,
-            potential_initial=setting.potential_initial,
-            potential_final=setting.potential_final,
-            comm=comm,
-        )
+        loss = MlippyLossFunction(images, mtp_data, setting.loss, comm=comm)
     else:
         loss = LossFunction(
             images,
@@ -73,13 +62,8 @@ def run(args: argparse.Namespace) -> None:
             comm=comm,
         )
 
-    # Create folders for each rank
-    folder_name = f"rank_{rank}"
-    pathlib.Path(folder_name).mkdir(parents=True, exist_ok=True)
-
-    # Change working directory to the created folder
-    with cd(folder_name):
-        for i, step in enumerate(setting.steps):
+    for i, step in enumerate(setting.steps):
+        with measure_time(f"step {i}: {step['method']}", comm):
             if rank == 0:
                 pprint.pp(step)
                 print(flush=True)
@@ -95,19 +79,19 @@ def run(args: argparse.Namespace) -> None:
             if rank == 0:
                 print(flush=True)
 
-            # Print parameters after optimization.
-            if rank == 0:
+                # Print parameters after optimization.
                 mtp_data.print(flush=True)
 
-            write_mtp(f"intermediate_{i}.mtp", mtp_data)
-            if rank == 0:
+                write_mtp(f"intermediate_{i}.mtp", mtp_data)
+
                 ErrorPrinter(loss).print(flush=True)
 
-    write_mtp(setting.potential_final, mtp_data)
-
-    end_time = time.time()
     if rank == 0:
-        print("Total time taken:", end_time - start_time, "seconds")
+        write_mtp(setting.potential_final, mtp_data)
 
-    comm.Barrier()
-    MPI.Finalize()
+
+def run(args: argparse.Namespace) -> None:
+    """Run."""
+    comm = MPI.COMM_WORLD
+    with measure_time("total"):
+        train(args.setting, comm)
