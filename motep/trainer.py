@@ -56,14 +56,7 @@ def run(args: argparse.Namespace) -> None:
     if setting.engine == "mlippy":
         from motep.mlippy_loss import MlippyLossFunction
 
-        loss = MlippyLossFunction(
-            images,
-            mtp_data,
-            setting.loss,
-            potential_initial=setting.potential_initial,
-            potential_final=setting.potential_final,
-            comm=comm,
-        )
+        loss = MlippyLossFunction(images, mtp_data, setting.loss, comm=comm)
     else:
         loss = LossFunction(
             images,

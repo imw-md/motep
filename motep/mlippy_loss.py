@@ -1,12 +1,12 @@
 """Loss function."""
 
 import pathlib
+import tempfile
 
 import mlippy
 
 from motep.io.mlip.mtp import write_mtp
 from motep.loss import LossFunctionBase
-from motep.potentials.mtp.data import MTPData
 
 
 def init_mlip(file: str, species: list[int]):
@@ -18,35 +18,29 @@ def init_mlip(file: str, species: list[int]):
     return mlip
 
 
-def init_calc(file: str, mtp_data: MTPData, species: list[int]):
-    """Initialize the mlippy `mtp` ojbect."""
-    write_mtp(file, mtp_data)
-    return init_mlip(file, species)
-
-
 class MlippyLossFunction(LossFunctionBase):
-    def __init__(
-        self,
-        *args: tuple,
-        potential_initial: pathlib.Path | str = "initial.mtp",
-        potential_final: pathlib.Path | str = "final.mtp",
-        **kwargs: dict,
-    ) -> None:
+    """Loss function with proper treatment for mlippy."""
+
+    def __init__(self, *args: tuple, **kwargs: dict) -> None:
         super().__init__(*args, **kwargs)
-        self.potential_initial = potential_initial
-        self.potential_final = potential_final
-        mlip = init_calc(self.potential_initial, self.mtp_data, self.mtp_data.species)
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as fd:
+            file = fd.name
+        write_mtp(file, self.mtp_data)
+        mlip = init_mlip(file, self.mtp_data.species)
         for atoms in self.images:
             targets = atoms.calc.results
             atoms.calc = mlippy.MLIP_Calculator(mlip, {})
             atoms.calc.targets = targets
+        pathlib.Path.unlink(file)
 
     def __call__(self, parameters: list[float]) -> float:
-        file = self.potential_final
         self.mtp_data.parameters = parameters
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as fd:
+            file = fd.name
         write_mtp(file, self.mtp_data)
         options = {"mtp-filename": file}
         for atoms in self.images:
             atoms.calc.mlip.init_wrapper(options)
             atoms.calc.results = {}
+        pathlib.Path.unlink(file)
         return self.calc_loss_function()
