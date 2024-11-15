@@ -2,8 +2,8 @@
 
 import argparse
 import pathlib
+import pprint
 import time
-from pprint import pprint
 
 import numpy as np
 from ase import Atoms
@@ -38,7 +38,7 @@ def run(args: argparse.Namespace) -> None:
 
     setting = parse_setting(args.setting)
     if rank == 0:
-        pprint(setting, sort_dicts=False)
+        pprint.pp(setting)
         print()
 
     setting.rng = np.random.default_rng(setting.seed)
@@ -81,7 +81,7 @@ def run(args: argparse.Namespace) -> None:
     with cd(folder_name):
         for i, step in enumerate(setting.steps):
             if rank == 0:
-                pprint(step, sort_dicts=False)
+                pprint.pp(step)
                 print()
 
             # Print parameters before optimization.
