@@ -66,12 +66,12 @@ def time_mtp(
     engine: str,
     is_trained: bool = False,
 ) -> np.ndarray:
-    parameters = read_mtp(pot_path)
-    parameters["species"] = []
+    mtp_data = read_mtp(pot_path)
+    mtp_data.species = []
     for atomic_number in images[0].numbers:
-        if atomic_number not in parameters["species"]:
-            parameters["species"].append(atomic_number)
-    calc = MTP(parameters, engine=engine, is_trained=is_trained)
+        if atomic_number not in mtp_data.species:
+            mtp_data.species.append(atomic_number)
+    calc = MTP(mtp_data, engine=engine, is_trained=is_trained)
     calc.use_cache = False
 
     suffix = " (train)" if is_trained else " (run)"
