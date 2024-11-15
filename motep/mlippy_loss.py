@@ -35,7 +35,7 @@ class MlippyLossFunction(LossFunctionBase):
         super().__init__(*args, **kwargs)
         self.potential_initial = potential_initial
         self.potential_final = potential_final
-        mlip = init_calc(self.potential_initial, self.mtp_data, self.setting.species)
+        mlip = init_calc(self.potential_initial, self.mtp_data, self.mtp_data.species)
         for atoms in self.images:
             targets = atoms.calc.results
             atoms.calc = mlippy.MLIP_Calculator(mlip, {})

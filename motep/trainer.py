@@ -48,9 +48,10 @@ def run(args: argparse.Namespace) -> None:
     species = setting.species or None
     images = read_cfg(cfg_file, index=":", species=species)
     if not setting.species:
-        setting.species = _get_dummy_species(images)
+        species = _get_dummy_species(images)
 
     mtp_data = read_mtp(untrained_mtp)
+    mtp_data.species = species
 
     if setting.engine == "mlippy":
         from motep.mlippy_loss import MlippyLossFunction
