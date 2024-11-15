@@ -3,7 +3,6 @@
 import argparse
 import pathlib
 import pprint
-import time
 
 import numpy as np
 from ase import Atoms
@@ -14,6 +13,7 @@ from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
 from motep.setting import parse_setting
+from motep.utils import measure_time
 
 
 def _get_dummy_species(images: list[Atoms]) -> list[int]:
@@ -28,14 +28,10 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("setting")
 
 
-def run(args: argparse.Namespace) -> None:
-    """Run."""
-    start_time = time.time()
-
-    comm = MPI.COMM_WORLD
+def train(filename_setting: str, comm: MPI.Comm) -> None:
     rank = comm.Get_rank()
 
-    setting = parse_setting(args.setting)
+    setting = parse_setting(filename_setting)
     if rank == 0:
         pprint.pp(setting)
         print(flush=True)
@@ -67,34 +63,35 @@ def run(args: argparse.Namespace) -> None:
         )
 
     for i, step in enumerate(setting.steps):
-        if rank == 0:
-            pprint.pp(step)
-            print(flush=True)
+        with measure_time(f"step {i}: {step['method']}", comm):
+            if rank == 0:
+                pprint.pp(step)
+                print(flush=True)
 
-        # Print parameters before optimization.
-        mtp_data.initialize(setting.rng)
-        if rank == 0:
-            mtp_data.print()
+            # Print parameters before optimization.
+            mtp_data.initialize(setting.rng)
+            if rank == 0:
+                mtp_data.print()
 
-        # Instantiate an `Optimizer` class
-        optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
-        optimizer.optimize(**step.get("kwargs", {}))
-        if rank == 0:
-            print(flush=True)
+            # Instantiate an `Optimizer` class
+            optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
+            optimizer.optimize(**step.get("kwargs", {}))
+            if rank == 0:
+                print(flush=True)
 
-            # Print parameters after optimization.
-            mtp_data.print(flush=True)
+                # Print parameters after optimization.
+                mtp_data.print(flush=True)
 
-            write_mtp(f"intermediate_{i}.mtp", mtp_data)
+                write_mtp(f"intermediate_{i}.mtp", mtp_data)
 
-            ErrorPrinter(loss).print(flush=True)
+                ErrorPrinter(loss).print(flush=True)
 
     if rank == 0:
         write_mtp(setting.potential_final, mtp_data)
 
-    end_time = time.time()
-    if rank == 0:
-        print("Total time taken:", end_time - start_time, "seconds")
 
-    comm.Barrier()
-    MPI.Finalize()
+def run(args: argparse.Namespace) -> None:
+    """Run."""
+    comm = MPI.COMM_WORLD
+    with measure_time("total"):
+        train(args.setting, comm)
