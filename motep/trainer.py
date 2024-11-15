@@ -8,7 +8,7 @@ import numpy as np
 from ase import Atoms
 from mpi4py import MPI
 
-from motep.io.mlip.cfg import read_cfg
+import motep.io
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
@@ -38,11 +38,10 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
 
     setting.rng = np.random.default_rng(setting.seed)
 
-    cfg_file = str(pathlib.Path(setting.configurations[0]).resolve())
     untrained_mtp = str(pathlib.Path(setting.potential_initial).resolve())
 
     species = setting.species or None
-    images = read_cfg(cfg_file, index=":", species=species)
+    images = motep.io.read(setting.configurations, species=species)
     if not setting.species:
         species = _get_dummy_species(images)
 
