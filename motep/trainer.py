@@ -101,7 +101,7 @@ def run(args: argparse.Namespace) -> None:
 
             write_mtp(f"intermediate_{i}.mtp", mtp_data)
             if rank == 0:
-                ErrorPrinter(loss).print()
+                ErrorPrinter(loss).print(flush=True)
 
     write_mtp(setting.potential_final, mtp_data)
 
