@@ -39,7 +39,7 @@ def run(args: argparse.Namespace) -> None:
     setting = parse_setting(args.setting)
     if rank == 0:
         pprint.pp(setting)
-        print()
+        print(flush=True)
 
     setting.rng = np.random.default_rng(setting.seed)
 
@@ -82,7 +82,7 @@ def run(args: argparse.Namespace) -> None:
         for i, step in enumerate(setting.steps):
             if rank == 0:
                 pprint.pp(step)
-                print()
+                print(flush=True)
 
             # Print parameters before optimization.
             mtp_data.initialize(setting.rng)
@@ -93,7 +93,7 @@ def run(args: argparse.Namespace) -> None:
             optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
             optimizer.optimize(**step.get("kwargs", {}))
             if rank == 0:
-                print()
+                print(flush=True)
 
             # Print parameters after optimization.
             if rank == 0:

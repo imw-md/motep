@@ -28,7 +28,7 @@ class Callback:
             else self.loss(intermediate_result)
         )
         if self.loss.comm.Get_rank() == 0:
-            print(f"loss {self.iter:4d}:", fun)
+            print(f"loss {self.iter:4d}:", fun, flush=True)
         self.iter += 1
 
 
@@ -44,6 +44,7 @@ class ScipyOptimizerBase(OptimizerBase):
     def print_result(self, result: OptimizeResult) -> None:
         """Print `result`."""
         if self.loss.comm.Get_rank() == 0:
+            print(flush=True)
             print("Optimization result:")
             print("  Message:", result.message)
             print("  Success:", result.success)
