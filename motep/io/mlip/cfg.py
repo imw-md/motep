@@ -8,7 +8,7 @@ from ase import Atoms
 from ase.calculators.lammps import convert
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase.data import atomic_masses, chemical_symbols
-from ase.utils import reader, writer
+from ase.utils import reader, string2index, writer
 
 
 @reader
@@ -33,8 +33,10 @@ def read_cfg(
         if line.startswith("BEGIN_CFG"):
             atoms = _read_image(fd, species)
             atoms_list.append(atoms)
-    if index == ":":
-        return atoms_list
+
+    if isinstance(index, str):
+        index = string2index(index)
+
     return atoms_list[index]
 
 

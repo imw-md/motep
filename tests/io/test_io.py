@@ -13,6 +13,14 @@ def test_read_path(data_path: pathlib.Path) -> None:
     read_cfg(path)
 
 
+def test_index(data_path: pathlib.Path) -> None:
+    """Test if `read_cfg` can accept a flexible `index`."""
+    molecule = 762
+    path = data_path / f"original/molecules/{molecule}/training.cfg"
+    images = read_cfg(path, index="0:1")
+    assert len(images) == 1
+
+
 def test_read_multiple_files(data_path: pathlib.Path) -> None:
     """Test if multiple files can be read."""
     configurations = []
