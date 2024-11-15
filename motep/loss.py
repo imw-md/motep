@@ -1,6 +1,7 @@
 """Loss function."""
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -426,8 +427,12 @@ class ErrorPrinter:
         errors["stress"] = self._calc_errors_stress()  # eV/Ang^3
         return errors
 
-    def print(self) -> dict[str, float]:
-        """Print errors."""
+    def print(self, **kwargs: dict[str, Any]) -> dict[str, float]:
+        """Print errors.
+
+        `**kwargs` are used to, e.g., give `flush=True` for `print` at the end
+        of each block.
+        """
         errors = self.calculate()
 
         key0 = "energy"
@@ -435,28 +440,28 @@ class ErrorPrinter:
         print(f"    Errors checked for {errors[key0]['N']} configurations")
         for key1 in ["MAX", "ABS", "RMS"]:
             print(f"    {key1} error: {errors[key0][key1]}")
-        print()
+        print(**kwargs)
 
         key0 = "energy_per_atom"
         print("Energy per atom (eV/atom):")
         print(f"    Errors checked for {errors[key0]['N']} configurations")
         for key1 in ["MAX", "ABS", "RMS"]:
             print(f"    {key1} error: {errors[key0][key1]}")
-        print()
+        print(**kwargs)
 
         key0 = "forces"
         print("Forces per component (eV/angstrom):")
         print(f"    Errors checked for {errors[key0]['N'] // 3} atoms")
         for key1 in ["MAX", "ABS", "RMS"]:
             print(f"    {key1} error: {errors[key0][key1]}")
-        print()
+        print(**kwargs)
 
         key0 = "stress"
         print("Stress per component (GPa):")
         print(f"    Errors checked for {errors[key0]['N'] // 9} configurations")
         for key1 in ["MAX", "ABS", "RMS"]:
             print(f"    {key1} error: {errors[key0][key1] * eV * 1e21}")
-        print()
+        print(**kwargs)
 
         return errors
 

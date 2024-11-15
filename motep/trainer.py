@@ -2,8 +2,8 @@
 
 import argparse
 import pathlib
+import pprint
 import time
-from pprint import pprint
 
 import numpy as np
 from ase import Atoms
@@ -38,8 +38,8 @@ def run(args: argparse.Namespace) -> None:
 
     setting = parse_setting(args.setting)
     if rank == 0:
-        pprint(setting, sort_dicts=False)
-        print()
+        pprint.pp(setting)
+        print(flush=True)
 
     setting.rng = np.random.default_rng(setting.seed)
 
@@ -81,8 +81,8 @@ def run(args: argparse.Namespace) -> None:
     with cd(folder_name):
         for i, step in enumerate(setting.steps):
             if rank == 0:
-                pprint(step, sort_dicts=False)
-                print()
+                pprint.pp(step)
+                print(flush=True)
 
             # Print parameters before optimization.
             mtp_data.initialize(setting.rng)
@@ -93,15 +93,15 @@ def run(args: argparse.Namespace) -> None:
             optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
             optimizer.optimize(**step.get("kwargs", {}))
             if rank == 0:
-                print()
+                print(flush=True)
 
             # Print parameters after optimization.
             if rank == 0:
-                mtp_data.print()
+                mtp_data.print(flush=True)
 
             write_mtp(f"intermediate_{i}.mtp", mtp_data)
             if rank == 0:
-                ErrorPrinter(loss).print()
+                ErrorPrinter(loss).print(flush=True)
 
     write_mtp(setting.potential_final, mtp_data)
 
