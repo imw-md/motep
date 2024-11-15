@@ -97,7 +97,7 @@ def run(args: argparse.Namespace) -> None:
 
             # Print parameters after optimization.
             if rank == 0:
-                mtp_data.print()
+                mtp_data.print(flush=True)
 
             write_mtp(f"intermediate_{i}.mtp", mtp_data)
             if rank == 0:

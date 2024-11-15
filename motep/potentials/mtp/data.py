@@ -1,6 +1,7 @@
 """Initializer."""
 
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -111,8 +112,12 @@ class MTPData:
             tmp.extend([(-np.inf, +np.inf)] * self.radial_coeffs.size)
         return np.vstack(tmp)
 
-    def print(self) -> None:
-        """Print parameters."""
+    def print(self, **kwargs: dict[str, Any]) -> None:
+        """Print parameters.
+
+        `**kwargs` are used to, e.g., give `flush=True` for `print` at the end
+        of each block.
+        """
         print("scaling:", self.scaling)
         print("moment_coeffs:")
         print(self.moment_coeffs)
@@ -120,4 +125,4 @@ class MTPData:
         print(self.species_coeffs)
         print("radial_coeffs:")
         print(self.radial_coeffs)
-        print()
+        print(**kwargs)
