@@ -28,6 +28,26 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("setting")
 
 
+def _read_images(
+    filenames: list[str],
+    species: list[int],
+    comm: MPI.Comm,
+) -> list[Atoms]:
+    rank = comm.Get_rank()
+    if rank == 0:
+        print(f"{'':=^72s}\n")
+        print("[configurations]")
+    images = []
+    for filename in filenames:
+        images_local = motep.io.read(filename, species)
+        images.extend(motep.io.read(filename, species))
+        if rank == 0:
+            print(f'"{filename}" = {len(images_local)}')
+    if rank == 0:
+        print()
+    return images
+
+
 def train(filename_setting: str, comm: MPI.Comm) -> None:
     rank = comm.Get_rank()
 
@@ -41,7 +61,7 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
     untrained_mtp = str(pathlib.Path(setting.potential_initial).resolve())
 
     species = setting.species or None
-    images = motep.io.read(setting.configurations, species=species)
+    images = _read_images(setting.configurations, species=species, comm=comm)
     if not setting.species:
         species = _get_dummy_species(images)
 

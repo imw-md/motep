@@ -7,13 +7,13 @@ from ase.io.formats import parse_filename
 from motep.io.mlip.cfg import read_cfg
 
 
-def read(filenames: list[str], species: list[int] | None = None) -> list[Atoms]:
+def read(filename: str, species: list[int] | None = None) -> list[Atoms]:
     """Read images.
 
     Parameters
     ----------
-    filenames : list[str]
-        List of filenames to be read.
+    filename : list[str]
+        File name to be read.
         Both the MLIP `.cfg` format and the ASE-recognized formats can be parsed.
 
         To select a part of images, the ASE `@` syntax can be used as follows.
@@ -46,16 +46,10 @@ def read(filenames: list[str], species: list[int] | None = None) -> list[Atoms]:
         List of ASE `Atoms` objects.
 
     """
-    images = []
-    for filename in filenames:
-        filename_parsed, index = parse_filename(filename)
-        index = ":" if index is None else index
-        if isinstance(filename_parsed, str) and filename_parsed.endswith(".cfg"):
-            atoms = read_cfg(filename_parsed, index=index, species=species)
-        else:
-            atoms = ase.io.read(filename_parsed, index=index)
-        if isinstance(atoms, Atoms):
-            images.append(atoms)
-        else:
-            images.extend(atoms)
-    return images
+    filename_parsed, index = parse_filename(filename)
+    index = ":" if index is None else index
+    if isinstance(filename_parsed, str) and filename_parsed.endswith(".cfg"):
+        images = read_cfg(filename_parsed, index=index, species=species)
+    else:
+        images = ase.io.read(filename_parsed, index=index)
+    return [images] if isinstance(images, Atoms) else images
