@@ -8,7 +8,7 @@ import numpy as np
 from ase import Atoms
 from mpi4py import MPI
 
-from motep.io.mlip.cfg import read_cfg
+import motep.io
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
@@ -28,6 +28,27 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("setting")
 
 
+def read_images(
+    filenames: list[str],
+    species: list[int] | None = None,
+    comm: MPI.Comm = MPI.COMM_WORLD,
+) -> list[Atoms]:
+    """Read images."""
+    rank = comm.Get_rank()
+    if rank == 0:
+        print(f"{'':=^72s}\n")
+        print("[configurations]")
+    images = []
+    for filename in filenames:
+        images_local = motep.io.read(filename, species)
+        images.extend(motep.io.read(filename, species))
+        if rank == 0:
+            print(f'"{filename}" = {len(images_local)}')
+    if rank == 0:
+        print()
+    return images
+
+
 def train(filename_setting: str, comm: MPI.Comm) -> None:
     rank = comm.Get_rank()
 
@@ -38,11 +59,10 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
 
     setting.rng = np.random.default_rng(setting.seed)
 
-    cfg_file = str(pathlib.Path(setting.configurations[0]).resolve())
     untrained_mtp = str(pathlib.Path(setting.potential_initial).resolve())
 
     species = setting.species or None
-    images = read_cfg(cfg_file, index=":", species=species)
+    images = read_images(setting.configurations, species=species, comm=comm)
     if not setting.species:
         species = _get_dummy_species(images)
 
@@ -65,6 +85,7 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
     for i, step in enumerate(setting.steps):
         with measure_time(f"step {i}: {step['method']}", comm):
             if rank == 0:
+                print(f"{'':=^72s}\n")
                 pprint.pp(step)
                 print(flush=True)
 
@@ -87,6 +108,7 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
                 ErrorPrinter(loss).print(flush=True)
 
     if rank == 0:
+        print(f"{'':=^72s}\n")
         write_mtp(setting.potential_final, mtp_data)
 
 

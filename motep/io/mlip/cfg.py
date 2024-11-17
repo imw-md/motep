@@ -1,6 +1,5 @@
 """Module for MTP formats."""
 
-import os
 import pathlib
 from typing import TextIO
 
@@ -9,10 +8,12 @@ from ase import Atoms
 from ase.calculators.lammps import convert
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase.data import atomic_masses, chemical_symbols
+from ase.utils import reader, string2index, writer
 
 
+@reader
 def read_cfg(
-    filename: str | os.PathLike,
+    fd: pathlib.Path,
     index: int = -1,
     species: list[int] | list[str] | None = None,
 ) -> Atoms | list[Atoms]:
@@ -28,13 +29,14 @@ def read_cfg(
     """
     species = _convert_species(species)
     atoms_list = []
-    with pathlib.Path(filename).open(encoding="utf-8") as file:
-        for line in file:
-            if line.startswith("BEGIN_CFG"):
-                atoms = _read_image(file, species)
-                atoms_list.append(atoms)
-    if index == ":":
-        return atoms_list
+    for line in fd:
+        if line.startswith("BEGIN_CFG"):
+            atoms = _read_image(fd, species)
+            atoms_list.append(atoms)
+
+    if isinstance(index, str):
+        index = string2index(index)
+
     return atoms_list[index]
 
 
@@ -130,8 +132,9 @@ def _set_stress(atoms: Atoms, stress):
     atoms.calc.results["stress"] = -stress / atoms.get_volume()
 
 
+@writer
 def write_cfg(
-    filename: str | os.PathLike,
+    fd: pathlib.Path,
     images: Atoms | list[Atoms],
     species: dict[str, int] | list[str] | None = None,
     key_energy: str = "free_energy",
@@ -141,7 +144,7 @@ def write_cfg(
 
     Parameters
     ----------
-    filename : str
+    filename : `pathlib.Path`
         _description_
     images : Atoms | list[Atoms]
         _description_
@@ -174,9 +177,8 @@ def write_cfg(
     if isinstance(images, Atoms):
         images = [images]
 
-    with pathlib.Path(filename).open("w", encoding="utf-8") as file:
-        for atoms in images:
-            _write_image(file, atoms, species, key_energy)
+    for atoms in images:
+        _write_image(fd, atoms, species, key_energy)
 
 
 def _get_species(images: list[Atoms]) -> dict[str, int]:
