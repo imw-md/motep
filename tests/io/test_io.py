@@ -2,10 +2,9 @@
 
 import pathlib
 
-from ase import Atoms
-
 import motep.io
 from motep.io.mlip.cfg import read_cfg
+from motep.trainer import read_images
 
 
 def test_read_path(data_path: pathlib.Path) -> None:
@@ -27,9 +26,9 @@ def test_parse_filename(data_path: pathlib.Path) -> None:
     """Test if the ASE at-mark syntax works."""
     molecule = 762
     path = data_path / f"original/molecules/{molecule}/training.cfg"
-    images = motep.io.read([str(path) + "@0"])
+    images = motep.io.read(str(path) + "@0")
     assert len(images) == 1
-    images = motep.io.read([str(path) + "@0:2"])
+    images = motep.io.read(str(path) + "@0:2")
     assert len(images) == 2
 
 
@@ -40,7 +39,7 @@ def test_read_multiple_files(data_path: pathlib.Path) -> None:
         path = data_path / f"original/molecules/{molecule}/training.cfg"
         configurations.append(str(path))
     n_ref = sum(len(read_cfg(_, index=":")) for _ in configurations)
-    assert len(motep.io.read(configurations)) == n_ref
+    assert len(read_images(configurations)) == n_ref
 
 
 def test_read_ase_file(data_path: pathlib.Path, tmp_path: pathlib.Path) -> None:
@@ -50,4 +49,4 @@ def test_read_ase_file(data_path: pathlib.Path, tmp_path: pathlib.Path) -> None:
     atoms = read_cfg(path)
     fd = tmp_path / "test.xyz"
     atoms.write(fd)
-    assert motep.io.read([fd])
+    assert motep.io.read(fd)

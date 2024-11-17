@@ -28,11 +28,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("setting")
 
 
-def _read_images(
+def read_images(
     filenames: list[str],
-    species: list[int],
-    comm: MPI.Comm,
+    species: list[int] | None = None,
+    comm: MPI.Comm = MPI.COMM_WORLD,
 ) -> list[Atoms]:
+    """Read images."""
     rank = comm.Get_rank()
     if rank == 0:
         print(f"{'':=^72s}\n")
@@ -61,7 +62,7 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
     untrained_mtp = str(pathlib.Path(setting.potential_initial).resolve())
 
     species = setting.species or None
-    images = _read_images(setting.configurations, species=species, comm=comm)
+    images = read_images(setting.configurations, species=species, comm=comm)
     if not setting.species:
         species = _get_dummy_species(images)
 
