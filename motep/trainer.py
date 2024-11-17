@@ -84,6 +84,7 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
     for i, step in enumerate(setting.steps):
         with measure_time(f"step {i}: {step['method']}", comm):
             if rank == 0:
+                print(f"{'':=^72s}\n")
                 pprint.pp(step)
                 print(flush=True)
 
@@ -106,6 +107,7 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
                 ErrorPrinter(loss).print(flush=True)
 
     if rank == 0:
+        print(f"{'':=^72s}\n")
         write_mtp(setting.potential_final, mtp_data)
 
 
