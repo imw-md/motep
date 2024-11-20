@@ -83,6 +83,44 @@ def test_without_forces(data_path: pathlib.Path) -> None:
     print()
 
 
+def test_local_minimum(data_path: pathlib.Path) -> None:
+    """Test if the optimized parameters correspond to the local minimum."""
+    crystal = "multi"  # test with multiple species
+    level = 2
+    engine = "numba"
+    images, mtp_data = make_crystals(crystal, level, data_path)
+    images = images[::100]
+
+    setting = LossSetting(
+        energy_weight=1.0,
+        forces_weight=0.01,
+        stress_weight=0.0,
+    )
+
+    rng = np.random.default_rng(42)
+
+    loss = LossFunction(
+        images,
+        mtp_data=mtp_data,
+        setting=setting,
+        comm=MPI.COMM_WORLD,
+        engine=engine,
+    )
+
+    optimizer = Level2MTPOptimizer(loss)
+    mtp_data.initialize(rng=rng)
+    optimizer.optimize()
+    loss_value_ref = loss(mtp_data.parameters)
+
+    for indices, orig in np.ndenumerate(mtp_data.radial_coeffs):
+        for dx in [+1e-6, -1e-6]:
+            mtp_data.radial_coeffs[indices] = orig + dx
+            loss_value = loss(mtp_data.parameters)
+            print(indices, loss_value, loss_value_ref)
+            assert loss(mtp_data.parameters) > loss_value_ref
+            mtp_data.radial_coeffs[indices] = orig
+
+
 @pytest.mark.parametrize("level", [2, 4, 6])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
 @pytest.mark.parametrize("engine", ["numpy", "numba"])
