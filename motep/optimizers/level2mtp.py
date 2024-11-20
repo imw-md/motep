@@ -122,7 +122,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
             matrix = np.hstack(
                 [
                     (
-                        images[i].calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0)
+                        images[i].calc.engine.rbd.dqdris.transpose(3, 4, 0, 1, 2)
                         * sqrt(self.loss.loss_energy.inverse_numbers_of_atoms[i])
                     ).flat
                     for i in idcs
@@ -131,7 +131,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         else:
             matrix = np.hstack(
                 [
-                    images[i].calc.engine.rbd.dqdris.transpose(3, 4, 2, 1, 0).flat
+                    images[i].calc.engine.rbd.dqdris.transpose(3, 4, 0, 1, 2).flat
                     for i in idcs
                 ],
             )
