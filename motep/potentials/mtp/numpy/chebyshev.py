@@ -77,9 +77,9 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
         Returns
         -------
         values : npt.NDArray[np.float64]
-            (neighbors, radial_basis_size)
+            (radial_basis_size, neighbors)
         derivs : npt.NDArray[np.float64]
-            (neighbors, radial_basis_size)
+            (radial_basis_size, neighbors)
 
         """
         min_dist = self.mtp_data.min_dist
