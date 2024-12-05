@@ -7,31 +7,9 @@ from ase import Atoms
 from motep.potentials.mtp.base import EngineBase
 from motep.potentials.mtp.data import MTPData
 
-from .conversion import BasisConverter
+from .conversion import BasisConverter, moments_count_to_level_map
 from .jax import calc_energy_forces_stress as jax_calc
-from .moment import (
-    extract_basic_moments,
-    extract_pair_contractions,
-    get_moment_contractions,
-)
-
-# dict mapping MLIP moments count to level, used for conversion
-moments_count_to_level_map = {
-    1: 2,
-    2: 4,
-    8: 6,
-    18: 8,
-    41: 10,
-    84: 12,
-    174: 14,
-    350: 16,
-    718: 18,
-    1352: 20,
-    2621: 22,
-    4991: 24,
-    9396: 26,
-    17366: 28,
-}
+from .moment import MomentBasis
 
 
 class JaxMTPEngine(EngineBase):
@@ -39,30 +17,25 @@ class JaxMTPEngine(EngineBase):
 
     def __init__(self, *args, **kwargs):
         """Intialize the engine."""
-        self.scalar_contractions = None
-        self.pair_contractions = None
-        self.basic_moments = None
-        self.basis_converter = BasisConverter(self)
+        self.moment_basis = None
+        self.basis_converter = None
         super().__init__(*args, **kwargs)
 
     def update(self, mtp_data: MTPData) -> None:
         """Update MTP parameters."""
         super().update(mtp_data)
         if self.mtp_data.alpha_moments_count is not None:
-            if self.scalar_contractions is None:
-                level = moments_count_to_level_map[mtp_data.alpha_moments_count]
-                self.init_moment_mappings(level)
-                self.basis_converter.remap_mlip_moment_coeffs()
-            else:
+            level = moments_count_to_level_map[mtp_data.alpha_moments_count]
+            if self.moment_basis is None:
+                self.moment_basis = MomentBasis(level)
+                self.moment_basis.init_moment_mappings()
+                self.basis_converter = BasisConverter(self.moment_basis)
+            elif self.moment_basis.max_level != level:
                 raise RuntimeError(
                     "Changing moments/level is not allowed. "
                     "Use a new instance instead."
                 )
-
-    def init_moment_mappings(self, level):
-        self.scalar_contractions = get_moment_contractions(level)
-        self.basic_moments = extract_basic_moments(self.scalar_contractions)
-        self.pair_contractions = extract_pair_contractions(self.scalar_contractions)
+            self.basis_converter.remap_mlip_moment_coeffs(self.mtp_data)
 
     def calculate(self, atoms: Atoms):
         self.update_neighbor_list(atoms)
@@ -96,9 +69,9 @@ class JaxMTPEngine(EngineBase):
             self.basis_converter.remapped_coeffs,
             mtp_data.radial_coeffs,
             # Static parameters:
-            self.basic_moments,
-            self.pair_contractions,
-            self.scalar_contractions,
+            self.moment_basis.basic_moments,
+            self.moment_basis.pair_contractions,
+            self.moment_basis.scalar_contractions,
         )
         self.results["energy"] = energy
         self.results["forces"] = forces

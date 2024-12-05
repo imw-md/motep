@@ -113,52 +113,102 @@ def _flatten_nested_pair_tuples(tpl, lst=None):
     return tuple(lst)
 
 
-def get_moment_contractions(max_level, nmoments_max=None):
-    """Enumerates all possible moments and contractions.
+class MomentBasis:
 
-    Parameters
-    ---------
-    max_level : int
-        Defines the maximum level of the moment contractions.
+    def __init__(
+        self,
+        max_level: int,
+        max_contraction_length: int | None = DEFAULT_MAX_MOMENTS,
+    ):
+        """
+        Parameters
+        ---------
+        max_level : int
+            Defines the maximum level of the moment contractions.
 
-    nmoments_max : int
-        Sets the upper limit for the number of moments in a contraction. For None, defaults to max_level / 2, i.e. all possible included.
+        nmoments_max : int or None
+            Sets the upper limit for the number of moments in a contraction.
+            Defaults to 4, but can also be None, in which case it is set to
+            max_level / 2, i.e. all possible included (Warning, see Note.).
 
-    Returns
-    -------
-    scalar_contractions : list(MomentContraction)
-        A list of the moment contractions resulting in a scalar.
-    """
-    # level = 2 + 4 * mu + nu
-    mu_max = int(np.floor((max_level - 2) / 4))
-    nu_max = int(np.max([max_level / 2 - 2, 0]))
-    moment_index_list = list(product(range(mu_max + 1), range(nu_max + 1)))
-    if nmoments_max is None:
-        nmoments_max = np.min(
-            [int(max_level / 2), DEFAULT_MAX_MOMENTS]
-        )  # MLIP limit is 4
-    try:
-        return read_moments(max_level, nmoments_max)
-    except FileNotFoundError:
-        pass
-    scalar_contractions = []
-    for nmoments in range(1, nmoments_max + 1):
-        for moment_combo in combinations_with_replacement(moment_index_list, nmoments):
-            level = np.sum([2 + 4 * mu + nu for mu, nu in moment_combo])
-            # mu_nus = np.array(moment_combo)
-            # level = np.sum(2 + 4 * mu_nus[:, 0] + mu_nus[:, 1])
-            # level = np.sum(2 + np.dot([4, 1], mu_nus.T))
-            if level > max_level:
-                continue
-            possible_contractions = _get_contractions_from_basic_moments(moment_combo)
-            possible_contractions = [c for c in possible_contractions if c[2] == 0]
-            if len(possible_contractions) == 0:
-                continue
-            contractions = _extract_unique_contractions(possible_contractions)
-            scalar_contractions.extend(contractions)
-    scalar_contractions = tuple(scalar_contractions)
-    write_moments(scalar_contractions, max_level, nmoments_max)
-    return scalar_contractions
+        Notes
+        -----
+        A high `max_contraction_lenth` can take very long time.
+
+        The 'level' of a moment is definition as `2 + 4 * mu + nu`
+        according to [Podryabinkin_JCP_2023_MLIP]_.
+
+        .. [Podryabinkin_JCP_2023_MLIP]
+          E. Podryabinkin, K. Garifullin, A. Shapeev, and I. Novikov,
+          J. Chem. Phys. 159, (2023).
+        """
+        self.max_level = max_level
+        self.basic_moments = None
+        self.pair_contractions = None
+        self.scalar_contractions = None
+        if max_contraction_length is not None:
+            self.max_contraction_length = max_contraction_length
+        else:
+            self.max_contraction_length = int(max_level / 2)
+
+    def init_moment_mappings(self):
+        self.scalar_contractions = self.get_moment_contractions()
+        self.basic_moments = extract_basic_moments(self.scalar_contractions)
+        self.pair_contractions = extract_pair_contractions(self.scalar_contractions)
+
+    def get_moment_contractions(self):
+        """Get the contraction list."""
+        max_moments = np.min([int(self.max_level / 2), self.max_contraction_length])
+        try:
+            scalar_contractions = self.read_moments(max_moments)
+        except FileNotFoundError:
+            scalar_contractions = self.find_moment_contractions(max_moments)
+        self.write_moments(scalar_contractions, max_moments)
+        return scalar_contractions
+
+    def find_moment_contractions(self, max_moments):
+        """Enumerates all possible moments and contractions.
+
+        Returns
+        -------
+        scalar_contractions : tuple of tuple
+            A tuple of tuples representing the moment contractions resulting
+            in a unique scalar.
+
+        """
+        mu_max = int(np.floor((self.max_level - 2) / 4))
+        nu_max = int(np.max([self.max_level / 2 - 2, 0]))
+        moment_index_list = list(product(range(mu_max + 1), range(nu_max + 1)))
+        scalar_contractions = []
+        for nmoments in range(1, max_moments + 1):
+            for moment_combo in combinations_with_replacement(
+                moment_index_list, nmoments
+            ):
+                level = np.sum([2 + 4 * mu + nu for mu, nu in moment_combo])
+                if level > self.max_level:
+                    continue
+                possible_contractions = _get_contractions_from_basic_moments(
+                    moment_combo
+                )
+                possible_contractions = [c for c in possible_contractions if c[2] == 0]
+                if len(possible_contractions) == 0:
+                    continue
+                contractions = _extract_unique_contractions(possible_contractions)
+                scalar_contractions.extend(contractions)
+        scalar_contractions = tuple(scalar_contractions)
+        return scalar_contractions
+
+    def read_moments(self, max_number_of_moments):
+        filename = _get_filename(self.max_level, max_number_of_moments)
+        with open(filename, "r") as f:
+            moments = json.load(f)
+        moments = _to_tuple_recursively(moments)
+        return moments
+
+    def write_moments(self, moments, max_number_of_moments):
+        filename = _get_filename(self.max_level, max_number_of_moments)
+        with open(filename, "w") as f:
+            json.dump(moments, f)
 
 
 def _get_filename(max_level, max_moments):
@@ -172,20 +222,6 @@ def _get_filename(max_level, max_moments):
 
 def _to_tuple_recursively(lst):
     return tuple(_to_tuple_recursively(i) if isinstance(i, list) else i for i in lst)
-
-
-def read_moments(max_level, nmoments_max):
-    filename = _get_filename(max_level, nmoments_max)
-    with open(filename, "r") as f:
-        moments = json.load(f)
-    moments = _to_tuple_recursively(moments)
-    return moments
-
-
-def write_moments(moments, max_level, nmoments_max):
-    filename = _get_filename(max_level, nmoments_max)
-    with open(filename, "w") as f:
-        json.dump(moments, f)
 
 
 def _get_contractions_from_basic_moments(index_combo):
@@ -297,19 +333,10 @@ def _test_contraction(contraction):
         if contraction not in calculated_test_moments:
             m1 = calculated_test_moments[contraction[0]]
             m2 = calculated_test_moments[contraction[1]]
-            calculated_contraction = contract_over_axes(
-                m1,
-                m2,
-                contraction[3],
-            )
+            calculated_contraction = np.tensordot(m1, m2, axes=contraction[3])
             calculated_test_moments[contraction] = calculated_contraction
     last_contraction = calculated_test_moments[pair_contractions[-1]]
     return last_contraction
-
-
-def contract_over_axes(m1, m2, axes):
-    calculated_contraction = np.tensordot(m1, m2, axes=axes)
-    return calculated_contraction
 
 
 def extract_basic_moments(contractions):

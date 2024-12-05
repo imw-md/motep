@@ -7,10 +7,29 @@ import numpy.typing as npt
 
 from motep.potentials.mtp.data import MTPData
 
+from .moment import MomentBasis
 from .utils import TEST_R_UNITS, TEST_RB_VALUES, make_tensor
 
+# dict mapping MLIP moments count to level, used for conversion
+moments_count_to_level_map = {
+    1: 2,
+    2: 4,
+    8: 6,
+    18: 8,
+    41: 10,
+    84: 12,
+    174: 14,
+    350: 16,
+    718: 18,
+    1352: 20,
+    2621: 22,
+    4991: 24,
+    9396: 26,
+    17366: 28,
+}
 
-class MomentBasis:
+
+class MLIPMomentBasis:
     """Simplified verison of numpy engine `MomentBasis`."""
 
     def __init__(self, mtp_data: MTPData) -> None:
@@ -86,11 +105,11 @@ def _contract_moments(
 class BasisConverter:
     """Class to store and convert mapping between MTP basis functions and coefficients."""
 
-    def __init__(self, engine):
-        self.engine = engine
+    def __init__(self, moment_basis: MomentBasis):
+        self.moment_basis = moment_basis
         self.remapped_coeffs = None
 
-    def remap_mlip_moment_coeffs(self):
+    def remap_mlip_moment_coeffs(self, mtp_data: MTPData):
         """Perform a remapping of the MLIP coeffs loaded to this potentials basis.
 
         This might be needed because the ordereing might be different or some basis elements omitted.
@@ -98,37 +117,35 @@ class BasisConverter:
         r_unit = TEST_R_UNITS
         rb_values = TEST_RB_VALUES
 
-        engine = self.engine
-        mtp_data = self.engine.mtp_data
-
-        # Stores coeffs as values with mlip basis values as keys
-        mlip_basis_coeffs_map = {}
-
         # Calculate the MLIP like basis for test vectors (rb_values are the same)
-        moment_basis = MomentBasis(mtp_data)
-        mlip_basis_values = moment_basis.calculate(r_unit, rb_values)
+        # Store coeffs as values with mlip basis values as keys
+        bc_map = {}
+        mlip_moment_basis = MLIPMomentBasis(mtp_data)
+        mlip_basis_values = mlip_moment_basis.calculate(r_unit, rb_values)
         for coef, mlip_basis_value in zip(mtp_data.moment_coeffs, mlip_basis_values):
-            mlip_basis_coeffs_map[float(mlip_basis_value)] = coef
+            bc_map[float(mlip_basis_value)] = coef
 
         # Calculate our basis for test vectors
-        remaining_mlip_bs = list(mlip_basis_coeffs_map.keys())
-        remapped_coeffs = []
-        basis_contractions_to_remove = []
-        basis = calc_moment_basis(
+        moment_basis = self.moment_basis
+        basis = _calc_moment_basis(
             r_unit,
             rb_values,
-            engine.basic_moments,
-            engine.scalar_contractions,
-            engine.pair_contractions,
+            moment_basis.basic_moments,
+            moment_basis.pair_contractions,
+            moment_basis.scalar_contractions,
         )
 
         # Compare our basis with MLIP like basis
+        remapped_coeffs = []
+        basis_contractions_to_remove = []
+        remaining_mlip_bs = list(bc_map.keys())
+
         relative_tolerance = 1e-8
-        for basis_value, contraction in zip(basis, engine.scalar_contractions):
-            for mlip_basis_value, coef in mlip_basis_coeffs_map.items():
+        for basis_value, contraction in zip(basis, moment_basis.scalar_contractions):
+            for mlip_basis_value, coef in bc_map.items():
                 if np.isclose(mlip_basis_value, basis_value, rtol=relative_tolerance):
-                    remaining_mlip_bs.remove(mlip_basis_value)
                     remapped_coeffs.append(coef)
+                    remaining_mlip_bs.remove(mlip_basis_value)
                     break
             else:
                 warn(
@@ -136,30 +153,31 @@ class BasisConverter:
                     f"It will now be omitted from the basis.\n{contraction}: {basis_value}"
                 )
                 basis_contractions_to_remove.append(contraction)
+
         if len(remaining_mlip_bs) > 0:
             raise RuntimeError(
                 "Not all MLIP contractions found:\n" f"{remaining_mlip_bs}\n"
             )
+
         # Remove contractions not present in the MLIP potential file
         # [should rarely be needed, as they now agree perfectly (tested at least to lvl 22)]
         for contraction in basis_contractions_to_remove:
-            engine.scalar_contractions.remove(contraction)
+            moment_basis.scalar_contractions.remove(contraction)
 
         self.remapped_coeffs = np.array(remapped_coeffs)
 
 
-def calc_moment_basis(
+def _calc_moment_basis(
     r_unit,
     rb_values,
     basic_moments,
-    scalar_contractions,
     pair_contractions,
+    scalar_contractions,
 ):
     calculated_moments = _calc_basic_moments(r_unit, rb_values, basic_moments)
     for contraction in pair_contractions:
         m1 = calculated_moments[contraction[0]]
         m2 = calculated_moments[contraction[1]]
-
         # Contract two moments by tensordot
         calculated_contraction = np.tensordot(m1, m2, axes=contraction[3])
         calculated_moments[contraction] = calculated_contraction
