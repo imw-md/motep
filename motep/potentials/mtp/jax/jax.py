@@ -4,6 +4,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from motep.potentials.mtp import get_types
+
 jax.config.update("jax_enable_x64", True)
 
 
@@ -23,12 +25,9 @@ def calc_energy_forces_stress(
     pair_contractions,
     scalar_contractions,
 ):
-    itypes = jnp.array([species[_] for _ in atoms.numbers], dtype=int)
+    itypes = jnp.array(get_types(atoms, species))
     all_js, all_rijs = engine._get_all_distances(atoms)
-    all_jtypes = jnp.array(
-        [[species[_] for _ in atoms.numbers[js]] for js in all_js],
-        dtype=int,
-    )
+    all_jtypes = itypes[all_js]
 
     local_energy, local_gradient = _jax_calc_local_energy_and_derivs(
         all_rijs,
