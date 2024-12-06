@@ -161,6 +161,8 @@ class EngineBase:
             self._initiate_neighbor_list(atoms)
         elif self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
             self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
+            all_precomp = _compute_all_offsets(self._neighbor_list, atoms)
+            self.all_js, self.all_offsets = all_precomp
 
     def _initiate_neighbor_list(self, atoms: Atoms) -> None:
         """Initialize the ASE `PrimitiveNeighborList` object."""
@@ -172,6 +174,8 @@ class EngineBase:
         )
         self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
         self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
+        all_precomp = _compute_all_offsets(self._neighbor_list, atoms)
+        self.all_js, self.all_offsets = all_precomp
 
         natoms = len(atoms)
 
@@ -188,6 +192,14 @@ class EngineBase:
         pos_js = atoms.positions[indices_js] + offsets
         dist_vectors = pos_js - atoms.positions[index]
         return indices_js, dist_vectors
+
+    def _get_all_distances(self, atoms: Atoms) -> tuple[np.ndarray, np.ndarray]:
+        max_dist = self.mtp_data.max_dist
+        positions = atoms.positions
+        offsets = self.all_offsets
+        all_r_ijs = positions[self.all_js] + offsets - positions[:, None, :]
+        all_r_ijs[self.all_js[:, :] < 0, :] = max_dist
+        return self.all_js, all_r_ijs
 
     def _symmetrize_stress(self, atoms: Atoms, stress: np.ndarray) -> None:
         if atoms.cell.rank == 3:
@@ -259,3 +271,20 @@ class EngineBase:
 def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
     cell = atoms.cell
     return [nl.get_neighbors(j)[1] @ cell for j in range(len(atoms))]
+
+
+def _compute_all_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
+    cell = atoms.cell
+    js = [nl.get_neighbors(i)[0] for i in range(len(atoms))]
+    offsets = [nl.get_neighbors(i)[1] @ cell for i in range(len(atoms))]
+    num_js = [_.shape[0] for _ in js]
+    max_num_js = np.max([_.shape[0] for _ in offsets])
+    pads = [(0, max_num_js - n) for n in num_js]
+    # Pad dummy indices as -1 to recognize later
+    padded_js = [
+        np.pad(js_, pad_width=pad, constant_values=-1) for js_, pad in zip(js, pads)
+    ]
+    padded_offsets = [
+        np.pad(offset, pad_width=(pad, (0, 0))) for offset, pad in zip(offsets, pads)
+    ]
+    return np.array(padded_js, dtype=int), np.array(padded_offsets)
