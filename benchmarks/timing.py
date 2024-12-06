@@ -105,14 +105,6 @@ def main() -> None:
                 f" with level {level}:"
             )
             pot_path = path / "pot.mtp"
-            # To test with previous codes traj and pot
-            # images = [
-            #     ase.io.read("/Users/axelforslund/python_mtp/misc/md_atoms.traj")
-            #     for _ in range(10)
-            # ]
-            # rng = np.random.default_rng()
-            # [_.rattle(rng=rng) for _ in images]
-            # pot_path = "/Users/axelforslund/direct-upsampling/directupsampling/tests/resources/Al_mtps/Al_fcc_pbe_10g.mtp"
             e_ref = time_mlippy(pot_path, images)
             if number_of_atoms < 300:
                 e_numpy = time_mtp(pot_path, images, engine="numpy")
@@ -121,6 +113,8 @@ def main() -> None:
             np.testing.assert_allclose(e_numba, e_ref)
             e_numba = time_mtp(pot_path, images, engine="numba", is_trained=True)
             np.testing.assert_allclose(e_numba, e_ref)
+            e_jax = time_mtp(pot_path, images, engine="jax")
+            np.testing.assert_allclose(e_jax, e_ref)
 
 
 if __name__ == "__main__":
