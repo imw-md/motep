@@ -38,7 +38,7 @@ class MLIPMomentBasis:
 
     def calculate(
         self,
-        r_ijs_unit: npt.NDArray[np.float64],  # (3, neighbors)
+        r_ijs_unit: npt.NDArray[np.float64],  # (neighbors, 3)
         rb_values: npt.NDArray[np.float64],
     ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         r"""Calculate basis functions and their derivatives.
