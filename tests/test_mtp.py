@@ -8,6 +8,7 @@ import pytest
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
+from motep.potentials.mtp.jax.engine import JaxMTPEngine
 from motep.potentials.mtp.numba.engine import NumbaMTPEngine
 from motep.potentials.mtp.numpy.engine import NumpyMTPEngine
 
@@ -35,7 +36,7 @@ def get_scale(component: str, d: float) -> np.ndarray:
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
 @pytest.mark.parametrize("is_trained", [False, True])
-@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
+@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine])
 # @pytest.mark.parametrize("molecule", [762])
 def test_molecules(
     engine: Any,
@@ -70,7 +71,7 @@ def test_molecules(
 @pytest.mark.parametrize("crystal", ["size", "multi"])
 @pytest.mark.parametrize("is_trained", [False, True])
 # @pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
-@pytest.mark.parametrize("engine", [NumbaMTPEngine])
+@pytest.mark.parametrize("engine", [NumbaMTPEngine, JaxMTPEngine])
 def test_crystals(
     engine: Any,
     is_trained: bool,
@@ -107,7 +108,7 @@ def test_crystals(
 # @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23028])
-@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
+@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine])
 def test_forces(
     engine: Any,
     molecule: int,
@@ -146,7 +147,7 @@ def test_forces(
 @pytest.mark.parametrize("component", ["xx", "yy", "zz", "yz", "zx", "xy"])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
-@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
+@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine])
 def test_stress(
     engine: Any,
     crystal: int,

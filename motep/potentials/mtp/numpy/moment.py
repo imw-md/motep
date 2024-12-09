@@ -18,7 +18,7 @@ class MomentBasis:
         self,
         itype: int,
         jtypes: list[int],
-        r_ijs: npt.NDArray[np.float64],  # (3, neighbors)
+        r_ijs: npt.NDArray[np.float64],  # (neighbors, 3)
         r_abs: npt.NDArray[np.float64],  # (neighbors)
         rb: ChebyshevArrayRadialBasis,
     ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
@@ -34,7 +34,7 @@ class MomentBasis:
         -------
         basis_vals : np.ndarray (alpha_moments_count)
             Values of the basis functions.
-        basis_ders : np.ndarray (alpha_moments_count, 3, number_of_atoms)
+        basis_ders : np.ndarray (alpha_moments_count, number_of_atoms, 3)
             Derivatives of the basis functions with respect to :math:`x_j, y_j, z_j`.
 
         """

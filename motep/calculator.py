@@ -20,6 +20,10 @@ def make_mtp_engine(engine: str = "numpy") -> EngineBase:
         from motep.potentials.mtp.numba.engine import NumbaMTPEngine
 
         return NumbaMTPEngine
+    elif engine == "jax":
+        from motep.potentials.mtp.jax.engine import JaxMTPEngine
+
+        return JaxMTPEngine
     else:
         raise ValueError(engine)
 
