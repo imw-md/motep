@@ -41,21 +41,6 @@ class JaxMTPEngine(EngineBase):
         self.update_neighbor_list(atoms)
         return self._calc_energy_forces_stress(atoms)
 
-    def _get_all_distances(self, atoms: Atoms) -> tuple[np.ndarray, np.ndarray]:
-        max_dist = self.mtp_data.max_dist
-        max_num_js = np.max([_.shape[0] for _ in self.precomputed_offsets])
-        all_js = []
-        all_r_ijs = []
-        for i in range(len(atoms)):
-            js, r_ijs = self._get_distances(atoms, i)
-            (num_js,) = js.shape
-            pad = (0, max_num_js - num_js)
-            padded_js = np.pad(js, pad_width=pad, constant_values=i)
-            padded_rs = np.pad(r_ijs, pad_width=(pad, (0, 0)), constant_values=max_dist)
-            all_js.append(padded_js)
-            all_r_ijs.append(padded_rs)
-        return jnp.array(all_js, dtype=int), jnp.array(all_r_ijs)
-
     def _calc_energy_forces_stress(self, atoms: Atoms):
         mtp_data = self.mtp_data
         energy, forces, stress = jax_calc(

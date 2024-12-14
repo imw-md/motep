@@ -27,6 +27,7 @@ def calc_energy_forces_stress(
 ):
     itypes = jnp.array(get_types(atoms, species))
     all_js, all_rijs = engine._get_all_distances(atoms)
+    all_js, all_rijs = jnp.array(all_js), jnp.array(all_rijs)
     all_jtypes = itypes[all_js]
 
     local_energy, local_gradient = _jax_calc_local_energy_and_derivs(

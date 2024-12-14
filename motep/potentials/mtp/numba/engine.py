@@ -25,42 +25,21 @@ class NumbaMTPEngine(EngineBase):
         super().__init__(*args, **kwargs)
         self.calculate = self._calc_train if self._is_trained else self._calc_run
 
-    def _calc_max_ijs(self, atoms: Atoms) -> tuple:
-        # TODO: precompute distances and send in indices.
-        # See also jax implementation of full tensor version
-        number_of_atoms = len(atoms)
-        max_number_of_js = 0
-        all_js_list = []
-        all_r_ijs = []
-        for i in range(number_of_atoms):
-            js, r_ijs = self._get_distances(atoms, i)
-            all_js_list.append(js)
-            all_r_ijs.append(r_ijs)
-            (number_of_js,) = js.shape
-            max_number_of_js = max(number_of_js, max_number_of_js)
-        shape = (max_number_of_js, number_of_atoms)
-        all_js = np.zeros(shape, dtype=int)
-        for i in range(number_of_atoms):
-            js = all_js_list[i]
-            (number_of_js,) = js.shape
-            all_js[:number_of_js, i] = js
-        return max_number_of_js, all_js, all_r_ijs
-
     def _calc_run(self, atoms: Atoms) -> tuple:
         """Calculate properties of the given system."""
         self.update_neighbor_list(atoms)
 
         mtp_data = self.mtp_data
 
-        max_number_of_js, all_js, all_r_ijs = self._calc_max_ijs(atoms)
+        all_js, all_r_ijs = self._get_all_distances(atoms)
         itypes = get_types(atoms, self.mtp_data.species)
 
         energy = 0.0
         stress = np.zeros((3, 3))
-        gradient = np.zeros((itypes.size, max_number_of_js, 3))
+        gradient = np.zeros((itypes.size, all_js.shape[1], 3))
         for i, itype in enumerate(itypes):
-            js = all_js[:, i]
-            r_ijs = all_r_ijs[i]
+            js = all_js[i, :]
+            r_ijs = all_r_ijs[i, js >= 0, :]
             (number_of_js, _) = r_ijs.shape
             jtypes = itypes[js]
             r_abs = _nb_linalg_norm(r_ijs)
@@ -91,7 +70,7 @@ class NumbaMTPEngine(EngineBase):
             stress += r_ijs.T @ local_gradient
             gradient[i, :number_of_js, :] = local_gradient
 
-        forces = _nb_forces_from_gradient(gradient, all_js, max_number_of_js)
+        forces = _nb_forces_from_gradient(gradient, all_js, all_js.shape[1])
 
         if atoms.cell.rank == 3:
             stress += stress.T  # symmetrize
