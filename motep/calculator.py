@@ -1,11 +1,7 @@
 """ASE Calculators."""
 
 from ase import Atoms
-from ase.calculators.calculator import (
-    Calculator,
-    PropertyNotImplementedError,
-    all_changes,
-)
+from ase.calculators.calculator import Calculator, all_changes
 
 from motep.potentials.mtp.base import EngineBase
 from motep.potentials.mtp.data import MTPData
@@ -63,11 +59,9 @@ class MTP(Calculator):
     ) -> None:
         super().calculate(atoms, properties, system_changes)
 
-        energy, forces, stress = self.engine.calculate(self.atoms)
+        self.results = self.engine.calculate(self.atoms)
 
-        self.results["energy"] = self.results["free_energy"] = energy
-        self.results["forces"] = forces
-        if self.atoms.cell.rank == 3:
-            self.results["stress"] = stress
-        elif "stress" in properties:
-            raise PropertyNotImplementedError
+        self.results["free_energy"] = self.results["energy"]
+
+        if self.atoms.cell.rank != 3 and "stress" in self.results:
+            del self.results["stress"]

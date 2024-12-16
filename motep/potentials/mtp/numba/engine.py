@@ -33,8 +33,8 @@ class NumbaMTPEngine(EngineBase):
 
         all_js, all_r_ijs = self._get_all_distances(atoms)
         itypes = get_types(atoms, self.mtp_data.species)
+        energies = self.mtp_data.species_coeffs[itypes]
 
-        energy = 0.0
         stress = np.zeros((3, 3))
         gradient = np.zeros((itypes.size, all_js.shape[1], 3))
         for i, itype in enumerate(itypes):
@@ -62,11 +62,9 @@ class NumbaMTPEngine(EngineBase):
                 mtp_data.alpha_moment_mapping,
                 mtp_data.alpha_index_basic,
                 mtp_data.alpha_index_times,
-                itype,
-                mtp_data.species_coeffs,
                 mtp_data.moment_coeffs,
             )
-            energy += local_energy
+            energies[i] += local_energy
             stress += r_ijs.T @ local_gradient
             gradient[i, :number_of_js, :] = local_gradient
 
@@ -80,7 +78,12 @@ class NumbaMTPEngine(EngineBase):
 
         stress = stress.flat[[0, 4, 8, 5, 2, 1]]
 
-        return energy, forces, stress
+        self.results["energies"] = energies
+        self.results["energy"] = self.results["energies"].sum()
+        self.results["forces"] = forces
+        self.results["stress"] = stress
+
+        return self.results
 
     def _calc_train(self, atoms: Atoms) -> tuple:
         self.update_neighbor_list(atoms)
@@ -145,7 +148,6 @@ class NumbaMTPEngine(EngineBase):
             _update_mbd_dgdcs(i, itype, js, self.mbd.dgdcs, dgdcs)
             _update_mbd_dsdcs(itype, js, r_ijs, self.mbd.dsdcs, dgdcs)
 
-        energy = energies.sum()
         forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1).T * -1.0
         stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T
 
@@ -153,7 +155,12 @@ class NumbaMTPEngine(EngineBase):
 
         stress = stress.flat[[0, 4, 8, 5, 2, 1]]
 
-        return energy, forces, stress
+        self.results["energies"] = energies
+        self.results["energy"] = self.results["energies"].sum()
+        self.results["forces"] = forces
+        self.results["stress"] = stress
+
+        return self.results
 
 
 @nb.njit(nb.float64[:, :](nb.float64[:, :], nb.float64[:]))
