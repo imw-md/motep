@@ -1,7 +1,3 @@
-from typing import Any
-
-import jax.numpy as jnp
-import numpy as np
 from ase import Atoms
 
 from motep.potentials.mtp.base import EngineBase
@@ -39,11 +35,8 @@ class JaxMTPEngine(EngineBase):
 
     def calculate(self, atoms: Atoms):
         self.update_neighbor_list(atoms)
-        return self._calc_energy_forces_stress(atoms)
-
-    def _calc_energy_forces_stress(self, atoms: Atoms):
         mtp_data = self.mtp_data
-        energy, forces, stress = jax_calc(
+        energies, forces, stress = jax_calc(
             self,
             atoms,
             mtp_data.species,
@@ -58,7 +51,8 @@ class JaxMTPEngine(EngineBase):
             self.moment_basis.pair_contractions,
             self.moment_basis.scalar_contractions,
         )
-        self.results["energy"] = energy
+        self.results["energies"] = energies
+        self.results["energy"] = self.results["energies"].sum()
         self.results["forces"] = forces
         self.results["stress"] = stress
         return self.results

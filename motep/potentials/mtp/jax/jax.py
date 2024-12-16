@@ -30,7 +30,7 @@ def calc_energy_forces_stress(
     all_js, all_rijs = jnp.array(all_js), jnp.array(all_rijs)
     all_jtypes = itypes[all_js]
 
-    local_energy, local_gradient = _jax_calc_local_energy_and_derivs(
+    local_energies, local_gradient = _jax_calc_local_energy_and_derivs(
         all_rijs,
         itypes,
         all_jtypes,
@@ -47,8 +47,6 @@ def calc_energy_forces_stress(
         scalar_contractions,
     )
 
-    energy = local_energy.sum()
-
     forces = np.array(local_gradient.sum(axis=1))
     np.subtract.at(forces, all_js, local_gradient)
 
@@ -61,7 +59,7 @@ def calc_energy_forces_stress(
     else:
         stress = np.full(6, np.nan)
 
-    return energy, forces, stress
+    return local_energies, forces, stress
 
 
 @partial(jax.jit, static_argnums=(9, 10, 11, 12))
