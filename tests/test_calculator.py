@@ -30,6 +30,18 @@ def test_calculator(data_path: pathlib.Path) -> None:
         atoms.get_stress()
 
 
+@pytest.mark.parametrize("engine", ["numpy"])
+def test_potential_energies(engine: str, data_path: pathlib.Path) -> None:
+    """Test if the site-energies are computed."""
+    molecule = 291
+    level = 10
+    path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
+    mtp_parameters = read_mtp(path / "pot.mtp")
+    atoms = read_cfg(path / "out.cfg", index=0)
+    atoms.calc = MTP(mtp_parameters, engine=engine)
+    assert atoms.get_potential_energies().sum() == atoms.get_potential_energy()
+
+
 def _modify_min_dist(path: pathlib.Path, min_dist: float) -> None:
     with path.open("r", encoding="utf-8") as fd:
         oldlines = fd.readlines()
