@@ -55,13 +55,15 @@ def test_molecules(
     images = [read_cfg(path / "out.cfg", index=0)]
     mtp._initiate_neighbor_list(images[0])
 
+    results_all = [mtp.calculate(atoms) for atoms in images]
+
     energies_ref = np.array([_.get_potential_energy() for _ in images])
-    energies = np.array([mtp.calculate(_)[0] for _ in images]).reshape(-1)
+    energies = np.array([_["energy"] for _ in results_all]).reshape(-1)
     print(np.array(energies), np.array(energies_ref))
     np.testing.assert_allclose(energies, energies_ref)
 
     forces_ref = np.vstack([_.get_forces() for _ in images])
-    forces = np.vstack([mtp.calculate(_)[1] for _ in images])
+    forces = np.vstack([_["forces"] for _ in results_all])
     print(np.array(forces), np.array(forces_ref))
     np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
 
@@ -89,18 +91,20 @@ def test_crystals(
     images = [read_cfg(path / "out.cfg", index=-1)]
     mtp._initiate_neighbor_list(images[0])
 
+    results_all = [mtp.calculate(atoms) for atoms in images]
+
     energies_ref = np.array([_.get_potential_energy() for _ in images])
-    energies = np.array([mtp.calculate(_)[0] for _ in images]).reshape(-1)
+    energies = np.array([_["energy"] for _ in results_all]).reshape(-1)
     print(np.array(energies), np.array(energies_ref))
     np.testing.assert_allclose(energies, energies_ref)
 
     forces_ref = np.vstack([_.get_forces() for _ in images])
-    forces = np.vstack([mtp.calculate(_)[1] for _ in images])
+    forces = np.vstack([_["forces"] for _ in results_all])
     print(np.array(forces), np.array(forces_ref))
     np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
 
     stress_ref = np.vstack([_.get_stress() for _ in images])
-    stress = np.vstack([mtp.calculate(_)[2] for _ in images])
+    stress = np.vstack([_["stress"] for _ in results_all])
     print(np.array(stress), np.array(stress_ref))
     np.testing.assert_allclose(stress, stress_ref, rtol=0.0, atol=1e-4)
 
@@ -125,17 +129,17 @@ def test_forces(
     atoms_ref = read_cfg(path / "out.cfg", index=-1)
     mtp._initiate_neighbor_list(atoms_ref)
 
-    forces_ref = mtp.calculate(atoms_ref)[1]
+    forces_ref = mtp.calculate(atoms_ref)["forces"]
 
     dx = 1e-6
 
     atoms = atoms_ref.copy()
     atoms.positions[0, 0] += dx
-    ep = mtp.calculate(atoms)[0]
+    ep = mtp.calculate(atoms)["energy"]
 
     atoms = atoms_ref.copy()
     atoms.positions[0, 0] -= dx
-    em = mtp.calculate(atoms)[0]
+    em = mtp.calculate(atoms)["energy"]
 
     f = -1.0 * (ep - em) / (2.0 * dx)
 
@@ -172,19 +176,19 @@ def test_stress(
     atoms_ref = read_cfg(path / "out.cfg", index=-1)
     mtp._initiate_neighbor_list(atoms_ref)
 
-    stress_ref = mtp.calculate(atoms_ref)[2]
+    stress_ref = mtp.calculate(atoms_ref)["stress"]
 
     dx = 1e-6
 
     atoms = atoms_ref.copy()
     sindex, scale = get_scale(component, +1.0 * dx)
     atoms.set_cell(atoms.get_cell() @ scale, scale_atoms=True)
-    ep = mtp.calculate(atoms)[0]
+    ep = mtp.calculate(atoms)["energy"]
 
     atoms = atoms_ref.copy()
     sindex, scale = get_scale(component, -1.0 * dx)
     atoms.set_cell(atoms.get_cell() @ scale, scale_atoms=True)
-    em = mtp.calculate(atoms)[0]
+    em = mtp.calculate(atoms)["energy"]
 
     s = (ep - em) / (2.0 * dx) / atoms_ref.get_volume()
 

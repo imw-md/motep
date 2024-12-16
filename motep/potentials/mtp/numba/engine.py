@@ -80,7 +80,11 @@ class NumbaMTPEngine(EngineBase):
 
         stress = stress.flat[[0, 4, 8, 5, 2, 1]]
 
-        return energy, forces, stress
+        self.results["energy"] = energy
+        self.results["forces"] = forces
+        self.results["stress"] = stress
+
+        return self.results
 
     def _calc_train(self, atoms: Atoms) -> tuple:
         self.update_neighbor_list(atoms)
@@ -153,7 +157,11 @@ class NumbaMTPEngine(EngineBase):
 
         stress = stress.flat[[0, 4, 8, 5, 2, 1]]
 
-        return energy, forces, stress
+        self.results["energy"] = energy
+        self.results["forces"] = forces
+        self.results["stress"] = stress
+
+        return self.results
 
 
 @nb.njit(nb.float64[:, :](nb.float64[:, :], nb.float64[:]))

@@ -61,4 +61,4 @@ class JaxMTPEngine(EngineBase):
         self.results["energy"] = energy
         self.results["forces"] = forces
         self.results["stress"] = stress
-        return self.results["energy"], self.results["forces"], self.results["stress"]
+        return self.results

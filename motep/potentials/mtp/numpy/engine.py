@@ -107,4 +107,4 @@ class NumpyMTPEngine(EngineBase):
 
         self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
 
-        return self.results["energy"], self.results["forces"], self.results["stress"]
+        return self.results
