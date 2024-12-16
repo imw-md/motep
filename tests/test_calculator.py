@@ -30,7 +30,7 @@ def test_calculator(data_path: pathlib.Path) -> None:
         atoms.get_stress()
 
 
-@pytest.mark.parametrize("engine", ["numpy"])
+@pytest.mark.parametrize("engine", ["numpy", "numba"])
 def test_potential_energies(engine: str, data_path: pathlib.Path) -> None:
     """Test if the site-energies are computed."""
     molecule = 291

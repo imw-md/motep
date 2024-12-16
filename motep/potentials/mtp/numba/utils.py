@@ -360,8 +360,6 @@ def _propagate_backward(
         nb.int64[:],
         nb.int64[:, :],
         nb.int64[:, :],
-        nb.int64,
-        nb.float64[:],
         nb.float64[:],
     )
 )
@@ -374,8 +372,6 @@ def _nb_calc_local_energy_and_gradient(
     alpha_moment_mapping,
     alpha_index_basic,
     alpha_index_times,
-    itype,
-    species_coeffs,
     moment_coeffs,
 ):
     (number_of_js,) = r_abs.shape
@@ -398,7 +394,7 @@ def _nb_calc_local_energy_and_gradient(
         i1, i2, mult, i3 = ait
         moment_components[i3] += mult * moment_components[i1] * moment_components[i2]
     # Extract basis elements and multiply with moment coefficients
-    energy = species_coeffs[itype]
+    energy = 0.0
     for basis_i, moment_i in enumerate(alpha_moment_mapping):
         energy += moment_coeffs[basis_i] * moment_components[moment_i]
 
