@@ -1,5 +1,6 @@
 import numba as nb
 import numpy as np
+import numpy.typing as npt
 
 from .chebyshev import _nb_calc_radial_basis_ene_only
 
@@ -261,25 +262,26 @@ def _calc_moment_basic(
         nb.float64[:, :, :, :],
     ),
 )
-def _calc_moment_times(
-    alpha_index_times,
-    moment_components,
-    moment_jacobian,
-    moment_jac_cs,
-):
-    number_of_js = moment_jacobian.shape[1]
+def _contract_moments(
+    alpha_index_times: npt.NDArray[np.int64],
+    moment_values: npt.NDArray[np.float64],
+    moment_jac_rs: npt.NDArray[np.float64],
+    moment_jac_cs: npt.NDArray[np.float64],
+) -> None:
+    """Compute contractions of moments."""
+    number_of_js = moment_jac_rs.shape[1]
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
-        moment_components[i3] += mult * moment_components[i1] * moment_components[i2]
+        moment_values[i3] += mult * moment_values[i1] * moment_values[i2]
         for j in range(number_of_js):
             for k in range(3):
-                moment_jacobian[i3, j, k] += mult * (
-                    moment_jacobian[i1, j, k] * moment_components[i2]
-                    + moment_components[i1] * moment_jacobian[i2, j, k]
+                moment_jac_rs[i3, j, k] += mult * (
+                    moment_jac_rs[i1, j, k] * moment_values[i2]
+                    + moment_values[i1] * moment_jac_rs[i2, j, k]
                 )
         moment_jac_cs[i3] += mult * (
-            moment_jac_cs[i1] * moment_components[i2]
-            + moment_components[i1] * moment_jac_cs[i2]
+            moment_jac_cs[i1] * moment_values[i2]
+            + moment_values[i1] * moment_jac_cs[i2]
         )
 
 
@@ -634,7 +636,7 @@ def _nb_calc_moment(
         moment_jac_rc,
     )
 
-    _calc_moment_times(
+    _contract_moments(
         alpha_index_times,
         moment_values,
         moment_jac_rs,
