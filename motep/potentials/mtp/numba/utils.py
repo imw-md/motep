@@ -270,6 +270,7 @@ def _contract_moments(
 ) -> None:
     """Compute contractions of moments."""
     number_of_js = moment_jac_rs.shape[1]
+    _, spc, rfc, rbs = moment_jac_cs.shape
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
         moment_values[i3] += mult * moment_values[i1] * moment_values[i2]
@@ -279,10 +280,13 @@ def _contract_moments(
                     moment_jac_rs[i1, j, k] * moment_values[i2]
                     + moment_values[i1] * moment_jac_rs[i2, j, k]
                 )
-        moment_jac_cs[i3] += mult * (
-            moment_jac_cs[i1] * moment_values[i2]
-            + moment_values[i1] * moment_jac_cs[i2]
-        )
+        for ispc in range(spc):
+            for irfc in range(rfc):
+                for irbs in range(rbs):
+                    moment_jac_cs[i3, ispc, irfc, irbs] += mult * (
+                        moment_jac_cs[i1, ispc, irfc, irbs] * moment_values[i2]
+                        + moment_values[i1] * moment_jac_cs[i2, ispc, irfc, irbs]
+                    )
 
 
 # @nb.njit(
