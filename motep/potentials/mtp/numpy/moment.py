@@ -111,10 +111,10 @@ class MomentBasis:
             )
 
         _contract_moments(
+            alpha_index_times,
             moment_values,
             moment_jac_rs,
             moment_jac_cs,
-            alpha_index_times,
         )
 
         moment_coeffs = self.mtp_data.moment_coeffs
@@ -147,10 +147,10 @@ def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
 
 
 def _contract_moments(
+    alpha_index_times: npt.NDArray[np.int64],
     moment_values: npt.NDArray[np.float64],
     moment_jac_rs: npt.NDArray[np.float64],
     moment_jac_cs: npt.NDArray[np.float64],
-    alpha_index_times: npt.NDArray[np.int64],
 ) -> None:
     """Compute contractions of moments."""
     for ait in alpha_index_times:
