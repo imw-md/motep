@@ -254,23 +254,14 @@ def _calc_moment_basic(
                 )
 
 
-@nb.njit(
-    (
-        nb.int64[:, :],
-        nb.float64[:],
-        nb.float64[:, :, :],
-        nb.float64[:, :, :, :],
-    ),
-)
+@nb.njit((nb.int64[:, :], nb.float64[:], nb.float64[:, :, :]))
 def _contract_moments(
     alpha_index_times: npt.NDArray[np.int64],
     moment_values: npt.NDArray[np.float64],
     moment_jac_rs: npt.NDArray[np.float64],
-    moment_jac_cs: npt.NDArray[np.float64],
 ) -> None:
     """Compute contractions of moments."""
     number_of_js = moment_jac_rs.shape[1]
-    _, spc, rfc, rbs = moment_jac_cs.shape
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
         moment_values[i3] += mult * moment_values[i1] * moment_values[i2]
@@ -280,13 +271,6 @@ def _contract_moments(
                     moment_jac_rs[i1, j, k] * moment_values[i2]
                     + moment_values[i1] * moment_jac_rs[i2, j, k]
                 )
-        for ispc in range(spc):
-            for irfc in range(rfc):
-                for irbs in range(rbs):
-                    moment_jac_cs[i3, ispc, irfc, irbs] += mult * (
-                        moment_jac_cs[i1, ispc, irfc, irbs] * moment_values[i2]
-                        + moment_values[i1] * moment_jac_cs[i2, ispc, irfc, irbs]
-                    )
 
 
 # @nb.njit(
@@ -522,7 +506,7 @@ def _calc_dedcs(
 
 
 @nb.njit(
-    nb.float64[:, :, :, :, :](
+    nb.types.Tuple((nb.float64[:, :, :], nb.float64[:, :, :, :, :]))(
         nb.int64,
         nb.int64[:, :],
         nb.int64[:],
@@ -533,7 +517,7 @@ def _calc_dedcs(
         nb.float64[:, :, :, :, :, :],
     ),
 )
-def _calc_site_energy_jacobian(
+def cald_dedcs_and_dgdcs(
     alpha_index_basic_count: np.int64,
     alpha_index_times: np.ndarray,
     alpha_moment_mapping: np.ndarray,
@@ -543,33 +527,53 @@ def _calc_site_energy_jacobian(
     moment_jac_cs: np.ndarray,
     moment_jac_rc: np.ndarray,
 ) -> np.ndarray:
-    """Calculate Jacobian of site energy gradients to radial basis coefficients.
+    """Calculate dV/dc and d(dV/dr)/dc.
+
+    - dV/dc: Jacobian of site energy to radial basis coefficients
+    - d(dV/dr)/dc: Jacobians of site energy gradients to radial basis coefficients
 
     Returns
     -------
+    dedcs : np.ndarray
+        dV/dc.
     dgdcs : np.ndarray
         d(dV/dr)/dc.
 
     """
-    amc, spc, rfc, rbs, nns, _ = moment_jac_rc.shape
+    _, spc, rfc, rbs, nns, _ = moment_jac_rc.shape
 
-    tmp0 = np.zeros_like(moment_values)
-    tmp1 = np.zeros_like(moment_jac_rs)
-    tmp0[alpha_moment_mapping] = moment_coeffs  # dV/dB
+    dedmb = np.zeros_like(moment_values)
+    dgdmb = np.zeros_like(moment_jac_rs)
+    dedmb[alpha_moment_mapping] = moment_coeffs  # dV/dB
     for ait in alpha_index_times[::-1]:
         i1, i2, mult, i3 = ait
-        tmp0[i1] += mult * tmp0[i3] * moment_values[i2]
-        tmp0[i2] += mult * tmp0[i3] * moment_values[i1]
+        dedmb[i1] += mult * dedmb[i3] * moment_values[i2]
+        dedmb[i2] += mult * dedmb[i3] * moment_values[i1]
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
         for j in range(nns):
             for ixyz0 in range(3):
-                tmp1[i1, j, ixyz0] += mult * tmp0[i3] * moment_jac_rs[i2, j, ixyz0]
-                tmp1[i2, j, ixyz0] += mult * tmp0[i3] * moment_jac_rs[i1, j, ixyz0]
+                dgdmb[i1, j, ixyz0] += mult * dedmb[i3] * moment_jac_rs[i2, j, ixyz0]
+                dgdmb[i2, j, ixyz0] += mult * dedmb[i3] * moment_jac_rs[i1, j, ixyz0]
+    for ait in alpha_index_times[::-1]:
+        i1, i2, mult, i3 = ait
+        for j in range(nns):
+            for ixyz0 in range(3):
+                dgdmb[i1, j, ixyz0] += mult * dgdmb[i3, j, ixyz0] * moment_values[i2]
+                dgdmb[i2, j, ixyz0] += mult * dgdmb[i3, j, ixyz0] * moment_values[i1]
+
+    dedcs = np.zeros((spc, rfc, rbs))
+    for iamc in range(alpha_index_basic_count):
+        v1 = dedmb[iamc]
+        for ispc in range(spc):
+            for irfc in range(rfc):
+                for irbs in range(rbs):
+                    v0 = moment_jac_cs[iamc, ispc, irfc, irbs]
+                    dedcs[ispc, irfc, irbs] += v0 * v1
 
     dgdcs = np.zeros(moment_jac_rc.shape[1:])
     for iamc in range(alpha_index_basic_count):
-        v1 = tmp0[iamc]
+        v1 = dedmb[iamc]
         for ispc in range(spc):
             for irfc in range(rfc):
                 for irbs in range(rbs):
@@ -577,16 +581,17 @@ def _calc_site_energy_jacobian(
                         for ixyz in range(3):
                             v0 = moment_jac_rc[iamc, ispc, irfc, irbs, j, ixyz]
                             dgdcs[ispc, irfc, irbs, j, ixyz] += v0 * v1
-    for iamc in range(amc):
+    for iamc in range(alpha_index_basic_count):
         for ispc in range(spc):
             for irfc in range(rfc):
                 for irbs in range(rbs):
                     v0 = moment_jac_cs[iamc, ispc, irfc, irbs]
                     for j in range(nns):
                         for ixyz in range(3):
-                            v1 = tmp1[iamc, j, ixyz]
+                            v1 = dgdmb[iamc, j, ixyz]
                             dgdcs[ispc, irfc, irbs, j, ixyz] += v0 * v1
-    return dgdcs
+
+    return dedcs, dgdcs
 
 
 @nb.njit(
@@ -648,16 +653,9 @@ def _nb_calc_moment(
         moment_jac_rc,
     )
 
-    _contract_moments(
-        alpha_index_times,
-        moment_values,
-        moment_jac_rs,
-        moment_jac_cs,
-    )
+    _contract_moments(alpha_index_times, moment_values, moment_jac_rs)
 
-    dedcs = _calc_dedcs(alpha_moment_mapping, moment_coeffs, moment_jac_cs)
-
-    dgdcs = _calc_site_energy_jacobian(
+    dedcs, dgdcs = cald_dedcs_and_dgdcs(
         alpha_index_basic.shape[0],
         alpha_index_times,
         alpha_moment_mapping,
