@@ -523,6 +523,7 @@ def _calc_dedcs(
 
 @nb.njit(
     nb.float64[:, :, :, :, :](
+        nb.int64,
         nb.int64[:, :],
         nb.int64[:],
         nb.float64[:],
@@ -533,6 +534,7 @@ def _calc_dedcs(
     ),
 )
 def _calc_site_energy_jacobian(
+    alpha_index_basic_count: np.int64,
     alpha_index_times: np.ndarray,
     alpha_moment_mapping: np.ndarray,
     moment_coeffs: np.ndarray,
@@ -552,8 +554,8 @@ def _calc_site_energy_jacobian(
     amc, spc, rfc, rbs, nns, _ = moment_jac_rc.shape
 
     tmp0 = np.zeros_like(moment_values)
-    tmp0[alpha_moment_mapping] = moment_coeffs  # dV/dB
     tmp1 = np.zeros_like(moment_jac_rs)
+    tmp0[alpha_moment_mapping] = moment_coeffs  # dV/dB
     for ait in alpha_index_times[::-1]:
         i1, i2, mult, i3 = ait
         tmp0[i1] += mult * tmp0[i3] * moment_values[i2]
@@ -566,18 +568,24 @@ def _calc_site_energy_jacobian(
                 tmp1[i2, j, ixyz0] += mult * tmp0[i3] * moment_jac_rs[i1, j, ixyz0]
 
     dgdcs = np.zeros(moment_jac_rc.shape[1:])
-    for iamc in range(amc):
+    for iamc in range(alpha_index_basic_count):
+        v1 = tmp0[iamc]
         for ispc in range(spc):
             for irfc in range(rfc):
                 for irbs in range(rbs):
                     for j in range(nns):
-                        for ixyz0 in range(3):
-                            v0 = moment_jac_rc[iamc, ispc, irfc, irbs, j, ixyz0]
-                            v1 = tmp0[iamc]
-                            dgdcs[ispc, irfc, irbs, j, ixyz0] += v0 * v1
-                            v0 = moment_jac_cs[iamc, ispc, irfc, irbs]
-                            v1 = tmp1[iamc, j, ixyz0]
-                            dgdcs[ispc, irfc, irbs, j, ixyz0] += v0 * v1
+                        for ixyz in range(3):
+                            v0 = moment_jac_rc[iamc, ispc, irfc, irbs, j, ixyz]
+                            dgdcs[ispc, irfc, irbs, j, ixyz] += v0 * v1
+    for iamc in range(amc):
+        for ispc in range(spc):
+            for irfc in range(rfc):
+                for irbs in range(rbs):
+                    v0 = moment_jac_cs[iamc, ispc, irfc, irbs]
+                    for j in range(nns):
+                        for ixyz in range(3):
+                            v1 = tmp1[iamc, j, ixyz]
+                            dgdcs[ispc, irfc, irbs, j, ixyz] += v0 * v1
     return dgdcs
 
 
@@ -650,6 +658,7 @@ def _nb_calc_moment(
     dedcs = _calc_dedcs(alpha_moment_mapping, moment_coeffs, moment_jac_cs)
 
     dgdcs = _calc_site_energy_jacobian(
+        alpha_index_basic.shape[0],
         alpha_index_times,
         alpha_moment_mapping,
         moment_coeffs,
