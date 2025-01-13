@@ -537,29 +537,29 @@ def cald_dedcs_and_dgdcs(
     """
     _, spc, rfc, rbs, nns, _ = moment_jac_rc.shape
 
-    tmp0 = np.zeros_like(moment_values)
-    tmp1 = np.zeros_like(moment_jac_rs)
-    tmp0[alpha_moment_mapping] = moment_coeffs  # dV/dB
+    dedmb = np.zeros_like(moment_values)
+    dgdmb = np.zeros_like(moment_jac_rs)
+    dedmb[alpha_moment_mapping] = moment_coeffs  # dV/dB
     for ait in alpha_index_times[::-1]:
         i1, i2, mult, i3 = ait
-        tmp0[i1] += mult * tmp0[i3] * moment_values[i2]
-        tmp0[i2] += mult * tmp0[i3] * moment_values[i1]
+        dedmb[i1] += mult * dedmb[i3] * moment_values[i2]
+        dedmb[i2] += mult * dedmb[i3] * moment_values[i1]
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
         for j in range(nns):
             for ixyz0 in range(3):
-                tmp1[i1, j, ixyz0] += mult * tmp0[i3] * moment_jac_rs[i2, j, ixyz0]
-                tmp1[i2, j, ixyz0] += mult * tmp0[i3] * moment_jac_rs[i1, j, ixyz0]
+                dgdmb[i1, j, ixyz0] += mult * dedmb[i3] * moment_jac_rs[i2, j, ixyz0]
+                dgdmb[i2, j, ixyz0] += mult * dedmb[i3] * moment_jac_rs[i1, j, ixyz0]
     for ait in alpha_index_times[::-1]:
         i1, i2, mult, i3 = ait
         for j in range(nns):
             for ixyz0 in range(3):
-                tmp1[i1, j, ixyz0] += mult * tmp1[i3, j, ixyz0] * moment_values[i2]
-                tmp1[i2, j, ixyz0] += mult * tmp1[i3, j, ixyz0] * moment_values[i1]
+                dgdmb[i1, j, ixyz0] += mult * dgdmb[i3, j, ixyz0] * moment_values[i2]
+                dgdmb[i2, j, ixyz0] += mult * dgdmb[i3, j, ixyz0] * moment_values[i1]
 
     dedcs = np.zeros((spc, rfc, rbs))
     for iamc in range(alpha_index_basic_count):
-        v1 = tmp0[iamc]
+        v1 = dedmb[iamc]
         for ispc in range(spc):
             for irfc in range(rfc):
                 for irbs in range(rbs):
@@ -568,7 +568,7 @@ def cald_dedcs_and_dgdcs(
 
     dgdcs = np.zeros(moment_jac_rc.shape[1:])
     for iamc in range(alpha_index_basic_count):
-        v1 = tmp0[iamc]
+        v1 = dedmb[iamc]
         for ispc in range(spc):
             for irfc in range(rfc):
                 for irbs in range(rbs):
@@ -583,7 +583,7 @@ def cald_dedcs_and_dgdcs(
                     v0 = moment_jac_cs[iamc, ispc, irfc, irbs]
                     for j in range(nns):
                         for ixyz in range(3):
-                            v1 = tmp1[iamc, j, ixyz]
+                            v1 = dgdmb[iamc, j, ixyz]
                             dgdcs[ispc, irfc, irbs, j, ixyz] += v0 * v1
 
     return dedcs, dgdcs
