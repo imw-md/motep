@@ -527,10 +527,15 @@ def cald_dedcs_and_dgdcs(
     moment_jac_cs: np.ndarray,
     moment_jac_rc: np.ndarray,
 ) -> np.ndarray:
-    """Calculate Jacobian of site energy gradients to radial basis coefficients.
+    """Calculate dV/dc and d(dV/dr)/dc.
+
+    - dV/dc: Jacobian of site energy to radial basis coefficients
+    - d(dV/dr)/dc: Jacobians of site energy gradients to radial basis coefficients
 
     Returns
     -------
+    dedcs : np.ndarray
+        dV/dc.
     dgdcs : np.ndarray
         d(dV/dr)/dc.
 
