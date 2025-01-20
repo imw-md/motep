@@ -15,59 +15,6 @@ from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting
 
 
-def calc_properties(
-    images: list[Atoms],
-    comm: MPI.Comm,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Fetch energies, forces, and stresses from the training dataset."""
-    rank = comm.Get_rank()
-    size = comm.Get_size()
-    # Initialize lists to store energies, forces, and stresses
-    energies = []
-    forceses = []
-    stresses = []
-
-    # Determine the chunk of atoms to process for each MPI process
-    chunk_size = len(images) // size
-    remainder = len(images) % size
-    start_idx = rank * chunk_size
-    end_idx = (rank + 1) * chunk_size + (remainder if rank == size - 1 else 0)
-    local_atoms = images[start_idx:end_idx]
-
-    # Perform local calculations
-    local_results = [_calc_efs(atoms) for atoms in local_atoms]
-
-    # Gather results from all processes
-    all_results = comm.gather(local_results, root=0)
-
-    # Process results on root process
-    if rank == 0:
-        for result_list in all_results:
-            for energy, forces, stress in result_list:
-                energies.append(energy)
-                forceses.append(forces)
-                stresses.append(stress)
-
-    # Broadcast the processed results to all processes
-    energies = comm.bcast(energies, root=0)
-    forceses = comm.bcast(forceses, root=0)
-    stresses = comm.bcast(stresses, root=0)
-
-    return np.array(energies), forceses, stresses
-
-
-def _calc_efs(atoms: Atoms) -> tuple:
-    # `atoms.calc.get_potential_energy()` triggers also `forces` and `stress`.
-    energy = atoms.get_potential_energy()
-    forces = atoms.calc.results["forces"].copy()
-    stress = (
-        atoms.get_stress(voigt=False)
-        if "stress" in atoms.calc.results
-        else np.zeros((3, 3))
-    )
-    return energy, forces, stress
-
-
 def _calc_errors_from_diff(diff: np.ndarray) -> dict[str, float]:
     if diff.size == 0:
         return {"N": diff.size, "MAX": np.nan, "ABS": np.nan, "RMS": np.nan}
