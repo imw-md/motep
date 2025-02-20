@@ -1,7 +1,7 @@
 """Module for MTP formats."""
 
 import pathlib
-from typing import TextIO
+from typing import Any, TextIO
 
 import numpy as np
 from ase import Atoms
@@ -22,7 +22,7 @@ def read_cfg(
     Parameters
     ----------
     species : list[int] | list[str], optional
-        List or dict defining types of chemical symbols. For example,
+        List defining types of chemical symbols. For example,
         [46, 1] and ['Pd', 'H'] assign Pd for type 0 and H for type 1. If None,
         dummy symbols 'X', 'H', 'He', etc. are assigned for types 0, 1, 2, etc.
 
@@ -65,7 +65,7 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
             for _ in range(size):
                 line = next(file)
                 for key, value in zip(atomdata, line.split(), strict=True):
-                    value = int(value) if value.isdigit() else float(value)
+                    value = _parse_value(value)
                     atomdata[key].append(value)
         elif line.split()[0] == "Energy":
             energy = float(next(file).split()[0])
@@ -80,9 +80,6 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
                 info[str(line.split()[1])] = float(line.split()[2])
             except ValueError:
                 info[str(line.split()[1])] = line.split()[2]
-
-    if "nbh_grades" in atomdata:
-        results["nbh_grades"] = atomdata["nbh_grades"]
 
     if species is None:
         numbers = atomdata["type"]
@@ -110,6 +107,11 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
     else:
         raise ValueError
 
+    for key, value in atomdata.items():
+        if key in {'id', 'type'} or key in keys_c or key in keys_d:
+            continue
+        results[key] = atomdata[key]
+
     atoms.calc = SinglePointCalculator(atoms)
     atoms.calc.results.update(results)
     if "fx" in atomdata:
@@ -130,6 +132,19 @@ def _set_stress(atoms: Atoms, stress):
     voigt_order = ["xx", "yy", "zz", "yz", "xz", "xy"]
     stress = np.array([stress[_] for _ in voigt_order])
     atoms.calc.results["stress"] = -stress / atoms.get_volume()
+
+
+def _parse_value(value: str) -> Any:
+    if value.isdigit():
+        return int(value)
+    if value.replace('.', '').replace('-', '').isdigit():
+        return float(value)
+    if value.lower() == 'true':
+        return True
+    elif value.lower() == 'false':
+        return False
+    else:
+        raise RuntimeError(value)
 
 
 @writer
