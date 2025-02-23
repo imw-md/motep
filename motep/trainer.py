@@ -38,15 +38,13 @@ def read_images(
     if rank == 0:
         print(f"{'':=^72s}\n")
         print("[configurations]")
-    images = []
-    for filename in filenames:
-        images_local = motep.io.read(filename, species)
-        images.extend(motep.io.read(filename, species))
-        if rank == 0:
+        images = []
+        for filename in filenames:
+            images_local = motep.io.read(filename, species)
+            images.extend(images_local)
             print(f'"{filename}" = {len(images_local)}')
-    if rank == 0:
         print()
-    return images
+    return comm.bcast(images, root=0)
 
 
 def train(filename_setting: str, comm: MPI.Comm) -> None:
