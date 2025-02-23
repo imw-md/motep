@@ -4,7 +4,7 @@ import ase.io
 from ase import Atoms
 from ase.io.formats import parse_filename
 
-from motep.io.mlip.cfg import read_cfg
+from motep.io.mlip.cfg import read_cfg, write_cfg
 
 
 def read(filename: str, species: list[int] | None = None) -> list[Atoms]:
@@ -12,7 +12,7 @@ def read(filename: str, species: list[int] | None = None) -> list[Atoms]:
 
     Parameters
     ----------
-    filename : list[str]
+    filename : str
         File name to be read.
         Both the MLIP `.cfg` format and the ASE-recognized formats can be parsed.
 
@@ -53,3 +53,22 @@ def read(filename: str, species: list[int] | None = None) -> list[Atoms]:
     else:
         images = ase.io.read(filename_parsed, index=index)
     return [images] if isinstance(images, Atoms) else images
+
+
+def write(filename: str, images: list[Atoms], species: list[int] | None = None) -> None:
+    """Write images.
+
+    Parameters
+    ----------
+    filename : str
+        File name to be written.
+        Both the MLIP `.cfg` format and the ASE-recognized formats can be parsed.
+    images : list[Atoms]
+        List of ASE `Atoms` objects.
+    species : list[int]
+        List of atomic numbers for the atomic types in the MLIP `.cfg` format.
+
+    """
+    if filename.endswith(".cfg"):
+        return write_cfg(filename, images, species=species)
+    return ase.io.write(filename, images)

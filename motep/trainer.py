@@ -5,48 +5,19 @@ import pathlib
 import pprint
 
 import numpy as np
-from ase import Atoms
 from mpi4py import MPI
 
-import motep.io
 from motep.io.mlip.mtp import read_mtp, write_mtp
+from motep.io.utils import get_dummy_species, read_images
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
 from motep.setting import parse_setting
 from motep.utils import measure_time
 
 
-def _get_dummy_species(images: list[Atoms]) -> list[int]:
-    m = 0
-    for atoms in images:
-        m = max(m, atoms.numbers.max())
-    return list(range(m + 1))
-
-
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Add arguments."""
     parser.add_argument("setting")
-
-
-def read_images(
-    filenames: list[str],
-    species: list[int] | None = None,
-    comm: MPI.Comm = MPI.COMM_WORLD,
-) -> list[Atoms]:
-    """Read images."""
-    rank = comm.Get_rank()
-    if rank == 0:
-        print(f"{'':=^72s}\n")
-        print("[configurations]")
-    images = []
-    for filename in filenames:
-        images_local = motep.io.read(filename, species)
-        images.extend(motep.io.read(filename, species))
-        if rank == 0:
-            print(f'"{filename}" = {len(images_local)}')
-    if rank == 0:
-        print()
-    return images
 
 
 def train(filename_setting: str, comm: MPI.Comm) -> None:
@@ -62,9 +33,14 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
     untrained_mtp = str(pathlib.Path(setting.potential_initial).resolve())
 
     species = setting.species or None
-    images = read_images(setting.configurations, species=species, comm=comm)
+    images = read_images(
+        setting.data_training,
+        species=species,
+        comm=comm,
+        title="data_training",
+    )
     if not setting.species:
-        species = _get_dummy_species(images)
+        species = get_dummy_species(images)
 
     mtp_data = read_mtp(untrained_mtp)
     mtp_data.species = species

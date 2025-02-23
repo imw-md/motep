@@ -2,7 +2,10 @@
 
 import argparse
 
-from motep import trainer
+from motep import (
+    grader,
+    trainer,
+)
 
 
 def main():
@@ -13,6 +16,7 @@ def main():
 
     commands = {
         "train": trainer,
+        "grade": grader,
     }
     for key, value in commands.items():
         value.add_arguments(subparsers.add_parser(key))

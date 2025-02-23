@@ -43,7 +43,9 @@ class LossSetting:
 class Setting:
     """Setting of the training."""
 
-    configurations: list[str] = field(default_factory=lambda: ["training.cfg"])
+    data_training: list[str] = field(default_factory=lambda: ["training.cfg"])
+    data_in: list[str] = field(default_factory=lambda: ["in.cfg"])
+    data_out: list[str] = field(default_factory=lambda: ["out.cfg"])
     species: list[int] = field(default_factory=list)
     potential_initial: str = "initial.mtp"
     potential_final: str = "final.mtp"
@@ -66,8 +68,10 @@ def parse_setting(filename: str) -> Setting:
     with pathlib.Path(filename).open("rb") as f:
         setting_overwritten = tomllib.load(f)
 
-    if isinstance(setting_overwritten["configurations"], str):
-        setting_overwritten["configurations"] = [setting_overwritten["configurations"]]
+    keys = ["configurations", "data_training", "data_in", "data_out"]
+    for key in keys:
+        if key in setting_overwritten and isinstance(setting_overwritten[key], str):
+            setting_overwritten[key] = [setting_overwritten[key]]
 
     # convert the old style "steps" like {'steps`: ['L-BFGS-B']} to the new one
     # {'steps`: {'method': 'L-BFGS-B'}

@@ -31,7 +31,7 @@ mpirun -np 4 motep train motep.toml
 where the setting file `motep.toml` is like
 
 ```toml
-configurations = 'training.cfg'
+data_training = 'training.cfg'
 potential_initial = 'initial.mtp'
 potential_final = 'final.mtp'
 
@@ -72,6 +72,20 @@ depending on the above setting.
 - `radial_coeffs`
 - `moment_coeffs`
 - `species_coeffs`
+
+### `motep grade`
+
+```
+motep grade motep.toml
+```
+
+```toml
+data_training = 'traning.cfg'  # original data for training
+data_in = 'in.cfg'  # data to be evaluated
+data_out = 'out.cfg'  # data with `MV_grade`
+potential_final = 'final.mtp'
+engine = 'numba'  # default
+```
 
 ## Big Question ?
 What This code do
