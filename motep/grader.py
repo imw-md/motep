@@ -103,7 +103,12 @@ def grade(filename_setting: str, comm: MPI.Comm) -> None:
     mtp_file = str(pathlib.Path(setting.potential_final).resolve())
 
     species = setting.species or None
-    images_training = read_images(setting.data_training, species=species, comm=comm)
+    images_training = read_images(
+        setting.data_training,
+        species=species,
+        comm=comm,
+        title="data_training",
+    )
     if not setting.species:
         species = get_dummy_species(images_training)
 
@@ -132,7 +137,12 @@ def grade(filename_setting: str, comm: MPI.Comm) -> None:
         print("[data_active]")
         print(optimality.indices_best)
 
-    images_in = read_images(setting.data_in, species=species, comm=comm)
+    images_in = read_images(
+        setting.data_in,
+        species=species,
+        comm=comm,
+        title="data_in",
+    )
 
     optimality.calc_grade(images_in, engine=setting.engine)
 

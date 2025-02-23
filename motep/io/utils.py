@@ -18,12 +18,13 @@ def read_images(
     filenames: list[str],
     species: list[int] | None = None,
     comm: MPI.Comm = MPI.COMM_WORLD,
+    title: str = "data",
 ) -> list[Atoms]:
     """Read images."""
     rank = comm.Get_rank()
     if rank == 0:
         print(f"{'':=^72s}\n")
-        print("[data_training]")
+        print(f"[{title}]")
         images = []
         for filename in filenames:
             images_local = motep.io.read(filename, species)

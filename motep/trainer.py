@@ -33,7 +33,12 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
     untrained_mtp = str(pathlib.Path(setting.potential_initial).resolve())
 
     species = setting.species or None
-    images = read_images(setting.data_training, species=species, comm=comm)
+    images = read_images(
+        setting.data_training,
+        species=species,
+        comm=comm,
+        title="data_training",
+    )
     if not setting.species:
         species = get_dummy_species(images)
 
