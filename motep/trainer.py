@@ -8,8 +8,8 @@ import numpy as np
 from ase import Atoms
 from mpi4py import MPI
 
-import motep.io
 from motep.io.mlip.mtp import read_mtp, write_mtp
+from motep.io.utils import read_images
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
 from motep.setting import parse_setting
@@ -26,25 +26,6 @@ def _get_dummy_species(images: list[Atoms]) -> list[int]:
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Add arguments."""
     parser.add_argument("setting")
-
-
-def read_images(
-    filenames: list[str],
-    species: list[int] | None = None,
-    comm: MPI.Comm = MPI.COMM_WORLD,
-) -> list[Atoms]:
-    """Read images."""
-    rank = comm.Get_rank()
-    if rank == 0:
-        print(f"{'':=^72s}\n")
-        print("[configurations]")
-        images = []
-        for filename in filenames:
-            images_local = motep.io.read(filename, species)
-            images.extend(images_local)
-            print(f'"{filename}" = {len(images_local)}')
-        print()
-    return comm.bcast(images, root=0)
 
 
 def train(filename_setting: str, comm: MPI.Comm) -> None:
