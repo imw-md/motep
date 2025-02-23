@@ -23,7 +23,7 @@ def read_images(
     rank = comm.Get_rank()
     if rank == 0:
         print(f"{'':=^72s}\n")
-        print("[configurations]")
+        print("[data_training]")
         images = []
         for filename in filenames:
             images_local = motep.io.read(filename, species)
