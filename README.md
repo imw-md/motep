@@ -80,9 +80,11 @@ motep grade motep.toml
 ```
 
 ```toml
-data_training = 'traning.cfg'
-data_in = 'in.cfg'
-data_out = 'out.cfg'
+data_training = 'traning.cfg'  # original data for training
+data_in = 'in.cfg'  # data to be evaluated
+data_out = 'out.cfg'  # data with `MV_grade`
+potential_final = 'final.mtp'
+engine = 'numba'  # default
 ```
 
 ## Big Question ?
