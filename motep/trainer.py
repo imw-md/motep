@@ -11,7 +11,7 @@ from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
-from motep.setting import parse_setting
+from motep.setting import load_setting_train
 from motep.utils import measure_time
 
 
@@ -24,7 +24,7 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
     """Train."""
     rank = comm.Get_rank()
 
-    setting = parse_setting(filename_setting)
+    setting = load_setting_train(filename_setting)
     if rank == 0:
         pprint.pp(setting)
         print(flush=True)

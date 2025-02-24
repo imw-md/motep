@@ -84,7 +84,12 @@ data_training = 'traning.cfg'  # original data for training
 data_in = 'in.cfg'  # data to be evaluated
 data_out = 'out.cfg'  # data with `MV_grade`
 potential_final = 'final.mtp'
+
+seed = 42  # random seed
 engine = 'numba'
+
+# grade
+algorithm = 'maxvol'  # {'maxvol', 'exaustive'}
 ```
 
 ## Big Question ?
