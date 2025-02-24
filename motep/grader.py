@@ -45,15 +45,16 @@ class DOptimality:
         self.engine = engine
         self.matrix_overdet = np.empty((0, 0))
         self.indices_best = []
-
-        # Calculate basis functions of `images_training`
-        for atoms in images_training:
-            atoms.calc = MTP(self.mtp_data, engine=self.engine, is_trained=True)
-            atoms.get_potential_energy()
+        self.find_active_set()
 
     def find_active_set(self) -> None:
         """Find the active set."""
         images = self.images_training
+
+        # Calculate basis functions of `images_training`
+        for atoms in images:
+            atoms.calc = MTP(self.mtp_data, engine=self.engine, is_trained=True)
+            atoms.get_potential_energy()
 
         # Make the overdetermined matrix
         matrix_overdet = np.array([atoms.calc.engine.mbd.values for atoms in images])
@@ -132,7 +133,6 @@ def grade(filename_setting: str, comm: MPI.Comm) -> None:
         raise ValueError(msg)
 
     optimality = DOptimality(images_training, mtp_data, setting.engine)
-    optimality.find_active_set()
 
     if rank == 0:
         print("[data_active]")
