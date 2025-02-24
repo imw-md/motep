@@ -21,6 +21,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def train(filename_setting: str, comm: MPI.Comm) -> None:
+    """Train."""
     rank = comm.Get_rank()
 
     setting = parse_setting(filename_setting)

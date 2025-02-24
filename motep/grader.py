@@ -116,7 +116,7 @@ def grade(filename_setting: str, comm: MPI.Comm) -> None:
     mtp_data.species = species
 
     if setting.engine == "mlippy":
-        msg = "`mlippy` engine is not available for `motep grade"
+        msg = "`mlippy` engine is not available for `motep grade`"
         raise ValueError(msg)
 
     loss = LossFunction(
