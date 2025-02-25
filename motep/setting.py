@@ -1,8 +1,11 @@
 """Functions related to the setting file."""
 
+from __future__ import annotations
+
 import pathlib
 import tomllib
 from dataclasses import dataclass, field
+from inspect import signature
 from typing import Any
 
 scipy_minimize_methods = {
@@ -51,6 +54,18 @@ class Setting:
     potential_final: str = "final.mtp"
     seed: int | None = None
     engine: str = "numpy"
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Setting:
+        """Make an instance from dict with ignoring extra fields."""
+        # https://stackoverflow.com/a/55096964/12382356
+        return cls(**{k: v for k, v in data.items() if k in signature(cls).parameters})
+
+
+@dataclass
+class TrainSetting(Setting):
+    """Setting of the training."""
+
     loss: dict[str, Any] = field(default_factory=LossSetting)
     steps: list[dict] = field(
         default_factory=lambda: [
@@ -61,6 +76,25 @@ class Setting:
     def __post_init__(self) -> None:
         """Postprocess attributes."""
         self.loss = LossSetting(**self.loss)
+
+
+@dataclass
+class GradeSetting(Setting):
+    """Setting for the extrapolation-grade calculations."""
+
+    algorithm: str = "maxvol"
+
+
+def _parse_steps(setting_overwritten: dict) -> dict:
+    for i, value in enumerate(setting_overwritten["steps"]):
+        if not isinstance(value, dict):
+            setting_overwritten["steps"][i] = {"method": value}
+        if value["method"].lower() in scipy_minimize_methods:
+            if "kwargs" not in value:
+                value["kwargs"] = {}
+            value["kwargs"]["method"] = value["method"]
+            value["method"] = "minimize"
+    return setting_overwritten
 
 
 def parse_setting(filename: str) -> Setting:
@@ -76,13 +110,16 @@ def parse_setting(filename: str) -> Setting:
     # convert the old style "steps" like {'steps`: ['L-BFGS-B']} to the new one
     # {'steps`: {'method': 'L-BFGS-B'}
     # Default 'optimized' is defined in each `Optimizer` class.
-    for i, value in enumerate(setting_overwritten["steps"]):
-        if not isinstance(value, dict):
-            setting_overwritten["steps"][i] = {"method": value}
-        if value["method"].lower() in scipy_minimize_methods:
-            if "kwargs" not in value:
-                value["kwargs"] = {}
-            value["kwargs"]["method"] = value["method"]
-            value["method"] = "minimize"
+    if "steps" in setting_overwritten:
+        setting_overwritten = _parse_steps(setting_overwritten)
+    return setting_overwritten
 
-    return Setting(**setting_overwritten)
+
+def load_setting_train(filename: str) -> TrainSetting:
+    """Load setting for `train`."""
+    return TrainSetting.from_dict(parse_setting(filename))
+
+
+def load_setting_grade(filename: str) -> GradeSetting:
+    """Load setting for `grade`."""
+    return GradeSetting.from_dict(parse_setting(filename))

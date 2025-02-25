@@ -35,9 +35,9 @@ data_training = 'training.cfg'
 potential_initial = 'initial.mtp'
 potential_final = 'final.mtp'
 
-# seed = 10  # random seed for initializing MTP paramters
+# seed = 10  # random seed for initializing MTP parameters
 
-engine = 'numpy'  # {'numpy', 'numba', 'mlippy'}
+engine = 'numba'  # {'numpy', 'numba', 'mlippy'}
 
 [loss]  # setting for the loss function
 energy_weight = 1.0
@@ -84,7 +84,12 @@ data_training = 'traning.cfg'  # original data for training
 data_in = 'in.cfg'  # data to be evaluated
 data_out = 'out.cfg'  # data with `MV_grade`
 potential_final = 'final.mtp'
-engine = 'numba'  # default
+
+seed = 42  # random seed
+engine = 'numba'
+
+# grade
+algorithm = 'maxvol'  # {'maxvol', 'exaustive'}
 ```
 
 ## Big Question ?
