@@ -82,9 +82,9 @@ class ExaustiveAlgorithm(AlgorithmBase):
         # This is therefore valid so far only for a small `data_in`
         # and for a low level `potential_final`.
         asm = self.mtp_data.alpha_scalar_moments
-        if comb(len(images), asm) > 65535:
+        if comb(len(images), asm) > 2**24:  # 16777216
             msg = "too large possible combinations of rows"
-            raise RuntimeError(msg)
+            raise RuntimeError(msg, comb(len(images), asm))
         det_max = 0.0
         indices = np.arange(len(images))
         for _ in combinations(range(len(images)), asm):
