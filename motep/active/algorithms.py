@@ -68,8 +68,8 @@ class AlgorithmBase(ABC):
             atoms.info["MV_grade"] = maxvol_grade
 
 
-class ExaustiveAlgorithm(AlgorithmBase):
-    """Exaustive algorithm."""
+class ExhaustiveAlgorithm(AlgorithmBase):
+    """Exhaustive algorithm."""
 
     def find_active_set(self) -> None:
         """Find the active set."""
@@ -97,7 +97,7 @@ class ExaustiveAlgorithm(AlgorithmBase):
         self.indices = indices
 
 
-class MaxVolAlgorithm(ExaustiveAlgorithm):
+class MaxVolAlgorithm(ExhaustiveAlgorithm):
     """MaxVol algorithm."""
 
     def find_active_set(self) -> None:
