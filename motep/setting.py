@@ -85,6 +85,18 @@ class GradeSetting(Setting):
     algorithm: str = "maxvol"
 
 
+def _parse_steps(setting_overwritten: dict) -> dict:
+    for i, value in enumerate(setting_overwritten["steps"]):
+        if not isinstance(value, dict):
+            setting_overwritten["steps"][i] = {"method": value}
+        if value["method"].lower() in scipy_minimize_methods:
+            if "kwargs" not in value:
+                value["kwargs"] = {}
+            value["kwargs"]["method"] = value["method"]
+            value["method"] = "minimize"
+    return setting_overwritten
+
+
 def parse_setting(filename: str) -> Setting:
     """Parse setting file."""
     with pathlib.Path(filename).open("rb") as f:
@@ -98,14 +110,8 @@ def parse_setting(filename: str) -> Setting:
     # convert the old style "steps" like {'steps`: ['L-BFGS-B']} to the new one
     # {'steps`: {'method': 'L-BFGS-B'}
     # Default 'optimized' is defined in each `Optimizer` class.
-    for i, value in enumerate(setting_overwritten["steps"]):
-        if not isinstance(value, dict):
-            setting_overwritten["steps"][i] = {"method": value}
-        if value["method"].lower() in scipy_minimize_methods:
-            if "kwargs" not in value:
-                value["kwargs"] = {}
-            value["kwargs"]["method"] = value["method"]
-            value["method"] = "minimize"
+    if "steps" in setting_overwritten:
+        setting_overwritten = _parse_steps(setting_overwritten)
     return setting_overwritten
 
 
