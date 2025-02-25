@@ -34,23 +34,29 @@ class AlgorithmBase(ABC):
         self.engine = engine
         self.rng = rng
 
-        self.matrix = np.empty((0, 0))
+        self.matrix = self.calc_matrix(self.images_training)
         self.indices = []
+
         self.find_active_set()
+
+    def calc_matrix(self, images: list[Atoms]) -> np.ndarray:
+        """Calculate matrix."""
+        # Calculate basis functions of `images_training`
+        for atoms in images:
+            atoms.calc = MTP(self.mtp_data, engine=self.engine, is_trained=True)
+            atoms.get_potential_energy()
+
+        # Make the overdetermined matrix
+        return np.array([atoms.calc.engine.mbd.values for atoms in images])
 
     @abstractmethod
     def find_active_set(self) -> None:
         """Find the active set."""
 
-    def calc_grade(self, images: list[Atoms], engine: str) -> None:
+    def calc_grade(self, images: list[Atoms]) -> None:
         """Calculate the extrapolation grades."""
-        mtp_data = self.mtp_data
-        for atoms in images:
-            atoms.calc = MTP(mtp_data, engine=engine, is_trained=True)
-            atoms.get_potential_energy()
-
         # Make the overdetermined matrix
-        matrix = np.array([atoms.calc.engine.mbd.values for atoms in images])
+        matrix = self.calc_matrix(images)
 
         # Eq. (8) in [Podryabinkin_CMS_2017_Active]_
         matrix_active = self.matrix[self.indices]
@@ -68,14 +74,7 @@ class ExaustiveAlgorithm(AlgorithmBase):
     def find_active_set(self) -> None:
         """Find the active set."""
         images = self.images_training
-
-        # Calculate basis functions of `images_training`
-        for atoms in images:
-            atoms.calc = MTP(self.mtp_data, engine=self.engine, is_trained=True)
-            atoms.get_potential_energy()
-
-        # Make the overdetermined matrix
-        matrix = np.array([atoms.calc.engine.mbd.values for atoms in images])
+        matrix = self.matrix
 
         # Choose rows (configurations)
         # This is preliminarily implemented only in an exhausive manner.
@@ -95,7 +94,6 @@ class ExaustiveAlgorithm(AlgorithmBase):
                 indices = indices_checked
                 det_max = det
 
-        self.matrix = matrix
         self.indices = indices
 
 
@@ -105,14 +103,7 @@ class MaxVolAlgorithm(ExaustiveAlgorithm):
     def find_active_set(self) -> None:
         """Find the active set."""
         images = self.images_training
-
-        # Calculate basis functions of `images_training`
-        for atoms in images:
-            atoms.calc = MTP(self.mtp_data, engine=self.engine, is_trained=True)
-            atoms.get_potential_energy()
-
-        # Make the overdetermined matrix
-        matrix = np.array([atoms.calc.engine.mbd.values for atoms in images])
+        matrix = self.matrix
 
         asm = self.mtp_data.alpha_scalar_moments
         indices = self.rng.choice(len(images), asm, replace=False)
@@ -131,5 +122,4 @@ class MaxVolAlgorithm(ExaustiveAlgorithm):
         else:
             raise RuntimeError(_)
 
-        self.matrix = matrix
         self.indices = np.where(flags)[0]

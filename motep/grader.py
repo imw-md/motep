@@ -73,7 +73,7 @@ def grade(filename_setting: str, comm: MPI.Comm) -> None:
         title="data_in",
     )
 
-    optimality.calc_grade(images_in, engine=setting.engine)
+    optimality.calc_grade(images_in)
 
     motep.io.write(setting.data_out[0], images_in)
 
