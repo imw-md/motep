@@ -102,7 +102,7 @@ def parse_setting(filename: str) -> Setting:
     with pathlib.Path(filename).open("rb") as f:
         setting_overwritten = tomllib.load(f)
 
-    keys = ["configurations", "data_training", "data_in", "data_out"]
+    keys = ["data_training", "data_in", "data_out"]
     for key in keys:
         if key in setting_overwritten and isinstance(setting_overwritten[key], str):
             setting_overwritten[key] = [setting_overwritten[key]]
