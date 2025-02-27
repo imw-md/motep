@@ -55,12 +55,6 @@ class Setting:
     seed: int | None = None
     engine: str = "numpy"
 
-    @classmethod
-    def from_dict(cls, data: dict) -> Setting:
-        """Make an instance from dict with ignoring extra fields."""
-        # https://stackoverflow.com/a/55096964/12382356
-        return cls(**{k: v for k, v in data.items() if k in signature(cls).parameters})
-
 
 @dataclass
 class TrainSetting(Setting):
@@ -102,7 +96,7 @@ def parse_setting(filename: str) -> Setting:
     with pathlib.Path(filename).open("rb") as f:
         setting_overwritten = tomllib.load(f)
 
-    keys = ["configurations", "data_training", "data_in", "data_out"]
+    keys = ["data_training", "data_in", "data_out"]
     for key in keys:
         if key in setting_overwritten and isinstance(setting_overwritten[key], str):
             setting_overwritten[key] = [setting_overwritten[key]]
@@ -117,9 +111,9 @@ def parse_setting(filename: str) -> Setting:
 
 def load_setting_train(filename: str) -> TrainSetting:
     """Load setting for `train`."""
-    return TrainSetting.from_dict(parse_setting(filename))
+    return TrainSetting(**parse_setting(filename))
 
 
 def load_setting_grade(filename: str) -> GradeSetting:
     """Load setting for `grade`."""
-    return GradeSetting.from_dict(parse_setting(filename))
+    return GradeSetting(**parse_setting(filename))

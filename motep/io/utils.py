@@ -22,10 +22,10 @@ def read_images(
 ) -> list[Atoms]:
     """Read images."""
     rank = comm.Get_rank()
+    images = []
     if rank == 0:
         print(f"{'':=^72s}\n")
         print(f"[{title}]")
-        images = []
         for filename in filenames:
             images_local = motep.io.read(filename, species)
             images.extend(images_local)
