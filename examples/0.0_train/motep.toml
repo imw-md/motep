@@ -1,0 +1,35 @@
+data_training = 'ase.xyz'
+potential_initial = 'initial.mtp'
+potential_final = 'final.mtp'
+
+seed = 42  # random seed for initializing MTP parameters
+
+engine = 'numba'  # {'numpy', 'numba', 'mlippy'}
+
+species = [6, 1]  # atomic numbers corresponding to types
+
+[loss]  # setting for the loss function
+energy_weight = 1.0
+forces_weight = 0.01
+stress_weight = 0.01
+
+[[steps]]
+method = 'Level2MTP'
+optimized = ['radial_coeffs']
+
+[[steps]]
+method = 'LLS'
+optimized = ['moment_coeffs']
+
+[[steps]]
+method = 'BFGS'
+optimized = ['radial_coeffs', 'moment_coeffs']
+[steps.kwargs]
+jac = true
+tol = 1e-3
+[steps.kwargs.options]
+maxiter = 1000
+
+[[steps]]
+method = 'LLS'
+optimized = ['moment_coeffs']
