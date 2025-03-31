@@ -69,7 +69,7 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
             # Print parameters before optimization.
             mtp_data.initialize(setting.rng)
             if rank == 0:
-                mtp_data.print()
+                mtp_data.print(flush=True)
 
             # Instantiate an `Optimizer` class
             optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
