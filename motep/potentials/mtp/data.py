@@ -99,6 +99,24 @@ class MTPData:
             shape = species_count, species_count, rfc, rbs
             self.radial_coeffs = np.array(total_radial).reshape(shape)
 
+    @property
+    def number_of_parameters_optimized(self) -> int:
+        """Get number of parameters optiized."""
+        species_count = self.species_count
+        rfc = self.radial_funcs_count
+        rbs = self.radial_basis_size
+        asm = self.alpha_scalar_moments
+        n = 0
+        if "scaling" in self.optimized:
+            n += 1
+        if "moment_coeffs" in self.optimized:
+            n += asm
+        if "species_coeffs" in self.optimized:
+            n += species_count
+        if "radial_coeffs" in self.optimized:
+            n += species_count * species_count * rfc * rbs
+        return n
+
     def get_bounds(self) -> np.ndarray:
         """Get bounds."""
         tmp = []
