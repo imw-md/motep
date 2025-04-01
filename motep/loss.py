@@ -360,6 +360,11 @@ class LossFunctionBase(ABC):
         ncnf = len(self.images)
         for i in range(rank, ncnf, size):
             self.images[i].get_potential_energy()
+
+    def broadcast(self) -> None:
+        """Broadcast data."""
+        size = self.comm.Get_size()
+        ncnf = len(self.images)
         for i in range(ncnf):
             results = self.images[i].calc.results
             results.update(self.comm.bcast(results, root=i % size))
@@ -457,7 +462,14 @@ class ErrorPrinter:
 
         `**kwargs` are used to, e.g., give `flush=True` for `print` at the end
         of each block.
+
+        Returns
+        -------
+        errors : dict[str, float]
+            Errors.
+
         """
+        self.loss.broadcast()  # be sure that all processes has the same data
         errors = self.calculate()
 
         key0 = "energy"
