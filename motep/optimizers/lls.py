@@ -188,6 +188,7 @@ class LLSOptimizer(LLSOptimizerBase):
 
         # Calculate basis functions of `loss.images`
         self.loss(self.loss.mtp_data.parameters)
+        self.loss.broadcast()
 
         callback = Callback(self.loss)
 

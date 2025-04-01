@@ -15,59 +15,6 @@ from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting
 
 
-def calc_properties(
-    images: list[Atoms],
-    comm: MPI.Comm,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Fetch energies, forces, and stresses from the training dataset."""
-    rank = comm.Get_rank()
-    size = comm.Get_size()
-    # Initialize lists to store energies, forces, and stresses
-    energies = []
-    forceses = []
-    stresses = []
-
-    # Determine the chunk of atoms to process for each MPI process
-    chunk_size = len(images) // size
-    remainder = len(images) % size
-    start_idx = rank * chunk_size
-    end_idx = (rank + 1) * chunk_size + (remainder if rank == size - 1 else 0)
-    local_atoms = images[start_idx:end_idx]
-
-    # Perform local calculations
-    local_results = [_calc_efs(atoms) for atoms in local_atoms]
-
-    # Gather results from all processes
-    all_results = comm.gather(local_results, root=0)
-
-    # Process results on root process
-    if rank == 0:
-        for result_list in all_results:
-            for energy, forces, stress in result_list:
-                energies.append(energy)
-                forceses.append(forces)
-                stresses.append(stress)
-
-    # Broadcast the processed results to all processes
-    energies = comm.bcast(energies, root=0)
-    forceses = comm.bcast(forceses, root=0)
-    stresses = comm.bcast(stresses, root=0)
-
-    return np.array(energies), forceses, stresses
-
-
-def _calc_efs(atoms: Atoms) -> tuple:
-    # `atoms.calc.get_potential_energy()` triggers also `forces` and `stress`.
-    energy = atoms.get_potential_energy()
-    forces = atoms.calc.results["forces"].copy()
-    stress = (
-        atoms.get_stress(voigt=False)
-        if "stress" in atoms.calc.results
-        else np.zeros((3, 3))
-    )
-    return energy, forces, stress
-
-
 def _calc_errors_from_diff(diff: np.ndarray) -> dict[str, float]:
     if diff.size == 0:
         return {"N": diff.size, "MAX": np.nan, "ABS": np.nan, "RMS": np.nan}
@@ -86,13 +33,17 @@ class LossFunctionEnergy:
         self,
         images: list[Atoms],
         *,
+        mtp_data: MTPData,
         energy_per_atom: bool = False,
         energy_per_conf: bool = True,
+        comm: MPI.Comm = MPI.COMM_WORLD,
     ) -> None:
         """Initialize."""
         self.images = images
+        self.mtp_data = mtp_data
         self.energy_per_atom = energy_per_atom
         self.energy_per_conf = energy_per_conf
+        self.comm = comm
 
         numbers_of_atoms = np.fromiter(
             (len(atoms) for atoms in images),
@@ -103,44 +54,56 @@ class LossFunctionEnergy:
 
         self.configuration_weight = np.ones(len(self.images))
 
-    @property
-    def target(self) -> np.float64:
-        """Return target values."""
-        iterable = (atoms.calc.targets["energy"] for atoms in self.images)
-        energies = np.fromiter(iterable, dtype=float, count=len(self.images))
-        if self.energy_per_atom:
-            energies *= self.inverse_numbers_of_atoms
-        return energies
-
-    @property
-    def result(self) -> np.float64:
-        """Return result values."""
-        iterable = (atoms.calc.results["energy"] for atoms in self.images)
-        energies = np.fromiter(iterable, dtype=float, count=len(self.images))
-        if self.energy_per_atom:
-            energies *= self.inverse_numbers_of_atoms
-        return energies
-
     def calculate(self) -> np.float64:
-        """Calculate the contribution to the loss function."""
-        energy_ses = (self.result - self.target) ** 2
-        loss = self.configuration_weight @ energy_ses
-        return loss / len(self.images) if self.energy_per_conf else loss
+        """Calculate the contribution to the loss function.
+
+        Returns
+        -------
+        loss : float
+            Energy contribution to the loss function.
+
+        """
+        rank = self.comm.Get_rank()
+        size = self.comm.Get_size()
+        ncnf = len(self.images)
+        loss_cnf = 0.0
+        for i in range(rank, ncnf, size):
+            atoms = self.images[i]
+            target = atoms.calc.targets["energy"]
+            result = atoms.calc.results["energy"]
+            c = self.configuration_weight[i]
+            if self.energy_per_atom:
+                c *= self.inverse_numbers_of_atoms[i] ** 2
+            loss_cnf += c * (result - target) ** 2
+        loss_all = self.comm.allreduce(loss_cnf, op=MPI.SUM)
+        return loss_all / ncnf if self.energy_per_conf else loss_all
 
     def jac(self) -> npt.NDArray[np.float64]:
-        """Calculate the contribution to the loss function Jacobian."""
+        """Calculate the contribution to the loss function Jacobian.
 
-        def per_configuration(atoms: Atoms) -> np.float64:
-            return 2.0 * (
-                (atoms.calc.results["energy"] - atoms.calc.targets["energy"])
-                * atoms.calc.engine.jac_energy(atoms).parameters
-            )
+        Returns
+        -------
+        jac : npt.NDArray[np.float64]
+            Energy contribution to the loss function Jacobian.
 
-        jacs = np.array([per_configuration(atoms) for atoms in self.images])
-        if self.energy_per_atom:
-            jacs *= self.inverse_numbers_of_atoms[:, None] ** 2
-        jac = self.configuration_weight @ jacs
-        return jac / len(self.images) if self.energy_per_conf else jac
+        """
+        rank = self.comm.Get_rank()
+        size = self.comm.Get_size()
+        ncnf = len(self.images)
+        nprm = self.mtp_data.number_of_parameters_optimized
+        jac_cnf = np.zeros(nprm)
+        jac_all = np.zeros(nprm)
+        for i in range(rank, ncnf, size):
+            atoms = self.images[i]
+            target = atoms.calc.targets["energy"]
+            result = atoms.calc.results["energy"]
+            c = self.configuration_weight[i]
+            if self.energy_per_atom:
+                c *= self.inverse_numbers_of_atoms[i] ** 2
+            dedp = atoms.calc.engine.jac_energy(atoms).parameters
+            jac_cnf += c * 2.0 * (result - target) * dedp
+        self.comm.Allreduce(jac_cnf, jac_all, op=MPI.SUM)
+        return jac_all / ncnf if self.energy_per_conf else jac_all
 
 
 class LossFunctionForces:
@@ -157,13 +120,17 @@ class LossFunctionForces:
         self,
         images: list[Atoms],
         *,
+        mtp_data: MTPData,
         forces_per_atom: bool = False,
         forces_per_conf: bool = True,
+        comm: MPI.Comm = MPI.COMM_WORLD,
     ) -> None:
         """Initialize."""
         self.images = images
+        self.mtp_data = mtp_data
         self.forces_per_atom = forces_per_atom
         self.forces_per_conf = forces_per_conf
+        self.comm = comm
 
         numbers_of_atoms = np.fromiter(
             (len(atoms) for atoms in images),
@@ -180,34 +147,58 @@ class LossFunctionForces:
         self.configuration_weight = np.ones(len(self.images))
 
     def calculate(self) -> np.float64:
-        """Calculate the contribution to the loss function."""
-        images = self.images
-        key = "forces"
-        iterable = (
-            np.sum((images[i].calc.results[key] - images[i].calc.targets[key]) ** 2)
-            for i in self.idcs_frc
-        )
-        forces_ses = np.fromiter(iterable, dtype=float, count=self.idcs_frc.size)
-        if self.forces_per_atom:
-            forces_ses *= self.inverse_numbers_of_atoms[self.idcs_frc]
-        loss = self.configuration_weight[self.idcs_frc] @ forces_ses
-        return loss / len(self.images) if self.forces_per_conf else loss
+        """Calculate the contribution to the loss function.
+
+        Returns
+        -------
+        loss : float
+            Force contribution to the loss function.
+
+        """
+        rank = self.comm.Get_rank()
+        size = self.comm.Get_size()
+        ncnf = len(self.images)
+        loss_cnf = 0.0
+        for i in range(rank, ncnf, size):
+            if i not in self.idcs_frc:
+                continue
+            atoms = self.images[i]
+            target = atoms.calc.targets["forces"]
+            result = atoms.calc.results["forces"]
+            c = self.configuration_weight[i]
+            if self.forces_per_atom:
+                c *= self.inverse_numbers_of_atoms[i]
+            loss_cnf += c * np.sum((result - target) ** 2)
+        loss_all = self.comm.allreduce(loss_cnf, op=MPI.SUM)
+        return loss_all / ncnf if self.forces_per_conf else loss_all
 
     def jac(self) -> npt.NDArray[np.float64]:
-        """Calculate the contribution to the loss function Jacobian."""
+        """Calculate the contribution to the loss function Jacobian.
 
-        def per_configuration(atoms: Atoms) -> np.float64:
-            return 2.0 * np.sum(
-                (atoms.calc.results["forces"] - atoms.calc.targets["forces"])
-                * atoms.calc.engine.jac_forces(atoms).parameters,
-                axis=(-2, -1),
-            )
+        Returns
+        -------
+        jac : npt.NDArray[np.float64]
+            Force contribution to the loss function Jacobian.
 
-        jacs = np.array([per_configuration(self.images[i]) for i in self.idcs_frc])
-        if self.forces_per_atom:
-            jacs *= self.inverse_numbers_of_atoms[self.idcs_frc, None]
-        jac = self.configuration_weight[self.idcs_frc] @ jacs
-        return jac / len(self.images) if self.forces_per_conf else jac
+        """
+        rank = self.comm.Get_rank()
+        size = self.comm.Get_size()
+        ncnf = len(self.images)
+        jac_cnf = np.zeros(self.mtp_data.number_of_parameters_optimized)
+        jac_all = np.zeros(self.mtp_data.number_of_parameters_optimized)
+        for i in range(rank, ncnf, size):
+            if i not in self.idcs_frc:
+                continue
+            atoms = self.images[i]
+            target = atoms.calc.targets["forces"]
+            result = atoms.calc.results["forces"]
+            c = self.configuration_weight[i]
+            if self.forces_per_atom:
+                c *= self.inverse_numbers_of_atoms[i]
+            dfdp = atoms.calc.engine.jac_forces(atoms).parameters
+            jac_cnf += c * 2.0 * np.sum((result - target) * dfdp, axis=(-2, -1))
+        self.comm.Allreduce(jac_cnf, jac_all, op=MPI.SUM)
+        return jac_all / ncnf if self.forces_per_conf else jac_all
 
 
 class LossFunctionStress:
@@ -223,14 +214,18 @@ class LossFunctionStress:
     def __init__(
         self,
         images: list[Atoms],
+        mtp_data: MTPData,
         *,
         stress_times_volume: bool = False,
         stress_per_conf: bool = True,
+        comm: MPI.Comm = MPI.COMM_WORLD,
     ) -> None:
         """Initialize."""
         self.images = images
+        self.mtp_data = mtp_data
         self.stress_times_volume = stress_times_volume
         self.stress_per_conf = stress_per_conf
+        self.comm = comm
 
         self.idcs_str = np.fromiter(
             (i for i, atoms in enumerate(images) if "stress" in atoms.calc.results),
@@ -246,36 +241,60 @@ class LossFunctionStress:
         self.configuration_weight = np.ones(len(self.images))
 
     def calculate(self) -> np.float64:
-        """Calculate the contribution to the loss function."""
-        images = self.images
-        key = "stress"
+        """Calculate the contribution to the loss function.
+
+        Returns
+        -------
+        loss : float
+            Stress contribution to the loss function.
+
+        """
+        rank = self.comm.Get_rank()
+        size = self.comm.Get_size()
+        ncnf = len(self.images)
         f = voigt_6_to_full_3x3_stress
-        iterable = (
-            np.sum((f(images[i].calc.results[key] - images[i].calc.targets[key])) ** 2)
-            for i in self.idcs_str
-        )
-        stress_ses = np.fromiter(iterable, dtype=float, count=self.idcs_str.size)
-        if self.stress_times_volume:
-            stress_ses *= self.volumes**2
-        loss = self.configuration_weight[self.idcs_str] @ stress_ses
-        return loss / len(images) if self.stress_per_conf else loss
+        loss_cnf = 0.0
+        for i in range(rank, ncnf, size):
+            if i not in self.idcs_str:
+                continue
+            atoms = self.images[i]
+            target = atoms.calc.targets["stress"]
+            result = atoms.calc.results["stress"]
+            c = self.configuration_weight[i]
+            if self.stress_times_volume:
+                c *= self.volumes[i] ** 2
+            loss_cnf += c * np.sum((f(target - result)) ** 2)
+        loss_all = self.comm.allreduce(loss_cnf, op=MPI.SUM)
+        return loss_all / ncnf if self.stress_per_conf else loss_all
 
     def jac(self) -> npt.NDArray[np.float64]:
-        """Calculate the contribution to the loss function Jacobian."""
+        """Calculate the contribution to the loss function Jacobian.
+
+        Returns
+        -------
+        jac : npt.NDArray[np.float64]
+            Stress contribution to the loss function Jacobian.
+
+        """
+        rank = self.comm.Get_rank()
+        size = self.comm.Get_size()
+        ncnf = len(self.images)
         f = voigt_6_to_full_3x3_stress
-
-        def per_configuration(atoms: Atoms) -> np.float64:
-            return 2.0 * np.sum(
-                f(atoms.calc.results["stress"] - atoms.calc.targets["stress"])
-                * atoms.calc.engine.jac_stress(atoms).parameters,
-                axis=(-2, -1),
-            )
-
-        jacs = np.array([per_configuration(self.images[i]) for i in self.idcs_str])
-        if self.stress_times_volume:
-            jacs *= self.volumes[self.idcs_str, None] ** 2
-        jac = self.configuration_weight[self.idcs_str] @ jacs
-        return jac / len(self.images) if self.stress_per_conf else jac
+        jac_cnf = np.zeros(self.mtp_data.number_of_parameters_optimized)
+        jac_all = np.zeros(self.mtp_data.number_of_parameters_optimized)
+        for i in range(rank, ncnf, size):
+            if i not in self.idcs_str:
+                continue
+            atoms = self.images[i]
+            target = atoms.calc.targets["stress"]
+            result = atoms.calc.results["stress"]
+            c = self.configuration_weight[i]
+            if self.stress_times_volume:
+                c *= self.volumes[i] ** 2
+            dsdp = atoms.calc.engine.jac_stress(atoms).parameters
+            jac_cnf += c * 2.0 * np.sum(f(result - target) * dsdp, axis=(-2, -1))
+        self.comm.Allreduce(jac_cnf, jac_all, op=MPI.SUM)
+        return jac_all / len(self.images) if self.stress_per_conf else jac_all
 
 
 class LossFunctionBase(ABC):
@@ -310,18 +329,24 @@ class LossFunctionBase(ABC):
 
         self.loss_energy = LossFunctionEnergy(
             self.images,
+            mtp_data=self.mtp_data,
             energy_per_atom=self.setting.energy_per_atom,
             energy_per_conf=self.setting.energy_per_conf,
+            comm=self.comm,
         )
         self.loss_forces = LossFunctionForces(
             self.images,
+            mtp_data=self.mtp_data,
             forces_per_atom=self.setting.forces_per_atom,
             forces_per_conf=self.setting.forces_per_conf,
+            comm=self.comm,
         )
         self.loss_stress = LossFunctionStress(
             self.images,
+            mtp_data=self.mtp_data,
             stress_times_volume=self.setting.stress_times_volume,
             stress_per_conf=self.setting.stress_per_conf,
+            comm=self.comm,
         )
 
     @abstractmethod
@@ -335,6 +360,11 @@ class LossFunctionBase(ABC):
         ncnf = len(self.images)
         for i in range(rank, ncnf, size):
             self.images[i].get_potential_energy()
+
+    def broadcast(self) -> None:
+        """Broadcast data."""
+        size = self.comm.Get_size()
+        ncnf = len(self.images)
         for i in range(ncnf):
             results = self.images[i].calc.results
             results.update(self.comm.bcast(results, root=i % size))
@@ -432,7 +462,14 @@ class ErrorPrinter:
 
         `**kwargs` are used to, e.g., give `flush=True` for `print` at the end
         of each block.
+
+        Returns
+        -------
+        errors : dict[str, float]
+            Errors.
+
         """
+        self.loss.broadcast()  # be sure that all processes has the same data
         errors = self.calculate()
 
         key0 = "energy"

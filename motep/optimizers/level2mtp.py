@@ -34,6 +34,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
 
         # Calculate basis functions of `loss.images`
         self.loss(parameters)
+        self.loss.broadcast()
 
         callback = Callback(self.loss)
 
