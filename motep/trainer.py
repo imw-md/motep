@@ -74,6 +74,7 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
             # Instantiate an `Optimizer` class
             optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
             optimizer.optimize(**step.get("kwargs", {}))
+            loss.broadcast()  # be sure that all processes have the same data
             if rank == 0:
                 print(flush=True)
 
