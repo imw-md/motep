@@ -469,7 +469,6 @@ class ErrorPrinter:
             Errors.
 
         """
-        self.loss.broadcast()  # be sure that all processes has the same data
         errors = self.calculate()
 
         key0 = "energy"
