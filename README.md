@@ -92,6 +92,8 @@ engine = 'numba'
 algorithm = 'maxvol'  # {'maxvol', 'exaustive'}
 ```
 
+### [`motep apply`](docs/apply.md)
+
 ## Big Question ?
 What This code do
 

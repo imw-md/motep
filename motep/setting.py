@@ -5,7 +5,6 @@ from __future__ import annotations
 import pathlib
 import tomllib
 from dataclasses import dataclass, field
-from inspect import signature
 from typing import Any
 
 scipy_minimize_methods = {
@@ -73,6 +72,11 @@ class TrainSetting(Setting):
 
 
 @dataclass
+class ApplySetting(Setting):
+    """Setting for the application of the potential."""
+
+
+@dataclass
 class GradeSetting(Setting):
     """Setting for the extrapolation-grade calculations."""
 
@@ -92,10 +96,17 @@ def _parse_steps(setting_overwritten: dict) -> dict:
 
 
 def parse_setting(filename: str) -> Setting:
-    """Parse setting file."""
+    """Parse setting file.
+
+    Returns
+    -------
+    Setting
+
+    """
     with pathlib.Path(filename).open("rb") as f:
         setting_overwritten = tomllib.load(f)
 
+    # convert the data files to lists
     keys = ["data_training", "data_in", "data_out"]
     for key in keys:
         if key in setting_overwritten and isinstance(setting_overwritten[key], str):
@@ -110,10 +121,33 @@ def parse_setting(filename: str) -> Setting:
 
 
 def load_setting_train(filename: str) -> TrainSetting:
-    """Load setting for `train`."""
+    """Load setting for `train`.
+
+    Returns
+    -------
+    TrainSetting
+
+    """
     return TrainSetting(**parse_setting(filename))
 
 
+def load_setting_apply(filename: str) -> ApplySetting:
+    """Load setting for `grade`.
+
+    Returns
+    -------
+    GradeSetting
+
+    """
+    return ApplySetting(**parse_setting(filename))
+
+
 def load_setting_grade(filename: str) -> GradeSetting:
-    """Load setting for `grade`."""
+    """Load setting for `grade`.
+
+    Returns
+    -------
+    GradeSetting
+
+    """
     return GradeSetting(**parse_setting(filename))

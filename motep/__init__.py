@@ -3,12 +3,13 @@
 import argparse
 
 from motep import (
+    applier,
     grader,
     trainer,
 )
 
 
-def main():
+def main() -> None:
     """Command."""
     formatter_class = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(formatter_class=formatter_class)
@@ -16,6 +17,7 @@ def main():
 
     commands = {
         "train": trainer,
+        "apply": applier,
         "grade": grader,
     }
     for key, value in commands.items():
