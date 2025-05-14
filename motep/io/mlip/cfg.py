@@ -1,7 +1,7 @@
 """Module for MTP formats."""
 
 import pathlib
-from typing import Any, TextIO
+from typing import TextIO
 
 import numpy as np
 from ase import Atoms
@@ -25,6 +25,10 @@ def read_cfg(
         List defining types of chemical symbols. For example,
         [46, 1] and ['Pd', 'H'] assign Pd for type 0 and H for type 1. If None,
         dummy symbols 'X', 'H', 'He', etc. are assigned for types 0, 1, 2, etc.
+
+    Returns
+    -------
+    Atoms | list[Atoms]
 
     """
     species = _convert_species(species)
@@ -63,10 +67,8 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
         elif line.split()[0] in {"AtomData:", "Atomic_data:"}:
             atomdata = {_: [] for _ in line.split()[1:]}
             for _ in range(size):
-                line = next(file)
-                for key, value in zip(atomdata, line.split(), strict=True):
-                    value = _parse_value(value)
-                    atomdata[key].append(value)
+                for key, value in zip(atomdata, next(file).split(), strict=True):
+                    atomdata[key].append(_parse_value(value))
         elif line.split()[0] == "Energy":
             energy = float(next(file).split()[0])
             for k in ["energy", "free_energy"]:
@@ -86,7 +88,7 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
     else:
         numbers = [species[_] for _ in atomdata["type"]]
 
-    pbc = False if cell is None else True
+    pbc = cell is not None
 
     if all((_ in atomdata) for _ in keys_c):
         positions = list(zip(*[atomdata[_] for _ in keys_c], strict=True))
@@ -110,7 +112,7 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
     for key, value in atomdata.items():
         if key in {"id", "type"} or key in keys_c or key in keys_d:
             continue
-        results[key] = np.array(atomdata[key])
+        results[key] = np.array(value)
 
     atoms.calc = SinglePointCalculator(atoms)
     atoms.calc.results.update(results)
@@ -122,19 +124,19 @@ def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
     return atoms
 
 
-def _set_forces(atoms: Atoms, atomdata: dict):
+def _set_forces(atoms: Atoms, atomdata: dict) -> None:
     keys_forces = ["fx", "fy", "fz"]
     forces = list(zip(*[atomdata[_] for _ in keys_forces], strict=True))
     atoms.calc.results["forces"] = np.array(forces)
 
 
-def _set_stress(atoms: Atoms, stress):
+def _set_stress(atoms: Atoms, stress: dict[float]) -> None:
     voigt_order = ["xx", "yy", "zz", "yz", "xz", "xy"]
     stress = np.array([stress[_] for _ in voigt_order])
     atoms.calc.results["stress"] = -stress / atoms.get_volume()
 
 
-def _parse_value(value: str) -> Any:
+def _parse_value(value: str) -> int | float | bool:
     if value.isdigit():
         return int(value)
     if value.replace(".", "").replace("-", "").isdigit():
@@ -151,8 +153,8 @@ def write_cfg(
     fd: pathlib.Path,
     images: Atoms | list[Atoms],
     species: list[int] | list[str] | None = None,
-    key_energy: str = "free_energy",
-):
+    key_energy: str | None = None,
+) -> None:
     """Write images into the MTP .cfg format.
 
     Parameters
@@ -166,8 +168,9 @@ def write_cfg(
         is type 0 and H type 1), by default None. If None, this list is built
         by assigning each distinct species to an integer in the order of
         appearance in `images`.
-    key_energy : str, default="free_energy"
+    key_energy : str | None, default: None
         Key for the energy (either "free_energy" or "energy") to be printed.
+        If :py:obj:`None`, "free_energy" is first considered, followed by "energy".
 
     """
     if isinstance(images, Atoms):
@@ -177,11 +180,10 @@ def write_cfg(
     if species is None:
         species = _get_species(images)
 
-    if isinstance(images, Atoms):
-        images = [images]
+    keys_energy = ["free_energy", "energy"] if key_energy is None else [key_energy]
 
     for atoms in images:
-        _write_image(fd, atoms, species, key_energy)
+        _write_image(fd, atoms, species, keys_energy)
 
 
 def _get_species(images: list[Atoms]) -> list[int]:
@@ -195,8 +197,8 @@ def _write_image(
     file: TextIO,
     atoms: Atoms,
     species: list[int],
-    key_energy: str,
-):
+    keys_energy: list[str],
+) -> None:
     if not hasattr(atoms, "calc") or atoms.calc is None:
         atoms.calc = SinglePointCalculator(atoms)  # dummy calculator
 
@@ -209,10 +211,12 @@ def _write_image(
 
     _write_atom_data(file, atoms, species)
 
-    if key_energy in atoms.calc.results:
-        energy = atoms.calc.get_property(key_energy)
-        file.write(" Energy\n")
-        file.write(f"{energy:24.12f}\n")
+    for key_energy in keys_energy:
+        if key_energy in atoms.calc.results:
+            energy = atoms.calc.get_property(key_energy)
+            file.write(" Energy\n")
+            file.write(f"{energy:24.12f}\n")
+            break
 
     if "stress" in atoms.calc.results:
         _write_stress(file, atoms)
@@ -222,7 +226,7 @@ def _write_image(
     file.write("\n")
 
 
-def _write_supercell(file: TextIO, atoms: Atoms):
+def _write_supercell(file: TextIO, atoms: Atoms) -> None:
     file.write(" Supercell\n")
     for vector in atoms.cell:
         file.write("   ")
@@ -234,11 +238,11 @@ def _write_supercell(file: TextIO, atoms: Atoms):
 def _write_atom_data(file: TextIO, atoms: Atoms, species: list[int]) -> None:
     line = " AtomData:  id type "
     file.write(line)
-    for _ in "cartes_x cartes_y cartes_z".split():
+    for _ in ["cartes_x", "cartes_y", "cartes_z"]:
         file.write(f"{_:>14s}")
     if "forces" in atoms.calc.results:
         file.write(" ")
-        for _ in "fx fy fz".split():
+        for _ in ["fx", "fy", "fz"]:
             file.write(f"{_:>12s}")
     file.write("\n")
     numbers = atoms.get_atomic_numbers()
@@ -258,10 +262,8 @@ def _write_atom_data(file: TextIO, atoms: Atoms, species: list[int]) -> None:
         file.write("\n")
 
 
-def _write_stress(file: TextIO, atoms: Atoms):
-    line = ""
-    for _ in ["xx", "yy", "zz", "yz", "xz", "xy"]:
-        line += f"{_:>12s}"
+def _write_stress(file: TextIO, atoms: Atoms) -> None:
+    line = "".join([f"{_:>12s}" for _ in ["xx", "yy", "zz", "yz", "xz", "xy"]])
     line = f" PlusStress:{line[8:]}\n"
     file.write(line)
     file.write("    ")
@@ -271,7 +273,7 @@ def _write_stress(file: TextIO, atoms: Atoms):
     file.write("\n")
 
 
-def _write_parameters(file: TextIO, species: dict[str, int]):
+def _write_parameters(file: TextIO, species: dict[str, int]) -> None:
     file.write("# Masses\n\n")
     units = "metal"  # g/mol
     for s, i in species.items():
