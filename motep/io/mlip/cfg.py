@@ -153,7 +153,7 @@ def write_cfg(
     fd: pathlib.Path,
     images: Atoms | list[Atoms],
     species: list[int] | list[str] | None = None,
-    key_energy: str = "free_energy",
+    key_energy: str | None = None,
 ) -> None:
     """Write images into the MTP .cfg format.
 
@@ -168,8 +168,9 @@ def write_cfg(
         is type 0 and H type 1), by default None. If None, this list is built
         by assigning each distinct species to an integer in the order of
         appearance in `images`.
-    key_energy : str, default="free_energy"
+    key_energy : str | None, default: None
         Key for the energy (either "free_energy" or "energy") to be printed.
+        If :py:obj:`None`, "free_energy" is first considered, followed by "energy".
 
     """
     if isinstance(images, Atoms):
@@ -179,11 +180,10 @@ def write_cfg(
     if species is None:
         species = _get_species(images)
 
-    if isinstance(images, Atoms):
-        images = [images]
+    keys_energy = ["free_energy", "energy"] if key_energy is None else [key_energy]
 
     for atoms in images:
-        _write_image(fd, atoms, species, key_energy)
+        _write_image(fd, atoms, species, keys_energy)
 
 
 def _get_species(images: list[Atoms]) -> list[int]:
@@ -197,7 +197,7 @@ def _write_image(
     file: TextIO,
     atoms: Atoms,
     species: list[int],
-    key_energy: str,
+    keys_energy: list[str],
 ) -> None:
     if not hasattr(atoms, "calc") or atoms.calc is None:
         atoms.calc = SinglePointCalculator(atoms)  # dummy calculator
@@ -211,10 +211,12 @@ def _write_image(
 
     _write_atom_data(file, atoms, species)
 
-    if key_energy in atoms.calc.results:
-        energy = atoms.calc.get_property(key_energy)
-        file.write(" Energy\n")
-        file.write(f"{energy:24.12f}\n")
+    for key_energy in keys_energy:
+        if key_energy in atoms.calc.results:
+            energy = atoms.calc.get_property(key_energy)
+            file.write(" Energy\n")
+            file.write(f"{energy:24.12f}\n")
+            break
 
     if "stress" in atoms.calc.results:
         _write_stress(file, atoms)
