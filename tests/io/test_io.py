@@ -2,8 +2,10 @@
 
 import pathlib
 
+import numpy as np
+
 import motep.io
-from motep.io.mlip.cfg import read_cfg
+from motep.io.mlip.cfg import read_cfg, write_cfg
 from motep.trainer import read_images
 
 
@@ -50,3 +52,17 @@ def test_read_ase_file(data_path: pathlib.Path, tmp_path: pathlib.Path) -> None:
     fd = tmp_path / "test.xyz"
     atoms.write(fd)
     assert motep.io.read(fd)
+
+
+def test_roundtrip(data_path: pathlib.Path, tmp_path: pathlib.Path) -> None:
+    """Test if `write_cfg` works as expected."""
+    molecule = 762
+    path = data_path / f"original/molecules/{molecule}/training.cfg"
+    atoms_ref = read_cfg(path)
+    atoms_ref.calc.results.pop("free_energy")
+    fd = tmp_path / "test.cfg"
+    write_cfg(fd, atoms_ref)
+    atoms = read_cfg(fd)
+    assert atoms == atoms_ref
+    for k, v in atoms_ref.calc.results.items():
+        assert np.all(atoms.calc.results[k] == v)
