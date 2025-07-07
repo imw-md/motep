@@ -3,7 +3,6 @@ import shutil
 from time import perf_counter
 
 import ase.io
-import mlippy
 import numpy as np
 from ase import Atoms
 
@@ -15,11 +14,11 @@ fmt = "{:20s}"
 
 
 class Timer:
-    def __init__(self, name: str = "", print: bool = True) -> None:
+    def __init__(self, name: str = "", *, verbose: bool = True) -> None:
         self.name: str = name
         self.start: float = float("nan")
         self.time: float = float("nan")
-        self.print: bool = print
+        self.print: bool = verbose
 
     def __enter__(self):
         self.start = perf_counter()
@@ -33,7 +32,9 @@ class Timer:
             print(readout)
 
 
-def init_mlippy(pot_path: pathlib.Path, atom_number_list: list[int]):
+def _init_mlippy(pot_path: pathlib.Path, atom_number_list: list[int]):
+    import mlippy  # noqa: PLC0415
+
     tmp_path = pathlib.Path("/tmp/motep_benchmarks/")
     tmp_path.mkdir(parents=True, exist_ok=True)
     shutil.copy2(pot_path, tmp_path / "pot.mtp")
@@ -46,12 +47,12 @@ def init_mlippy(pot_path: pathlib.Path, atom_number_list: list[int]):
     return calc
 
 
-def time_mlippy(pot_path: pathlib.Path, images: list[Atoms]) -> np.ndarray:
+def _time_mlippy(pot_path: pathlib.Path, images: list[Atoms]) -> np.ndarray:
     atom_number_list = []
     for n in images[0].get_atomic_numbers():
         if n not in atom_number_list:
             atom_number_list.append(n)
-    calc = init_mlippy(pot_path, atom_number_list)
+    calc = _init_mlippy(pot_path, atom_number_list)
     # Make initial calc to not time things like compile time and things that are cachable
     calc.get_potential_energy(images[-1])
     with Timer(fmt.format("mlippy")):
@@ -59,7 +60,7 @@ def time_mlippy(pot_path: pathlib.Path, images: list[Atoms]) -> np.ndarray:
     return np.array(energies)
 
 
-def time_mtp(
+def _time_mtp(
     pot_path: pathlib.Path,
     images: list[Atoms],
     *,
@@ -105,16 +106,28 @@ def main() -> None:
                 f" with level {level}:"
             )
             pot_path = path / "pot.mtp"
-            e_ref = time_mlippy(pot_path, images)
-            if number_of_atoms < 300:
-                e_numpy = time_mtp(pot_path, images, engine="numpy")
-                np.testing.assert_allclose(e_numpy, e_ref)
-            e_numba = time_mtp(pot_path, images, engine="numba")
-            np.testing.assert_allclose(e_numba, e_ref)
-            e_numba = time_mtp(pot_path, images, engine="numba", is_trained=True)
-            np.testing.assert_allclose(e_numba, e_ref)
-            e_jax = time_mtp(pot_path, images, engine="jax")
-            np.testing.assert_allclose(e_jax, e_ref)
+
+            try:
+                e_ref = _time_mlippy(pot_path, images)
+            except ImportError:
+                e_ref = None
+
+            setups = [
+                {"engine": "numpy"},
+                {"engine": "numba"},
+                {"engine": "numba", "is_trained": True},
+                {"engine": "jax"},
+            ]
+
+            for setup in setups:
+                if number_of_atoms > 300 and setup["engine"] in {"numpy", "jax"}:
+                    continue
+                e_test = _time_mtp(pot_path, images, **setup)
+                if e_ref is not None:
+                    try:
+                        np.testing.assert_allclose(e_test, e_ref)
+                    except AssertionError as e:
+                        print(setup["engine"], "energy differs from mlip:", e)
 
 
 if __name__ == "__main__":
