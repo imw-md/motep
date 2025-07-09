@@ -33,55 +33,32 @@ class NumbaMTPEngine(EngineBase):
 
         all_js, all_r_ijs = self._get_all_distances(atoms)
         itypes = get_types(atoms, self.mtp_data.species)
-        energies = self.mtp_data.species_coeffs[itypes]
-
-        stress = np.zeros((3, 3))
-        gradient = np.zeros((itypes.size, all_js.shape[1], 3))
-        for i, itype in enumerate(itypes):
-            js = all_js[i, :]
-            r_ijs = all_r_ijs[i, js >= 0, :]
-            (number_of_js, _) = r_ijs.shape
-            jtypes = itypes[js]
-            r_abs = _nb_linalg_norm(r_ijs)
-            r_ijs_unit = _calc_r_unit(r_ijs, r_abs)
-            rb_values, rb_derivs = _nb_calc_radial_funcs(
-                r_abs,
-                itype,
-                jtypes,
-                mtp_data.radial_coeffs,
-                mtp_data.scaling,
-                mtp_data.min_dist,
-                mtp_data.max_dist,
-            )
-            local_energy, local_gradient = _nb_calc_local_energy_and_gradient(
-                r_ijs_unit,
-                r_abs,
-                rb_values,
-                rb_derivs,
-                mtp_data.alpha_moments_count,
-                mtp_data.alpha_moment_mapping,
-                mtp_data.alpha_index_basic,
-                mtp_data.alpha_index_times,
-                mtp_data.moment_coeffs,
-            )
-            energies[i] += local_energy
-            stress += r_ijs.T @ local_gradient
-            gradient[i, :number_of_js, :] = local_gradient
+        all_jtypes = itypes[all_js]
+        energies, gradient = _nb_calc_energy_and_gradient(
+            all_r_ijs,
+            itypes,
+            all_jtypes,
+            mtp_data.alpha_moments_count,
+            mtp_data.alpha_moment_mapping,
+            mtp_data.alpha_index_basic,
+            mtp_data.alpha_index_times,
+            mtp_data.scaling,
+            mtp_data.min_dist,
+            mtp_data.max_dist,
+            mtp_data.radial_coeffs,
+            mtp_data.species_coeffs,
+            mtp_data.moment_coeffs,
+        )
 
         forces = _nb_forces_from_gradient(gradient, all_js, all_js.shape[1])
+        stress = np.einsum("ijk, ijl -> lk", all_r_ijs, gradient)
 
-        if atoms.cell.rank == 3:
-            stress += stress.T  # symmetrize
-            stress *= 0.5 / atoms.get_volume()
-        else:
-            stress[:, :] = np.nan
-
-        stress = stress.flat[[0, 4, 8, 5, 2, 1]]
+        self._symmetrize_stress(atoms, stress)
 
         self.results["energies"] = energies
         self.results["energy"] = self.results["energies"].sum()
         self.results["forces"] = forces
-        self.results["stress"] = stress
+        self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
 
         return self.results
 
@@ -163,14 +140,23 @@ class NumbaMTPEngine(EngineBase):
         return self.results
 
 
-@nb.njit(nb.float64[:, :](nb.float64[:, :], nb.float64[:]))
-def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
-    return r_ijs[:, :] / r_abs[:, None]
-
-
 @nb.njit(nb.float64[:](nb.float64[:, :]))
 def _nb_linalg_norm(r_ijs: np.ndarray) -> np.ndarray:
-    return np.sqrt((r_ijs**2).sum(axis=1))
+    r_abs = np.zeros((r_ijs.shape[0],))
+    for j in range(r_ijs.shape[0]):
+        for k in range(3):
+            r_abs[j] += r_ijs[j, k] ** 2
+        r_abs[j] **= 0.5
+    return r_abs
+
+
+@nb.njit(nb.float64[:, :](nb.float64[:, :], nb.float64[:]))
+def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
+    r_ijs_unit = np.zeros((r_ijs.shape[0], 3))
+    for j in range(r_ijs.shape[0]):
+        for k in range(3):
+            r_ijs_unit[j, k] = r_ijs[j, k] / r_abs[j]
+    return r_ijs_unit
 
 
 @nb.njit((nb.float64[:], nb.float64[:]))
@@ -277,3 +263,68 @@ def _update_mbd_dsdcs(
                         for ixyz1 in range(3):
                             v = r_ijs[k, ixyz0] * tmp_dgdcs[i1, i2, i3, k, ixyz1]
                             mbd_dsdcs[itype, i1, i2, i3, ixyz0, ixyz1] += v
+
+
+@nb.njit(
+    nb.types.Tuple((nb.float64[:], nb.float64[:, :, :]))(
+        nb.float64[:, :, :],
+        nb.int64[:],
+        nb.int64[:, :],
+        nb.int64,
+        nb.int64[:],
+        nb.int64[:, :],
+        nb.int64[:, :],
+        nb.float64,
+        nb.float64,
+        nb.float64,
+        nb.float64[:, :, :, :],
+        nb.float64[:],
+        nb.float64[:],
+    ),
+    # parallel=True,
+)
+def _nb_calc_energy_and_gradient(
+    all_r_ijs: npt.NDArray[np.float64],
+    itypes: npt.NDArray[np.int64],
+    all_jtypes: npt.NDArray[np.int64],
+    alpha_moments_count: np.int64,
+    alpha_moment_mapping: npt.NDArray[np.int64],
+    alpha_index_basic: npt.NDArray[np.int64],
+    alpha_index_times: npt.NDArray[np.int64],
+    scaling: np.float64,
+    min_dist: np.float64,
+    max_dist: np.float64,
+    radial_coeffs: npt.NDArray[np.float64],
+    species_coeffs: npt.NDArray[np.float64],
+    moment_coeffs: npt.NDArray[np.float64],
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    energies = species_coeffs[itypes]
+    gradient = np.zeros((itypes.size, all_jtypes.shape[1], 3))
+    for i in nb.prange(itypes.size):
+        r_abs = _nb_linalg_norm(all_r_ijs[i, :, :])
+        r_ijs_unit = _calc_r_unit(all_r_ijs[i, :, :], r_abs)
+        rb_values, rb_derivs = _nb_calc_radial_funcs(
+            r_abs,
+            itypes[i],
+            all_jtypes[i, :],
+            radial_coeffs,
+            scaling,
+            min_dist,
+            max_dist,
+        )
+        local_energy, local_gradient = _nb_calc_local_energy_and_gradient(
+            r_ijs_unit,
+            r_abs,
+            rb_values,
+            rb_derivs,
+            alpha_moments_count,
+            alpha_moment_mapping,
+            alpha_index_basic,
+            alpha_index_times,
+            moment_coeffs,
+        )
+        energies[i] += local_energy
+        for j in range(all_jtypes.shape[1]):
+            for k in range(3):
+                gradient[i, j, k] = local_gradient[j, k]
+    return energies, gradient
