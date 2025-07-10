@@ -10,10 +10,15 @@ from motep.potentials.mtp.base import EngineBase
 
 from .chebyshev import nb_calc_radial_basis, nb_calc_radial_funcs
 from .moment import (
-    _nb_calc_local_energy_and_gradient,
-    _nb_calc_moment,
-    _nb_forces_from_gradient,
-    _store_radial_basis_values,
+    nb_calc_local_energy_and_gradient,
+    nb_calc_moment,
+    store_radial_basis_values,
+    update_mbd_dbdeps,
+    update_mbd_dbdris,
+    update_mbd_dedcs,
+    update_mbd_dgdcs,
+    update_mbd_dsdcs,
+    update_mbd_values,
 )
 
 
