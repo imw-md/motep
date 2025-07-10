@@ -8,7 +8,7 @@ from ase import Atoms
 from motep.potentials.mtp import get_types
 from motep.potentials.mtp.base import EngineBase
 
-from .chebyshev import _nb_calc_radial_basis, _nb_calc_radial_funcs
+from .chebyshev import nb_calc_radial_basis, nb_calc_radial_funcs
 from .moment import (
     _nb_calc_local_energy_and_gradient,
     _nb_calc_moment,
@@ -81,7 +81,7 @@ class NumbaMTPEngine(EngineBase):
             jtypes = itypes[js]
             r_abs = _nb_linalg_norm(r_ijs)
             r_ijs_unit = _calc_r_unit(r_ijs, r_abs)
-            rb_values, rb_derivs = _nb_calc_radial_basis(
+            rb_values, rb_derivs = nb_calc_radial_basis(
                 r_abs,
                 mtp_data.radial_basis_size,
                 mtp_data.scaling,
@@ -303,7 +303,7 @@ def _nb_calc_energy_and_gradient(
     for i in nb.prange(itypes.size):
         r_abs = _nb_linalg_norm(all_r_ijs[i, :, :])
         r_ijs_unit = _calc_r_unit(all_r_ijs[i, :, :], r_abs)
-        rb_values, rb_derivs = _nb_calc_radial_funcs(
+        rb_values, rb_derivs = nb_calc_radial_funcs(
             r_abs,
             itypes[i],
             all_jtypes[i, :],
