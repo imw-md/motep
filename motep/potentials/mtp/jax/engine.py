@@ -20,14 +20,20 @@ jax.config.update("jax_enable_x64", True)  # noqa: FBT003
 class JaxMTPEngine(EngineBase):
     """MTP Engine in 'full tensor' version based on jax."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         """Intialize the engine."""
         self.moment_basis = None
         self.basis_converter = None
         super().__init__(*args, **kwargs)
 
     def update(self, mtp_data: MTPData) -> None:
-        """Update MTP parameters."""
+        """Update MTP parameters.
+
+        Raises
+        ------
+        ValueError: If `level` is updated after initialization.
+
+        """
         super().update(mtp_data)
         if self.mtp_data.alpha_moments_count is not None:
             level = moments_count_to_level_map[mtp_data.alpha_moments_count]
@@ -36,10 +42,8 @@ class JaxMTPEngine(EngineBase):
                 self.moment_basis.init_moment_mappings()
                 self.basis_converter = BasisConverter(self.moment_basis)
             elif self.moment_basis.max_level != level:
-                raise RuntimeError(
-                    "Changing moments/level is not allowed. "
-                    "Use a new instance instead."
-                )
+                msg = "Changing level is not allowed, use a new instance instead."
+                raise ValueError(msg)
             self.basis_converter.remap_mlip_moment_coeffs(self.mtp_data)
 
     def _calculate(self, atoms: Atoms) -> tuple:
