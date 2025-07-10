@@ -3,27 +3,110 @@ import numpy as np
 import numpy.typing as npt
 
 
+@nb.njit((nb.float64[:], nb.float64[:]))
+def update_mbd_values(
+    mbd_values: npt.NDArray[np.float64],
+    basis_values: npt.NDArray[np.float64],
+) -> None:
+    for iamc in range(mbd_values.size):
+        mbd_values[iamc] += basis_values[iamc]
+
+
+@nb.njit((nb.int64, nb.int64[:], nb.float64[:, :, :], nb.float64[:, :, :]))
+def update_mbd_dbdris(
+    i: np.int64,
+    js: npt.NDArray[np.int64],
+    mbd_dbdris: npt.NDArray[np.float64],
+    basis_jac_rs: npt.NDArray[np.float64],
+) -> None:
+    for iamc in range(mbd_dbdris.shape[0]):
+        for k, j in enumerate(js):
+            for ixyz0 in range(3):
+                mbd_dbdris[iamc, i, ixyz0] -= basis_jac_rs[iamc, k, ixyz0]
+                mbd_dbdris[iamc, j, ixyz0] += basis_jac_rs[iamc, k, ixyz0]
+
+
+@nb.njit((nb.int64[:], nb.float64[:, :], nb.float64[:, :, :], nb.float64[:, :, :]))
+def update_mbd_dbdeps(
+    js: npt.NDArray[np.int64],
+    r_ijs: npt.NDArray[np.float64],
+    mbd_dbdeps: npt.NDArray[np.float64],
+    basis_jac_rs: npt.NDArray[np.float64],
+) -> None:
+    for iamc in range(mbd_dbdeps.shape[0]):
+        for k in range(js.size):
+            for ixyz0 in range(3):
+                for ixyz1 in range(3):
+                    mbd_dbdeps[iamc, ixyz0, ixyz1] += (
+                        r_ijs[k, ixyz0] * basis_jac_rs[iamc, k, ixyz1]
+                    )
+
+
+@nb.njit((nb.int64, nb.float64[:, :, :, :], nb.float64[:, :, :]))
+def update_mbd_dedcs(
+    itype: np.int64,
+    mbd_dedcs: npt.NDArray[np.float64],
+    tmp_dedcs: npt.NDArray[np.float64],
+) -> None:
+    _, s1, s2, s3 = mbd_dedcs.shape
+    for i1 in range(s1):
+        for i2 in range(s2):
+            for i3 in range(s3):
+                mbd_dedcs[itype, i1, i2, i3] += tmp_dedcs[i1, i2, i3]
+
+
 @nb.njit(
-    nb.float64[:, :](
-        nb.float64[:, :, :],
-        nb.int64[:, :],
+    (
         nb.int64,
+        nb.int64,
+        nb.int64[:],
+        nb.float64[:, :, :, :, :, :],
+        nb.float64[:, :, :, :, :],
     ),
 )
-def _nb_forces_from_gradient(
-    gradient: np.ndarray,
-    all_js: np.ndarray,
-    max_number_of_js: int,
-) -> np.ndarray:
-    number_of_atoms = gradient.shape[0]
-    forces = np.zeros((number_of_atoms, 3))
-    for i in range(number_of_atoms):
-        for i_j in range(max_number_of_js):
-            j = all_js[i, i_j]
-            for k in range(3):
-                forces[i, k] += gradient[i, i_j, k]
-                forces[j, k] -= gradient[i, i_j, k]
-    return forces
+def update_mbd_dgdcs(
+    i: np.int64,
+    itype: np.int64,
+    js: npt.NDArray[np.int64],
+    mbd_dgdcs: npt.NDArray[np.float64],
+    tmp_dgdcs: npt.NDArray[np.float64],
+) -> None:
+    s1, s2, s3 = mbd_dgdcs.shape[1:4]
+    for i1 in range(s1):
+        for i2 in range(s2):
+            for i3 in range(s3):
+                for k, j in enumerate(js):
+                    for ixyz0 in range(3):
+                        v = tmp_dgdcs[i1, i2, i3, k, ixyz0]
+                        mbd_dgdcs[itype, i1, i2, i3, i, ixyz0] -= v
+                        mbd_dgdcs[itype, i1, i2, i3, j, ixyz0] += v
+
+
+@nb.njit(
+    (
+        nb.int64,
+        nb.int64[:],
+        nb.float64[:, :],
+        nb.float64[:, :, :, :, :, :],
+        nb.float64[:, :, :, :, :],
+    ),
+)
+def update_mbd_dsdcs(
+    itype: np.int64,
+    js: npt.NDArray[np.int64],
+    r_ijs: npt.NDArray[np.float64],
+    mbd_dsdcs: npt.NDArray[np.float64],
+    tmp_dgdcs: npt.NDArray[np.float64],
+) -> None:
+    s1, s2, s3 = mbd_dsdcs.shape[1:4]
+    for i1 in range(s1):  # noqa: PLR1702
+        for i2 in range(s2):
+            for i3 in range(s3):
+                for k in range(js.size):
+                    for ixyz0 in range(3):
+                        for ixyz1 in range(3):
+                            v = r_ijs[k, ixyz0] * tmp_dgdcs[i1, i2, i3, k, ixyz1]
+                            mbd_dsdcs[itype, i1, i2, i3, ixyz0, ixyz1] += v
 
 
 @nb.njit
@@ -123,36 +206,6 @@ def _contract_moments(
                 )
 
 
-# @nb.njit(
-#     nb.float64[:, :](
-#         nb.int64[:, :],
-#         nb.int64[:],
-#         nb.float64[:],
-#         nb.float64[:],
-#         nb.float64[:, :, :],
-#     ),
-# )
-# def _propagate_forward(
-#     alpha_index_times,
-#     alpha_moment_mapping,
-#     moment_coeffs,
-#     moment_components,
-#     moment_jacobian,
-# ):
-#     """Calculate gradients using the forward propagation."""
-#     _calc_moment_times(alpha_index_times, moment_components, moment_jacobian)
-#     _, number_of_js, _ = moment_jacobian.shape
-#     gradient = np.zeros((number_of_js, 3))
-#     for basis_i, moment_i in enumerate(alpha_moment_mapping):
-#         for j in range(number_of_js):
-#             for k in range(3):
-#                 gradient[j, k] += (
-#                     moment_coeffs[basis_i] * moment_jacobian[moment_i, j, k]
-#                 )
-
-#     return gradient
-
-
 @nb.njit(
     nb.float64[:, :](
         nb.int64[:, :],
@@ -171,9 +224,10 @@ def _propagate_backward(
     moment_components,
     moment_jacobian,
 ):
+    """Calculate gradients using backward propagation."""
     # alternatively with backpropagation: (saves in the order of 20% for higher levels)
     alpha_moments_count, number_of_js, _ = moment_jacobian.shape
-    tmp_moment_ders = np.zeros((alpha_moments_count))
+    tmp_moment_ders = np.zeros((alpha_moments_count,))
     for basis_i, moment_i in enumerate(alpha_moment_mapping):
         tmp_moment_ders[moment_i] = moment_coeffs[basis_i]
     for ait in alpha_index_times[::-1]:
@@ -201,18 +255,18 @@ def _propagate_backward(
         nb.int64[:, :],
         nb.int64[:, :],
         nb.float64[:],
-    )
+    ),
 )
-def _nb_calc_local_energy_and_gradient(
-    r_ijs_unit,
-    r_abs,
-    rb_values,
-    rb_derivs,
-    alpha_moments_count,
-    alpha_moment_mapping,
-    alpha_index_basic,
-    alpha_index_times,
-    moment_coeffs,
+def nb_calc_local_energy_and_gradient(
+    r_ijs_unit: npt.NDArray[np.float64],
+    r_abs: npt.NDArray[np.float64],
+    rb_values: npt.NDArray[np.float64],
+    rb_derivs: npt.NDArray[np.float64],
+    alpha_moments_count: np.int64,
+    alpha_moment_mapping: npt.NDArray[np.int64],
+    alpha_index_basic: npt.NDArray[np.int64],
+    alpha_index_times: npt.NDArray[np.int64],
+    moment_coeffs: npt.NDArray[np.float64],
 ):
     (number_of_js,) = r_abs.shape
     moment_components = np.zeros(alpha_moments_count)
@@ -467,7 +521,7 @@ def cald_dedcs_and_dgdcs(
         nb.float64[:],
     ),
 )
-def _nb_calc_moment(
+def nb_calc_moment(
     itype,
     jtypes,
     r_abs: np.ndarray,
@@ -525,7 +579,7 @@ def _nb_calc_moment(
 
 
 @nb.njit
-def _store_radial_basis_values(
+def store_radial_basis_values(
     i: np.int64,
     itype: np.int64,
     js: np.ndarray,
