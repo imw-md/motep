@@ -42,8 +42,7 @@ class JaxMTPEngine(EngineBase):
                 )
             self.basis_converter.remap_mlip_moment_coeffs(self.mtp_data)
 
-    def calculate(self, atoms: Atoms):
-        self.update_neighbor_list(atoms)
+    def _calculate(self, atoms: Atoms) -> tuple:
         mtp_data = self.mtp_data
         itypes = jnp.array(get_types(atoms, mtp_data.species))
         all_js, all_rijs = [jnp.array(_) for _ in self._get_all_distances(atoms)]
@@ -71,11 +70,7 @@ class JaxMTPEngine(EngineBase):
 
         stress = np.array((all_rijs.transpose((0, 2, 1)) @ gradients).sum(axis=0))
 
-        self.results["energies"] = energies
-        self.results["energy"] = self.results["energies"].sum()
-        self.results["forces"] = forces
-        self.results["stress"] = stress
-        return self.results
+        return energies, forces, stress
 
 
 @partial(jax.jit, static_argnums=(9, 10, 11, 12))

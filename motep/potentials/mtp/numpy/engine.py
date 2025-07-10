@@ -50,9 +50,7 @@ class NumpyMTPEngine(EngineBase):
         moment_basis = MomentBasis(self.mtp_data)
         return moment_basis.calculate(itype, jtypes, r_ijs, r_abs, self.rb)
 
-    def calculate(self, atoms: Atoms) -> tuple:
-        """Calculate properties of the given system."""
-        self.update_neighbor_list(atoms)
+    def _calculate(self, atoms: Atoms) -> tuple:
         itypes = get_types(atoms, self.mtp_data.species)
         energies = self.mtp_data.species_coeffs[itypes]
 
@@ -99,12 +97,4 @@ class NumpyMTPEngine(EngineBase):
         forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1).T * -1.0
         stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T
 
-        self.results["energies"] = energies
-        self.results["energy"] = self.results["energies"].sum()
-        self.results["forces"] = forces
-
-        self._symmetrize_stress(atoms, stress)
-
-        self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
-
-        return self.results
+        return energies, forces, stress

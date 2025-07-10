@@ -28,12 +28,9 @@ class NumbaMTPEngine(EngineBase):
     def __init__(self, *args: tuple, **kwargs: dict) -> None:
         """Intialize the engine."""
         super().__init__(*args, **kwargs)
-        self.calculate = self._calc_train if self._is_trained else self._calc_run
+        self._calculate = self._calc_train if self._is_trained else self._calc_run
 
     def _calc_run(self, atoms: Atoms) -> tuple:
-        """Calculate properties of the given system."""
-        self.update_neighbor_list(atoms)
-
         mtp_data = self.mtp_data
 
         all_js, all_r_ijs = self._get_all_distances(atoms)
@@ -58,18 +55,9 @@ class NumbaMTPEngine(EngineBase):
         forces = _calc_forces_from_gradient(gradient, all_js)
         stress = np.einsum("ijk, ijl -> lk", all_r_ijs, gradient)
 
-        self._symmetrize_stress(atoms, stress)
-
-        self.results["energies"] = energies
-        self.results["energy"] = self.results["energies"].sum()
-        self.results["forces"] = forces
-        self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
-
-        return self.results
+        return energies, forces, stress
 
     def _calc_train(self, atoms: Atoms) -> tuple:
-        self.update_neighbor_list(atoms)
-
         mtp_data = self.mtp_data
 
         itypes = get_types(atoms, self.mtp_data.species)
@@ -133,16 +121,7 @@ class NumbaMTPEngine(EngineBase):
         forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1).T * -1.0
         stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T
 
-        self._symmetrize_stress(atoms, stress)
-
-        stress = stress.flat[[0, 4, 8, 5, 2, 1]]
-
-        self.results["energies"] = energies
-        self.results["energy"] = self.results["energies"].sum()
-        self.results["forces"] = forces
-        self.results["stress"] = stress
-
-        return self.results
+        return energies, forces, stress
 
 
 @nb.njit(nb.float64[:](nb.float64[:, :]))
