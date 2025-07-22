@@ -42,6 +42,15 @@ class LossSetting:
 
 
 @dataclass
+class UpconvertPotentials:
+    """Setting of the potentials."""
+
+    base: str = "base.mtp"
+    initial: str = "initial.mtp"
+    final: str = "final.mtp"
+
+
+@dataclass
 class Setting:
     """Setting of the training."""
 
@@ -84,10 +93,15 @@ class GradeSetting(Setting):
 
 
 @dataclass
-class UpconvertSetting(Setting):
-    """Setting for the extrapolation-grade calculations."""
+class UpconvertSetting:
+    """Setting for the upconversion."""
 
-    potential_base: str = "base.mtp"
+    potentials: UpconvertPotentials = field(default_factory=UpconvertPotentials)
+
+    def __post_init__(self) -> None:
+        """Postprocess attributes."""
+        if isinstance(self.potentials, dict):
+            self.potentials = UpconvertPotentials(**dict(self.potentials))
 
 
 def _parse_steps(setting_overwritten: dict) -> dict:

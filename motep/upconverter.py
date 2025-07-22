@@ -145,10 +145,10 @@ def run(args: argparse.Namespace) -> None:
 
     setting = load_setting_upconvert(args.setting)
 
-    src = read_mtp(setting.potential_base)
-    dst = read_mtp(setting.potential_initial)
+    src = read_mtp(setting.potentials.base)
+    dst = read_mtp(setting.potentials.initial)
 
     upconvert(src, dst)
 
     if rank == 0:
-        write_mtp(setting.potential_final, dst)
+        write_mtp(setting.potentials.final, dst)

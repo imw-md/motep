@@ -94,6 +94,8 @@ algorithm = 'maxvol'  # {'maxvol', 'exaustive'}
 
 ### [`motep apply`](docs/apply.md)
 
+### [`motep upconvert`](docs/upconvert.md)
+
 ## Big Question ?
 What This code do
 
