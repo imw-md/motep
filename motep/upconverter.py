@@ -42,6 +42,18 @@ def _copy_radial_coeffs(src: MTPData, dst: MTPData) -> None:
     rbs = src.radial_basis_size
     dst.radial_coeffs[:spc, :spc, :rfc, :rbs] = src.radial_coeffs
 
+    # Zeros in both radial_coeffs and moment_coeffs may be troublesome during training.
+    # Therefore, new radial parts are initialized by the average of the old ones.
+
+    tmp = src.radial_coeffs.mean(axis=0)[None, :, :, :]
+    dst.radial_coeffs[spc:, :spc, :rfc, :rbs] = tmp
+
+    tmp = src.radial_coeffs.mean(axis=1)[:, None, :, :]
+    dst.radial_coeffs[:spc, spc:, :rfc, :rbs] = tmp
+
+    tmp = src.radial_coeffs.mean(axis=2)[:, :, None, :]
+    dst.radial_coeffs[:spc, :spc, rfc:, :rbs] = tmp
+
 
 def _copy_species_coeffs(src: MTPData, dst: MTPData) -> None:
     dst.species_coeffs[: src.species_count] = src.species_coeffs
