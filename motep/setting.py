@@ -160,7 +160,7 @@ def load_setting_grade(filename: str) -> GradeSetting:
     return GradeSetting(**parse_setting(filename))
 
 
-def load_setting_upconvert(filename: str) -> UpconvertSetting:
+def load_setting_upconvert(filename: str | None) -> UpconvertSetting:
     """Load setting for `upconvert`.
 
     Returns
@@ -168,4 +168,6 @@ def load_setting_upconvert(filename: str) -> UpconvertSetting:
     UpconvertSetting
 
     """
+    if filename is None:
+        return UpconvertSetting()
     return UpconvertSetting(**parse_setting(filename))

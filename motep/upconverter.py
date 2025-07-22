@@ -13,7 +13,7 @@ from motep.setting import load_setting_upconvert
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Add arguments."""
-    parser.add_argument("setting")
+    parser.add_argument("setting", nargs="?")
 
 
 def _init(src: MTPData, dst: MTPData) -> None:
