@@ -83,6 +83,13 @@ class GradeSetting(Setting):
     algorithm: str = "maxvol"
 
 
+@dataclass
+class UpconvertSetting(Setting):
+    """Setting for the extrapolation-grade calculations."""
+
+    potential_base: str = "base.mtp"
+
+
 def _parse_steps(setting_overwritten: dict) -> dict:
     for i, value in enumerate(setting_overwritten["steps"]):
         if not isinstance(value, dict):
@@ -151,3 +158,14 @@ def load_setting_grade(filename: str) -> GradeSetting:
 
     """
     return GradeSetting(**parse_setting(filename))
+
+
+def load_setting_upconvert(filename: str) -> UpconvertSetting:
+    """Load setting for `upconvert`.
+
+    Returns
+    -------
+    UpconvertSetting
+
+    """
+    return UpconvertSetting(**parse_setting(filename))

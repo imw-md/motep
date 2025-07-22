@@ -6,6 +6,7 @@ from motep import (
     applier,
     grader,
     trainer,
+    upconverter,
 )
 
 
@@ -19,6 +20,7 @@ def main() -> None:
         "train": trainer,
         "apply": applier,
         "grade": grader,
+        "upconvert": upconverter,
     }
     for key, value in commands.items():
         value.add_arguments(subparsers.add_parser(key))
