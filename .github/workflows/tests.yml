@@ -29,4 +29,5 @@ jobs:
           python -m pip install .
       - name: Run pytest
         run: |
-          python -m pytest
+          # python -m pytest -v
+          python -m pytest -v tests/test_mtp.py
