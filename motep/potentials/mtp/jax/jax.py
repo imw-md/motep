@@ -62,7 +62,7 @@ def calc_energy_forces_stress(
     return local_energies, forces, stress
 
 
-@partial(jax.jit, static_argnums=(6, 7, 8, 9, 10, 11, 12))
+@partial(jax.jit, static_argnums=(7, 8, 9, 10, 11, 12))
 @partial(jax.vmap, in_axes=(0,) * 3 + (None,) * 10, out_axes=0)
 def _jax_calc_local_energy_and_derivs(
     r_ijs,
