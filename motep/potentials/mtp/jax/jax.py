@@ -62,7 +62,7 @@ def calc_energy_forces_stress(
     return local_energies, forces, stress
 
 
-@partial(jax.jit, static_argnums=(9, 10, 11, 12))
+@partial(jax.jit, static_argnums=(7, 8, 9, 10, 11, 12))
 @partial(jax.vmap, in_axes=(0,) * 3 + (None,) * 10, out_axes=0)
 def _jax_calc_local_energy_and_derivs(
     r_ijs,
@@ -115,7 +115,7 @@ def _jax_calc_local_energy_and_derivs(
     return energy, derivs
 
 
-@partial(jax.jit, static_argnums=(9, 10, 11, 12))
+#@partial(jax.jit, static_argnums=(9, 10, 11, 12))
 def _jax_calc_local_energy(
     r_ijs,
     itype,
@@ -148,7 +148,7 @@ def _jax_calc_local_energy(
     return energy
 
 
-@partial(jax.jit, static_argnums=(3, 4, 5))
+#@partial(jax.jit, static_argnums=(3, 4, 5))
 def _jax_calc_basis(
     r_ijs,
     r_abs,
@@ -172,7 +172,7 @@ def _jax_calc_basis(
     return jnp.array(basis)
 
 
-@partial(jax.jit, static_argnums=[1, 2, 3])
+#@partial(jax.jit, static_argnums=[1, 2, 3])
 @partial(jax.vmap, in_axes=[0, None, None, None], out_axes=0)
 def _jax_chebyshev_basis(r, number_of_terms, min_dist, max_dist):
     r_scaled = (2 * r - (min_dist + max_dist)) / (max_dist - min_dist)
@@ -182,7 +182,7 @@ def _jax_chebyshev_basis(r, number_of_terms, min_dist, max_dist):
     return jnp.array(rb)
 
 
-@partial(jax.jit, static_argnums=(3,))
+#@partial(jax.jit, static_argnums=(3,))
 def _jax_calc_moments(r_ijs, r_abs, rb_values, moments):
     calculated_moments = {}
     r_ijs_unit = (r_ijs.T / r_abs).T
@@ -203,7 +203,7 @@ def _jax_make_tensor(r, nu):
     return m
 
 
-@partial(jax.jit, static_argnums=(2,))
+#@partial(jax.jit, static_argnums=(2,))
 def _jax_contract_over_axes(m1, m2, axes):
     calculated_contraction = jnp.tensordot(m1, m2, axes=axes)
     return calculated_contraction
