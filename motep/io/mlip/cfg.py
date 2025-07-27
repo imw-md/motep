@@ -1,6 +1,5 @@
 """Module for MTP formats."""
 
-import pathlib
 from typing import TextIO
 
 import numpy as np
@@ -13,7 +12,7 @@ from ase.utils import reader, string2index, writer
 
 @reader
 def read_cfg(
-    fd: pathlib.Path,
+    fd: TextIO,
     index: int = -1,
     species: list[int] | list[str] | None = None,
 ) -> Atoms | list[Atoms]:
@@ -21,6 +20,10 @@ def read_cfg(
 
     Parameters
     ----------
+    fd : TextIO
+        TextIO object.
+    index : int
+        Index of images.
     species : list[int] | list[str], optional
         List defining types of chemical symbols. For example,
         [46, 1] and ['Pd', 'H'] assign Pd for type 0 and H for type 1. If None,
@@ -150,7 +153,7 @@ def _parse_value(value: str) -> int | float | bool:
 
 @writer
 def write_cfg(
-    fd: pathlib.Path,
+    fd: TextIO,
     images: Atoms | list[Atoms],
     species: list[int] | list[str] | None = None,
     key_energy: str | None = None,
@@ -159,8 +162,8 @@ def write_cfg(
 
     Parameters
     ----------
-    filename : `pathlib.Path`
-        _description_
+    fd : TextIO
+        TextIO object.
     images : Atoms | list[Atoms]
         _description_
     species : list[int] | list[str], optional
