@@ -48,7 +48,19 @@ class AlgorithmBase(ABC):
         self.find_active_set()
 
     def calc_matrix(self, images: list[Atoms]) -> np.ndarray:
-        """Calculate matrix."""
+        """Calculate matrix.
+
+        Parameters
+        ----------
+        images : list[Atoms]
+            List of ASE :class:`~ase.Atoms` object.
+
+        Returns
+        -------
+        np.ndarray
+            Matrix to compute the extrapolation grade.
+
+        """
         # Calculate basis functions of `images_training`
         for atoms in images:
             atoms.calc = MTP(self.mtp_data, engine=self.engine, mode="train")
@@ -80,7 +92,13 @@ class ExhaustiveAlgorithm(AlgorithmBase):
     """Exhaustive algorithm."""
 
     def find_active_set(self) -> None:
-        """Find the active set."""
+        """Find the active set.
+
+        Raises
+        ------
+        RuntimeError
+
+        """
         images = self.images_training
         matrix = self.matrix
 
@@ -109,7 +127,13 @@ class MaxVolAlgorithm(ExhaustiveAlgorithm):
     """MaxVol algorithm."""
 
     def find_active_set(self) -> None:
-        """Find the active set."""
+        """Find the active set.
+
+        Raises
+        ------
+        RuntimeError
+
+        """
         images = self.images_training
         matrix = self.matrix
 
