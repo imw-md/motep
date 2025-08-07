@@ -130,7 +130,6 @@ def _calc_local_energy_and_derivs(
     return energy, derivs
 
 
-@partial(jax.jit, static_argnums=(9, 10, 11, 12))
 def _calc_local_energy(
     r_ijs,
     itype,
@@ -162,7 +161,6 @@ def _calc_local_energy(
     return species_coeffs[itype] + jnp.dot(moment_coeffs, basis)
 
 
-@partial(jax.jit, static_argnums=(3, 4, 5))
 def _calc_basis(
     r_ijs,
     r_abs,
@@ -184,7 +182,6 @@ def _calc_basis(
     return jnp.array(basis)
 
 
-@partial(jax.jit, static_argnums=(3,))
 @partial(jax.vmap, in_axes=(0, None, None, None), out_axes=0)
 def _chebyshev_basis(
     r: jnp.array,
@@ -199,7 +196,6 @@ def _chebyshev_basis(
     return jnp.array(rb)
 
 
-@partial(jax.jit, static_argnums=(3,))
 def _calc_moments(
     r_ijs: jnp.array,
     r_abs: jnp.array,
@@ -225,6 +221,5 @@ def _make_tensor(r: jnp.array, nu: int) -> jnp.array:
     return m
 
 
-@partial(jax.jit, static_argnums=(2,))
 def _contract_over_axes(m1: jnp.array, m2: jnp.array, axes: tuple) -> jnp.array:
     return jnp.tensordot(m1, m2, axes=axes)
