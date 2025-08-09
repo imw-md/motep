@@ -44,7 +44,7 @@ def _nb_chebyshev(
         nb.float64,
     ),
 )
-def _nb_calc_radial_basis(
+def nb_calc_radial_basis(
     r_abs: npt.NDArray[np.float64],
     radial_basis_size: np.int64,
     scaling: np.float64,
@@ -67,7 +67,7 @@ def _nb_calc_radial_basis(
 
 
 @nb.njit
-def _nb_calc_radial_funcs(
+def nb_calc_radial_funcs(
     r_abs: npt.NDArray[np.float64],
     itype: np.int64,
     jtypes: npt.NDArray[np.int64],
@@ -76,9 +76,15 @@ def _nb_calc_radial_funcs(
     min_dist: np.float64,
     max_dist: np.float64,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    """Calculate radial parts."""
+    """Calculate radial parts.
+
+    Returns
+    -------
+    Tuple of radial values and derivatives.
+
+    """
     _, _, radial_funcs_count, radial_basis_size = radial_coeffs.shape
-    values, derivs = _nb_calc_radial_basis(
+    values, derivs = nb_calc_radial_basis(
         r_abs,
         radial_basis_size,
         scaling,

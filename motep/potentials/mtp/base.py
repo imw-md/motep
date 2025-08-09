@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -201,8 +202,32 @@ class EngineBase:
         all_r_ijs[self.all_js[:, :] < 0, :] = max_dist
         return self.all_js, all_r_ijs
 
+    @abstractmethod
+    def _calculate(self, atoms: Atoms) -> tuple: ...
+
+    def calculate(self, atoms: Atoms) -> dict:
+        """Calculate properties of the given system.
+
+        Returns
+        -------
+        Dictionary with energies, energy, forces and stress.
+
+        """
+        self.update_neighbor_list(atoms)
+
+        energies, forces, stress = self._calculate(atoms)
+
+        self._symmetrize_stress(atoms, stress)
+
+        self.results["energies"] = energies
+        self.results["energy"] = self.results["energies"].sum()
+        self.results["forces"] = forces
+        self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
+
+        return self.results
+
     def _symmetrize_stress(self, atoms: Atoms, stress: np.ndarray) -> None:
-        if atoms.cell.rank == 3:
+        if atoms.cell.rank == 3:  # noqa: PLR2004
             volume = atoms.get_volume()
             stress += stress.T
             stress *= 0.5 / volume

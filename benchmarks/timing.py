@@ -1,8 +1,9 @@
+"""Contains functions (including a main function) for benchmarking."""
+
 import pathlib
 import shutil
 from time import perf_counter
 
-import ase.io
 import numpy as np
 from ase import Atoms
 
@@ -96,7 +97,7 @@ def main() -> None:
             cfg_path = path / "out.cfg"
             if not cfg_path.is_file():
                 continue
-            index = slice(0, 10)  # ":"
+            index = slice(0, 10)
             images = read_cfg(cfg_path, index=index)
             images = [_.repeat(size_reps) for _ in images]
             number_of_atoms = len(images[0])
@@ -120,7 +121,7 @@ def main() -> None:
             ]
 
             for setup in setups:
-                if number_of_atoms > 300 and setup["engine"] in {"numpy", "jax"}:
+                if number_of_atoms > 300 and setup != {"engine": "numba"}:
                     continue
                 e_test = _time_mtp(pot_path, images, **setup)
                 if e_ref is not None:
