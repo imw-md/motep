@@ -9,12 +9,18 @@ dependencies = [
     "ase",
     "mpi4py",
     "scipy",
+    "numba",
 ]
 requires-python = ">=3.11"  # tomllib
 authors = [
     {name = "Pranav Kumar"},  # trainer
     {name = "Axel Forslund"},  # calculator
     {name = "Yuji Ikeda"},  # testing
+]
+
+[project.optional-dependencies]
+jax = [
+  "jax",
 ]
 
 [project.scripts]
