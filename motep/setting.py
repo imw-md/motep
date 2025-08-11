@@ -61,7 +61,7 @@ class Setting:
     potential_initial: str = "initial.mtp"
     potential_final: str = "final.mtp"
     seed: int | None = None
-    engine: str = "numpy"
+    engine: str = "numba"
 
 
 @dataclass
