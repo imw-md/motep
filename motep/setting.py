@@ -116,12 +116,12 @@ def _parse_steps(setting_overwritten: dict) -> dict:
     return setting_overwritten
 
 
-def parse_setting(filename: str) -> Setting:
+def parse_setting(filename: str) -> dict:
     """Parse setting file.
 
     Returns
     -------
-    Setting
+    dict
 
     """
     with pathlib.Path(filename).open("rb") as f:
