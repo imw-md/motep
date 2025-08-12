@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pathlib
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Any
 
 scipy_minimize_methods = {
@@ -26,8 +26,18 @@ scipy_minimize_methods = {
 }
 
 
+class MappingMixin:
+    """Mixin class for mappability."""
+
+    def keys(self) -> tuple:
+        return (f.name for f in fields(self))
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+
 @dataclass
-class LossSetting:
+class LossSetting(MappingMixin):
     """Setting of the loss function."""
 
     energy_weight: float = 1.0
