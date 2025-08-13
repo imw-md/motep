@@ -26,18 +26,8 @@ scipy_minimize_methods = {
 }
 
 
-class MappingMixin:
-    """Mixin class for mappability."""
-
-    def keys(self) -> tuple:
-        return (f.name for f in fields(self))
-
-    def __getitem__(self, key: str) -> Any:
-        return getattr(self, key)
-
-
 @dataclass
-class LossSetting(MappingMixin):
+class LossSetting:
     """Setting of the loss function."""
 
     energy_weight: float = 1.0
