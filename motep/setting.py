@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import pathlib
 import tomllib
-from dataclasses import dataclass, field, fields
-from typing import Any
+from dataclasses import dataclass, field
 
 scipy_minimize_methods = {
     "nelder-mead",
