@@ -77,7 +77,8 @@ class TrainSetting(Setting):
 
     def __post_init__(self) -> None:
         """Postprocess attributes."""
-        self.loss = LossSetting(**self.loss)
+        if isinstance(self.loss, dict):
+            self.loss = LossSetting(**self.loss)
 
 
 @dataclass
