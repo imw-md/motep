@@ -5,7 +5,6 @@ from __future__ import annotations
 import pathlib
 import tomllib
 from dataclasses import dataclass, field
-from typing import Any
 
 scipy_minimize_methods = {
     "nelder-mead",
@@ -68,7 +67,7 @@ class Setting:
 class TrainSetting(Setting):
     """Setting of the training."""
 
-    loss: dict[str, Any] = field(default_factory=LossSetting)
+    loss: LossSetting = field(default_factory=LossSetting)
     steps: list[dict] = field(
         default_factory=lambda: [
             {"method": "L-BFGS-B", "optimized": ["radial_coeffs", "moment_coeffs"]},
@@ -77,7 +76,8 @@ class TrainSetting(Setting):
 
     def __post_init__(self) -> None:
         """Postprocess attributes."""
-        self.loss = LossSetting(**self.loss)
+        if isinstance(self.loss, dict):
+            self.loss = LossSetting(**self.loss)
 
 
 @dataclass
@@ -116,12 +116,12 @@ def _parse_steps(setting_overwritten: dict) -> dict:
     return setting_overwritten
 
 
-def parse_setting(filename: str) -> Setting:
+def parse_setting(filename: str) -> dict:
     """Parse setting file.
 
     Returns
     -------
-    Setting
+    dict
 
     """
     with pathlib.Path(filename).open("rb") as f:
