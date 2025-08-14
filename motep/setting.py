@@ -82,7 +82,7 @@ class TrainSetting(Setting):
     loss: LossSetting = field(default_factory=LossSetting)
     steps: list[dict] = field(
         default_factory=lambda: [
-            {"method": "L-BFGS-B", "optimized": ["radial_coeffs", "moment_coeffs"]},
+            {"method": "minimize", "optimized": ["radial_coeffs", "moment_coeffs"]},
         ],
     )
 
