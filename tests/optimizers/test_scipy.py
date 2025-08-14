@@ -12,7 +12,14 @@ from motep.io.mlip.mtp import read_mtp
 from motep.loss import LossFunction
 from motep.optimizers.scipy import ScipyMinimizeOptimizer
 from motep.potentials.mtp.data import MTPData
-from motep.setting import LossSetting
+from motep.setting import LossSetting, scipy_minimize_methods
+
+
+def test_scipy_methods_list() -> None:
+    """Test that the list of minmize methods is same as Scipy."""
+    from scipy.optimize._minimize import MINIMIZE_METHODS
+
+    assert set(MINIMIZE_METHODS) == set(scipy_minimize_methods)
 
 
 def make_crystals(
