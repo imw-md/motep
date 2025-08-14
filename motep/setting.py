@@ -6,23 +6,7 @@ import pathlib
 import tomllib
 from dataclasses import dataclass, field
 
-scipy_minimize_methods = {
-    "nelder-mead",
-    "powell",
-    "cg",
-    "bfgs",
-    "newton-cg",
-    "l-bfgs-b",
-    "tnc",
-    "cobyla",
-    "cobyqa",
-    "slsqp",
-    "trust-constr",
-    "dogleg",
-    "trust-ncg",
-    "trust-exact",
-    "trust-krylov",
-}
+from scipy.optimize._minimize import MINIMIZE_METHODS  # noqa: PLC2701
 
 
 @dataclass
@@ -63,6 +47,18 @@ class Setting:
     engine: str = "numba"
 
 
+def _convert_steps(steps: list[dict]) -> list[dict]:
+    for i, value in enumerate(steps):
+        if not isinstance(value, dict):
+            steps["steps"][i] = {"method": value}
+        if value["method"].lower() in MINIMIZE_METHODS:
+            if "kwargs" not in value:
+                value["kwargs"] = {}
+            value["kwargs"]["method"] = value["method"]
+            value["method"] = "minimize"
+    return steps
+
+
 @dataclass
 class TrainSetting(Setting):
     """Setting of the training."""
@@ -70,7 +66,7 @@ class TrainSetting(Setting):
     loss: LossSetting = field(default_factory=LossSetting)
     steps: list[dict] = field(
         default_factory=lambda: [
-            {"method": "L-BFGS-B", "optimized": ["radial_coeffs", "moment_coeffs"]},
+            {"method": "minimize"},
         ],
     )
 
@@ -78,6 +74,12 @@ class TrainSetting(Setting):
         """Postprocess attributes."""
         if isinstance(self.loss, dict):
             self.loss = LossSetting(**self.loss)
+
+        # Default 'optimized' is defined in each `Optimizer` class.
+
+        # convert the old style "steps" like {'steps`: ['L-BFGS-B']} to the new one
+        # {'steps`: {'method': 'L-BFGS-B'}
+        self.steps = _convert_steps(self.steps)
 
 
 @dataclass
@@ -104,18 +106,6 @@ class UpconvertSetting:
             self.potentials = UpconvertPotentials(**dict(self.potentials))
 
 
-def _parse_steps(setting_overwritten: dict) -> dict:
-    for i, value in enumerate(setting_overwritten["steps"]):
-        if not isinstance(value, dict):
-            setting_overwritten["steps"][i] = {"method": value}
-        if value["method"].lower() in scipy_minimize_methods:
-            if "kwargs" not in value:
-                value["kwargs"] = {}
-            value["kwargs"]["method"] = value["method"]
-            value["method"] = "minimize"
-    return setting_overwritten
-
-
 def parse_setting(filename: str) -> dict:
     """Parse setting file.
 
@@ -133,11 +123,6 @@ def parse_setting(filename: str) -> dict:
         if key in setting_overwritten and isinstance(setting_overwritten[key], str):
             setting_overwritten[key] = [setting_overwritten[key]]
 
-    # convert the old style "steps" like {'steps`: ['L-BFGS-B']} to the new one
-    # {'steps`: {'method': 'L-BFGS-B'}
-    # Default 'optimized' is defined in each `Optimizer` class.
-    if "steps" in setting_overwritten:
-        setting_overwritten = _parse_steps(setting_overwritten)
     return setting_overwritten
 
 

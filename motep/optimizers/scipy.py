@@ -99,16 +99,14 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
             if "scaling" in self.optimized:
                 raise ValueError("`jac` cannot (so far) be used to optimize `scaling`.")
             kwargs["jac"] = self.loss.jac
-        if kwargs["method"].lower() not in {
-            "nelder-mead",
-            "powell",
-            "l-bfgs-b",
-            "cobyla",
-            "cobyqa",
-            "slsqp",
-            "tnc",
-            "trust-constr",
-            "_custom",
+        if kwargs.get("method", "").lower() in {
+            "cg",
+            "bfgs",
+            "newton-cg",
+            "dogleg",
+            "trust-ncg",
+            "trust-exact",
+            "trust-krylov",
         }:
             bounds = None
         callback = Callback(self.loss)
