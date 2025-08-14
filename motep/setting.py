@@ -6,23 +6,7 @@ import pathlib
 import tomllib
 from dataclasses import dataclass, field
 
-scipy_minimize_methods = {
-    "nelder-mead",
-    "powell",
-    "cg",
-    "bfgs",
-    "newton-cg",
-    "l-bfgs-b",
-    "tnc",
-    "cobyla",
-    "cobyqa",
-    "slsqp",
-    "trust-constr",
-    "dogleg",
-    "trust-ncg",
-    "trust-exact",
-    "trust-krylov",
-}
+from scipy.optimize._minimize import MINIMIZE_METHODS  # noqa: PLC2701
 
 
 @dataclass
@@ -67,7 +51,7 @@ def _convert_steps(steps: list[dict]) -> list[dict]:
     for i, value in enumerate(steps):
         if not isinstance(value, dict):
             steps["steps"][i] = {"method": value}
-        if value["method"].lower() in scipy_minimize_methods:
+        if value["method"].lower() in MINIMIZE_METHODS:
             if "kwargs" not in value:
                 value["kwargs"] = {}
             value["kwargs"]["method"] = value["method"]
@@ -82,7 +66,7 @@ class TrainSetting(Setting):
     loss: LossSetting = field(default_factory=LossSetting)
     steps: list[dict] = field(
         default_factory=lambda: [
-            {"method": "minimize", "optimized": ["radial_coeffs", "moment_coeffs"]},
+            {"method": "minimize"},
         ],
     )
 
