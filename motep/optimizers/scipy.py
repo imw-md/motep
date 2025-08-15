@@ -21,12 +21,8 @@ class Callback:
         self.loss = loss
         self.iter = 0
 
-    def __call__(self, intermediate_result: OptimizeResult | np.ndarray):
-        fun = (
-            intermediate_result.fun
-            if isinstance(intermediate_result, OptimizeResult)
-            else self.loss(intermediate_result)
-        )
+    def __call__(self, intermediate_result: OptimizeResult):
+        fun = intermediate_result.fun
         if self.loss.comm.Get_rank() == 0:
             print(f"loss {self.iter:4d}:", fun, flush=True)
         self.iter += 1
