@@ -50,11 +50,11 @@ class LLSOptimizerBase(OptimizerBase):
         if "energy" in self.minimized:
             v = self._calc_matrix_energies_species_coeffs()
             tmp.append(np.sqrt(setting.energy_weight) * v)
+        # `species_coeffs` do not affect forces and stresses,
+        # and therefore the corresponding sub-mattrices should be zero-filled.
         if "forces" in self.minimized:
-            shape = (
-                sum(atoms.calc.results["forces"].size for atoms in images),
-                len(species),
-            )
+            nforces = sum(atoms.calc.targets["forces"].size for atoms in images)
+            shape = (nforces, len(species))
             tmp.append(np.zeros(shape))
         if "stress" in self.minimized:
             shape = (9 * len(images), len(species))
