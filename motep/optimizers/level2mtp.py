@@ -4,6 +4,7 @@ from math import sqrt
 from typing import Any
 
 import numpy as np
+from scipy.optimize._optimize import OptimizeResult
 
 from motep.optimizers.lls import LLSOptimizerBase
 from motep.optimizers.scipy import Callback
@@ -29,21 +30,17 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         return ["species_coeffs", "radial_coeffs"]
 
     def optimize(self, **kwargs: dict[str, Any]) -> None:
-        """Optimize parameters."""
         parameters = self.loss.mtp_data.parameters
-
-        # Calculate basis functions of `loss.images`
-        self.loss(parameters)
-        self.loss.broadcast()
-
         callback = Callback(self.loss)
 
+        # Calculate basis functions of `loss.images`
+        loss_value = self.loss(parameters)
+        self.loss.broadcast()
+
         # Print the value of the loss function.
-        callback(parameters)
+        callback(OptimizeResult(x=parameters, fun=loss_value))
 
-        # Update self.data based on the initialized parameters
-        self.loss.mtp_data.parameters = parameters
-
+        # Prepare and solve the LLS problem
         matrix = self._calc_matrix()
         vector = self._calc_vector()
 
@@ -52,10 +49,12 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         # Update `mtp_data` and `parameters`.
         parameters = self._update_parameters(coeffs)
 
-        # Print the value of the loss function.
-        callback(parameters)
+        # Evaluate loss with the new parameters
+        loss_value = self.loss(parameters)
+        self.loss.broadcast()
 
-        self.loss.mtp_data.parameters = parameters
+        # Print the value of the loss function.
+        callback(OptimizeResult(x=parameters, fun=loss_value))
 
     def _update_parameters(self, coeffs: np.ndarray) -> np.ndarray:
         mtp_data = self.loss.mtp_data

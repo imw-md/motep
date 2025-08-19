@@ -6,6 +6,7 @@ from typing import Any
 
 import numpy as np
 from ase.stress import voigt_6_to_full_3x3_stress
+from scipy.optimize._optimize import OptimizeResult
 
 from motep.loss import LossFunctionBase
 from motep.optimizers.base import OptimizerBase
@@ -183,37 +184,36 @@ class LLSOptimizer(LLSOptimizerBase):
         return ["species_coeffs", "moment_coeffs"]
 
     def optimize(self, **kwargs: dict[str, Any]) -> None:
-        """Optimize parameters."""
         parameters = self.loss.mtp_data.parameters
-
-        # Calculate basis functions of `loss.images`
-        self.loss(self.loss.mtp_data.parameters)
-        self.loss.broadcast()
-
         callback = Callback(self.loss)
 
+        # Calculate basis functions of `loss.images`
+        loss_value = self.loss(parameters)
+        self.loss.broadcast()
+
         # Print the value of the loss function.
-        callback(parameters)
+        callback(OptimizeResult(x=parameters, fun=loss_value))
 
-        # Update self.data based on the initialized parameters
-        self.loss.mtp_data.parameters = parameters
-
+        # Prepare and solve the LLS problem
         matrix = self._calc_matrix()
         vector = self._calc_vector()
 
         coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
 
-        # Update `mtp_data` and `parameters`.
+        # Update `mtp_data`
         asm = self.loss.mtp_data.alpha_scalar_moments
         self.loss.mtp_data.moment_coeffs = coeffs[:asm]
         if "species_coeffs" in self.optimized:
             self.loss.mtp_data.species_coeffs = coeffs[asm:]
+        # Update `parameters` by calling the property
         parameters = self.loss.mtp_data.parameters
 
-        # Print the value of the loss function.
-        callback(parameters)
+        # Evaluate loss with the new parameters
+        loss_value = self.loss(parameters)
+        self.loss.broadcast()
 
-        self.loss.mtp_data.parameters = parameters
+        # Print the value of the loss function.
+        callback(OptimizeResult(x=parameters, fun=loss_value))
 
     def _calc_matrix(self) -> np.ndarray:
         """Calculate the matrix for linear least squares (LLS)."""

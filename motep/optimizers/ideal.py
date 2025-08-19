@@ -3,6 +3,7 @@
 from typing import Any
 
 import numpy as np
+from scipy.optimize._optimize import OptimizeResult
 
 from motep.optimizers.base import OptimizerBase
 from motep.optimizers.scipy import Callback
@@ -20,34 +21,34 @@ class NoInteractionOptimizer(OptimizerBase):
 
         """
         parameters = self.loss.mtp_data.parameters
-
-        # Calculate basis functions of `fitness.images`
-        self.loss(parameters)
-
         callback = Callback(self.loss)
 
+        # Calculate basis functions of `loss.images`
+        loss_value = self.loss(parameters)
+
         # Print the value of the loss function.
-        callback(parameters)
+        callback(OptimizeResult(x=parameters, fun=loss_value))
 
-        # Update self.data based on the initialized parameters
-        self.loss.mtp_data.parameters = parameters
-
+        # Prepare and solve the LLS problem
         matrix = self._calc_matrix()
         vector = self._calc_vector()
 
         species_coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
 
+        # Update `mtp_data`
         self.loss.mtp_data.scaling = 1.0
         self.loss.mtp_data.moment_coeffs[...] = 0.0
         self.loss.mtp_data.radial_coeffs[...] = 0.0
         self.loss.mtp_data.species_coeffs = species_coeffs
-
+        # Update `parameters` by calling the property
         parameters = self.loss.mtp_data.parameters
 
-        # Print the value of the loss function.
-        callback(parameters)
+        # Evaluate loss with the new parameters
+        loss_value = self.loss(parameters)
+        self.loss.broadcast()
 
-        self.loss.mtp_data.parameters = parameters
+        # Print the value of the loss function.
+        callback(OptimizeResult(x=parameters, fun=loss_value))
 
     @property
     def optimized_default(self) -> list[str]:
