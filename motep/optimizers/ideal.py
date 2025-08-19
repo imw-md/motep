@@ -25,6 +25,7 @@ class NoInteractionOptimizer(OptimizerBase):
 
         # Calculate basis functions of `loss.images`
         loss_value = self.loss(parameters)
+        self.loss.broadcast()
 
         # Print the value of the loss function.
         callback(OptimizeResult(x=parameters, fun=loss_value))
