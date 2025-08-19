@@ -11,8 +11,8 @@ class OptimizerBase(ABC):
 
     Attributes
     ----------
-    mtp_data : MTPData
-        :class:`motep.potentials.MTPData` object.
+    loss : LossFunction
+        :class:`motep.loss.LossFunction` object.
 
     """
 
@@ -25,6 +25,10 @@ class OptimizerBase(ABC):
             :class:`motep.loss.LossFunction` object.
         **kwargs : dict[str, Any]
             Options passed to the `Optimizer` class.
+
+        Raises
+        ------
+        ValueError
 
         """
         self.loss = loss
@@ -41,7 +45,7 @@ class OptimizerBase(ABC):
 
     @abstractmethod
     def optimize(self, **kwargs: dict[str, Any]) -> None:
-        """Optimize parameters."""
+        """Optimize the parameters of `self.loss.mtp_data`."""
 
     @property
     @abstractmethod
