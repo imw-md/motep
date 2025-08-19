@@ -3,6 +3,7 @@
 from typing import Any
 
 import numpy as np
+from scipy.optimize._optimize import OptimizeResult
 
 from motep.loss import LossFunctionBase
 from motep.optimizers.base import OptimizerBase
@@ -26,17 +27,16 @@ class Randomizer(OptimizerBase):
         self.optimized = optimized
 
     def optimize(self, **kwargs: dict[str, Any]) -> None:
-        """Randomize parameters."""
         parameters = self.loss.mtp_data.parameters
-
-        # Calculate basis functions of `fitness.images`
-        self.loss(parameters)
+        callback = Callback(self.loss)
         rng: np.random.Generator = self.loss.setting["rng"]
 
-        callback = Callback(self.loss)
+        # Calculate basis functions of `loss.images`
+        loss_value = self.loss(parameters)
+        self.loss.broadcast()
 
         # Print the value of the loss function.
-        callback(parameters)
+        callback(OptimizeResult(x=parameters, fun=loss_value))
 
         mtp_data = self.loss.mtp_data
         for key in self.optimized:
@@ -44,10 +44,12 @@ class Randomizer(OptimizerBase):
             ub = +5.0
             shape = mtp_data[key].shape
             mtp_data[key] = rng.uniform(lb, ub, size=shape)
-
+        # Update `parameters` by calling the property
         parameters = mtp_data.parameters
 
-        # Print the value of the loss function.
-        callback(parameters)
+        # Evaluate loss with the new parameters
+        loss_value = self.loss(parameters)
+        self.loss.broadcast()
 
-        self.loss.mtp_data.parameters = parameters
+        # Print the value of the loss function.
+        callback(OptimizeResult(x=parameters, fun=loss_value))

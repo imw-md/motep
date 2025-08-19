@@ -51,7 +51,7 @@ def read(filename: str, species: list[int] | None = None) -> list[Atoms]:
     if isinstance(filename_parsed, str) and filename_parsed.endswith(".cfg"):
         images = read_cfg(filename_parsed, index=index, species=species)
     else:
-        images = ase.io.read(filename_parsed, index=index)
+        images = ase.io.read(filename_parsed, index=index, parallel=False)
     return [images] if isinstance(images, Atoms) else images
 
 
