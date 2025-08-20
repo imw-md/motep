@@ -257,7 +257,7 @@ def _propagate_backward(
         nb.float64[:],
     ),
 )
-def nb_calc_local_energy_and_gradient(
+def calc_local_energy_and_gradient(
     r_ijs_unit: npt.NDArray[np.float64],
     r_abs: npt.NDArray[np.float64],
     rb_values: npt.NDArray[np.float64],
@@ -521,7 +521,7 @@ def cald_dedcs_and_dgdcs(
         nb.float64[:],
     ),
 )
-def nb_calc_moment(
+def calc_moment(
     itype,
     jtypes,
     r_abs: np.ndarray,

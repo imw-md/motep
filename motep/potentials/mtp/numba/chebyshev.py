@@ -44,7 +44,7 @@ def _nb_chebyshev(
         nb.float64,
     ),
 )
-def nb_calc_radial_basis(
+def calc_radial_basis(
     r_abs: npt.NDArray[np.float64],
     radial_basis_size: np.int64,
     scaling: np.float64,
@@ -67,7 +67,7 @@ def nb_calc_radial_basis(
 
 
 @nb.njit
-def nb_calc_radial_funcs(
+def calc_radial_funcs(
     r_abs: npt.NDArray[np.float64],
     itype: np.int64,
     jtypes: npt.NDArray[np.int64],
@@ -84,7 +84,7 @@ def nb_calc_radial_funcs(
 
     """
     _, _, radial_funcs_count, radial_basis_size = radial_coeffs.shape
-    values, derivs = nb_calc_radial_basis(
+    values, derivs = calc_radial_basis(
         r_abs,
         radial_basis_size,
         scaling,
