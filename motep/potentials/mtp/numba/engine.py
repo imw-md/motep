@@ -69,7 +69,7 @@ class NumbaMTPEngine(EngineBase):
         self.mbd.clean()
         self.rbd.clean()
 
-        energies, gradient = _calc_train(
+        energies = _calc_train(
             all_js,
             all_r_ijs,
             itypes,
@@ -194,7 +194,7 @@ def _calc_run(
 
 
 @nb.njit(
-    nb.types.Tuple((nb.float64[:], nb.float64[:, :, :]))(
+    nb.float64[:](
         nb.int64[:, :],
         nb.float64[:, :, :],
         nb.int64[:],
@@ -247,7 +247,6 @@ def _calc_train(
     mbd_dsdcs: npt.NDArray[np.float64],
 ):
     energies = species_coeffs[itypes]
-    gradient = np.zeros((itypes.size, all_jtypes.shape[1], 3))
     for i in nb.prange(itypes.size):
         js = all_js[i, :]
         r_ijs = all_r_ijs[i, :, :]
@@ -299,12 +298,7 @@ def _calc_train(
         for basis_i, coeff in enumerate(moment_coeffs):
             energies[i] += coeff * basis_values[basis_i]
 
-        for basis_i, coeff in enumerate(moment_coeffs):
-            for j in range(r_abs.size):
-                for k in range(3):
-                    gradient[i, j, k] += coeff * basis_jac_rs[basis_i, j, k]
-
-    return energies, gradient
+    return energies
 
 
 @nb.njit(
