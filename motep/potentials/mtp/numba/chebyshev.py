@@ -52,17 +52,16 @@ def calc_radial_basis(
     max_dist: np.float64,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """Calculate radial basis values."""
-    number_of_neighbors = r_abs.size
-    values = np.zeros((radial_basis_size, number_of_neighbors))
-    derivs = np.zeros((radial_basis_size, number_of_neighbors))
-    for j in range(number_of_neighbors):
+    values = np.zeros((radial_basis_size, r_abs.size))
+    derivs = np.zeros((radial_basis_size, r_abs.size))
+    for j in range(r_abs.size):
         if r_abs[j] < max_dist:
             smooth_value = scaling * (max_dist - r_abs[j]) ** 2
             smooth_deriv = -2.0 * scaling * (max_dist - r_abs[j])
             vs0, ds0 = _nb_chebyshev(r_abs[j], radial_basis_size, min_dist, max_dist)
-            for k in range(radial_basis_size):
-                values[k, j] = vs0[k] * smooth_value
-                derivs[k, j] = ds0[k] * smooth_value + vs0[k] * smooth_deriv
+            for i_rb in range(radial_basis_size):
+                values[i_rb, j] = vs0[i_rb] * smooth_value
+                derivs[i_rb, j] = ds0[i_rb] * smooth_value + vs0[i_rb] * smooth_deriv
     return values, derivs
 
 
@@ -94,9 +93,9 @@ def calc_radial_funcs(
     radial_part_vs = np.zeros((radial_funcs_count, r_abs.size))
     radial_part_ds = np.zeros((radial_funcs_count, r_abs.size))
     for j in range(r_abs.size):
-        for i_mu in range(radial_funcs_count):
+        for mu in range(radial_funcs_count):
             for i_rb in range(radial_basis_size):
-                c = radial_coeffs[itype, jtypes[j], i_mu, i_rb]
-                radial_part_vs[i_mu, j] += c * values[i_rb, j]
-                radial_part_ds[i_mu, j] += c * derivs[i_rb, j]
+                c = radial_coeffs[itype, jtypes[j], mu, i_rb]
+                radial_part_vs[mu, j] += c * values[i_rb, j]
+                radial_part_ds[mu, j] += c * derivs[i_rb, j]
     return radial_part_vs, radial_part_ds
