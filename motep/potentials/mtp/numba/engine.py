@@ -10,9 +10,9 @@ from motep.potentials.mtp.base import EngineBase
 
 from .chebyshev import calc_radial_basis, calc_radial_funcs
 from .moment import (
-    calc_local_energy_and_gradient,
-    calc_moment,
-    store_radial_basis_values,
+    calc_moments_run,
+    calc_moments_train,
+    store_radial_basis,
     update_mbd_dbdeps,
     update_mbd_dbdris,
     update_mbd_dedcs,
@@ -37,7 +37,7 @@ class NumbaMTPEngine(EngineBase):
 
         itypes = get_types(atoms, mtp_data.species)
         all_jtypes = itypes[all_js]
-        energies, gradient = _calc_energy_and_gradient(
+        energies, gradient = _calc_run(
             all_r_ijs,
             itypes,
             all_jtypes,
@@ -69,7 +69,7 @@ class NumbaMTPEngine(EngineBase):
         self.mbd.clean()
         self.rbd.clean()
 
-        energies, gradient = _calc_energy_and_gradient_train(
+        energies, gradient = _calc_train(
             all_js,
             all_r_ijs,
             itypes,
@@ -124,6 +124,77 @@ def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
 
 @nb.njit(
     nb.types.Tuple((nb.float64[:], nb.float64[:, :, :]))(
+        nb.float64[:, :, :],
+        nb.int64[:],
+        nb.int64[:, :],
+        nb.int64,
+        nb.int64[:],
+        nb.int64[:, :],
+        nb.int64[:, :],
+        nb.float64,
+        nb.float64,
+        nb.float64,
+        nb.float64[:, :, :, :],
+        nb.float64[:],
+        nb.float64[:],
+    ),
+    # parallel=True,
+)
+def _calc_run(
+    all_r_ijs: npt.NDArray[np.float64],
+    itypes: npt.NDArray[np.int64],
+    all_jtypes: npt.NDArray[np.int64],
+    alpha_moments_count: np.int64,
+    alpha_moment_mapping: npt.NDArray[np.int64],
+    alpha_index_basic: npt.NDArray[np.int64],
+    alpha_index_times: npt.NDArray[np.int64],
+    scaling: np.float64,
+    min_dist: np.float64,
+    max_dist: np.float64,
+    radial_coeffs: npt.NDArray[np.float64],
+    species_coeffs: npt.NDArray[np.float64],
+    moment_coeffs: npt.NDArray[np.float64],
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+
+    energies = species_coeffs[itypes]
+    gradient = np.zeros((itypes.size, all_jtypes.shape[1], 3))
+
+    for i in nb.prange(itypes.size):
+        r_abs = _nb_linalg_norm(all_r_ijs[i, :, :])
+        r_ijs_unit = _calc_r_unit(all_r_ijs[i, :, :], r_abs)
+        rb_values, rb_derivs = calc_radial_funcs(
+            r_abs,
+            itypes[i],
+            all_jtypes[i, :],
+            radial_coeffs,
+            scaling,
+            min_dist,
+            max_dist,
+        )
+        basis_values, local_gradient = calc_moments_run(
+            r_ijs_unit,
+            r_abs,
+            rb_values,
+            rb_derivs,
+            alpha_moments_count,
+            alpha_moment_mapping,
+            alpha_index_basic,
+            alpha_index_times,
+            moment_coeffs,
+        )
+
+        for basis_i, coeff in enumerate(moment_coeffs):
+            energies[i] += coeff * basis_values[basis_i]
+
+        for j in range(r_abs.size):
+            for k in range(3):
+                gradient[i, j, k] = local_gradient[j, k]
+
+    return energies, gradient
+
+
+@nb.njit(
+    nb.types.Tuple((nb.float64[:], nb.float64[:, :, :]))(
         nb.int64[:, :],
         nb.float64[:, :, :],
         nb.int64[:],
@@ -150,7 +221,7 @@ def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
     ),
     # parallel=True,
 )
-def _calc_energy_and_gradient_train(
+def _calc_train(
     all_js: npt.NDArray[np.int64],
     all_r_ijs: npt.NDArray[np.float64],
     itypes: npt.NDArray[np.int64],
@@ -190,7 +261,7 @@ def _calc_energy_and_gradient_train(
             min_dist,
             max_dist,
         )
-        store_radial_basis_values(
+        store_radial_basis(
             i,
             itypes[i],
             js,
@@ -203,7 +274,7 @@ def _calc_energy_and_gradient_train(
             rbd_dqdris,
             rbd_dqdeps,
         )
-        basis_values, basis_jac_rs, dedcs, dgdcs = calc_moment(
+        basis_values, basis_jac_rs, dedcs, dgdcs = calc_moments_train(
             itypes[i],
             jtypes,
             r_abs,
@@ -218,10 +289,6 @@ def _calc_energy_and_gradient_train(
             moment_coeffs,
         )
 
-        # energies[i] = moment_coeffs @ basis_values
-        for basis_i in range(len(moment_coeffs)):
-            energies[i] += moment_coeffs[basis_i] * basis_values[basis_i]
-
         update_mbd_values(mbd_values, basis_values)
         update_mbd_dbdris(i, js, mbd_dbdris, basis_jac_rs)
         update_mbd_dbdeps(js, r_ijs, mbd_dbdeps, basis_jac_rs)
@@ -229,77 +296,14 @@ def _calc_energy_and_gradient_train(
         update_mbd_dgdcs(i, itypes[i], js, mbd_dgdcs, dgdcs)
         update_mbd_dsdcs(itypes[i], js, r_ijs, mbd_dsdcs, dgdcs)
 
-        for basis_i in range(len(moment_coeffs)):
-            for j in range(all_jtypes.shape[1]):
+        for basis_i, coeff in enumerate(moment_coeffs):
+            energies[i] += coeff * basis_values[basis_i]
+
+        for basis_i, coeff in enumerate(moment_coeffs):
+            for j in range(r_abs.size):
                 for k in range(3):
-                    gradient[i, j, k] += (
-                        moment_coeffs[basis_i] * basis_jac_rs[basis_i, j, k]
-                    )
-    return energies, gradient
+                    gradient[i, j, k] += coeff * basis_jac_rs[basis_i, j, k]
 
-
-@nb.njit(
-    nb.types.Tuple((nb.float64[:], nb.float64[:, :, :]))(
-        nb.float64[:, :, :],
-        nb.int64[:],
-        nb.int64[:, :],
-        nb.int64,
-        nb.int64[:],
-        nb.int64[:, :],
-        nb.int64[:, :],
-        nb.float64,
-        nb.float64,
-        nb.float64,
-        nb.float64[:, :, :, :],
-        nb.float64[:],
-        nb.float64[:],
-    ),
-    # parallel=True,
-)
-def _calc_energy_and_gradient(
-    all_r_ijs: npt.NDArray[np.float64],
-    itypes: npt.NDArray[np.int64],
-    all_jtypes: npt.NDArray[np.int64],
-    alpha_moments_count: np.int64,
-    alpha_moment_mapping: npt.NDArray[np.int64],
-    alpha_index_basic: npt.NDArray[np.int64],
-    alpha_index_times: npt.NDArray[np.int64],
-    scaling: np.float64,
-    min_dist: np.float64,
-    max_dist: np.float64,
-    radial_coeffs: npt.NDArray[np.float64],
-    species_coeffs: npt.NDArray[np.float64],
-    moment_coeffs: npt.NDArray[np.float64],
-) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    energies = species_coeffs[itypes]
-    gradient = np.zeros((itypes.size, all_jtypes.shape[1], 3))
-    for i in nb.prange(itypes.size):
-        r_abs = _nb_linalg_norm(all_r_ijs[i, :, :])
-        r_ijs_unit = _calc_r_unit(all_r_ijs[i, :, :], r_abs)
-        rb_values, rb_derivs = calc_radial_funcs(
-            r_abs,
-            itypes[i],
-            all_jtypes[i, :],
-            radial_coeffs,
-            scaling,
-            min_dist,
-            max_dist,
-        )
-        local_energy, local_gradient = calc_local_energy_and_gradient(
-            r_ijs_unit,
-            r_abs,
-            rb_values,
-            rb_derivs,
-            alpha_moments_count,
-            alpha_moment_mapping,
-            alpha_index_basic,
-            alpha_index_times,
-            moment_coeffs,
-        )
-        energies[i] += local_energy
-        for j in range(all_jtypes.shape[1]):
-            for k in range(3):
-                gradient[i, j, k] = local_gradient[j, k]
     return energies, gradient
 
 
