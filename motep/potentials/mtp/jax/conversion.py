@@ -130,7 +130,11 @@ class BasisConverter:
         bc_map = {}
         mlip_moment_basis = MLIPMomentBasis(mtp_data)
         mlip_basis_values = mlip_moment_basis.calculate(r_unit, rb_values)
-        for coef, mlip_basis_value in zip(mtp_data.moment_coeffs, mlip_basis_values):
+        for coef, mlip_basis_value in zip(
+            mtp_data.moment_coeffs,
+            mlip_basis_values,
+            strict=True,
+        ):
             bc_map[float(mlip_basis_value)] = coef
 
         # Calculate our basis for test vectors
@@ -149,7 +153,11 @@ class BasisConverter:
         remaining_mlip_bs = list(bc_map.keys())
 
         relative_tolerance = 1e-8
-        for basis_value, contraction in zip(basis, moment_basis.scalar_contractions):
+        for basis_value, contraction in zip(
+            basis,
+            moment_basis.scalar_contractions,
+            strict=True,
+        ):
             for mlip_basis_value, coef in bc_map.items():
                 if np.isclose(mlip_basis_value, basis_value, rtol=relative_tolerance):
                     remapped_coeffs.append(coef)
