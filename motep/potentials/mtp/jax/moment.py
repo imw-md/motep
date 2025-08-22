@@ -11,6 +11,7 @@ from itertools import (
 )
 
 import numpy as np
+import numpy.typing as npt
 
 from .utils import TEST_R_UNITS, TEST_RB_VALUES, make_tensor
 
@@ -25,7 +26,7 @@ DEFAULT_MAX_MOMENTS = 4
 calculated_test_moments = {}
 
 
-def _get_test_moments(moments):
+def _get_test_moments(moments: list) -> dict:
     calculated_moments = {}
     for moment in moments:
         mu, nu = moment[0:2]
@@ -35,20 +36,19 @@ def _get_test_moments(moments):
 
 
 @cache
-def _get_test_moment(nu, mu):
+def _get_test_moment(nu: int, mu: int) -> npt.NDArray[np.float64]:
     m = _get_test_tensor(nu)
-    m = (m * TEST_RB_VALUES[mu]).sum(axis=-1)
-    return m
+    return (m * TEST_RB_VALUES[mu]).sum(axis=-1)
 
 
 @cache
-def _get_test_tensor(nu):
+def _get_test_tensor(nu: int) -> npt.NDArray[np.float64]:
     make_tensor(TEST_R_UNITS, nu)
 
 
 @cache
-def _find_possible_axes(ldim, rdim):
-    """Returns possible axes to sum over.
+def _find_possible_axes(ldim: int, rdim: int) -> list:
+    """Find possible axes to sum over.
 
     Returns the allowed axes to sum over (see np.tensordot) of a contraction between ldim and rdim dimensional moments.
     """
@@ -75,19 +75,18 @@ def _find_possible_axes(ldim, rdim):
 
 
 # @cache  # Slows down
-def _get_contraction_dimension(contraction):
+def _get_contraction_dimension(contraction: list[tuple]) -> int:
     if type(contraction[0]) is not tuple:
         if type(contraction[1]) is tuple:
-            raise ValueError()
+            raise TypeError
         return contraction[1]
     ldim = _get_contraction_dimension(contraction[0])
     rdim = _get_contraction_dimension(contraction[1])
     naxes = len(contraction[3][0])
-    dim = ldim + rdim - 2 * naxes
-    return dim
+    return ldim + rdim - 2 * naxes
 
 
-def _get_cheapest_contraction(map_list):
+def _get_cheapest_contraction(map_list: list) -> list[list[int | list[int]]]:
     lowest_cost = 100_000_000  # Big
     for mapping in map_list:
         cost = 0
@@ -100,7 +99,7 @@ def _get_cheapest_contraction(map_list):
     return cheapest_mapping
 
 
-def _flatten_nested_pair_tuples(tpl, lst=None):
+def _flatten_nested_pair_tuples(tpl: tuple, lst: list | None = None) -> tuple:
     if lst is None:
         lst = []
     if type(tpl[0]) is not tuple:
@@ -141,6 +140,7 @@ class MomentBasis:
         .. [Podryabinkin_JCP_2023_MLIP]
           E. Podryabinkin, K. Garifullin, A. Shapeev, and I. Novikov,
           J. Chem. Phys. 159, (2023).
+
         """
         self.max_level = max_level
         self.basic_moments = None
@@ -151,12 +151,13 @@ class MomentBasis:
         else:
             self.max_contraction_length = int(max_level / 2)
 
-    def init_moment_mappings(self):
+    def init_moment_mappings(self) -> None:
+        """Initialize moment mappings."""
         self.scalar_contractions = self.get_moment_contractions()
         self.basic_moments = extract_basic_moments(self.scalar_contractions)
         self.pair_contractions = extract_pair_contractions(self.scalar_contractions)
 
-    def get_moment_contractions(self):
+    def get_moment_contractions(self) -> None:
         """Get the contraction list."""
         max_moments = np.min([int(self.max_level / 2), self.max_contraction_length])
         try:
@@ -220,11 +221,11 @@ def _get_filename(max_level, max_moments):
     return filename
 
 
-def _to_tuple_recursively(lst):
+def _to_tuple_recursively(lst: list) -> tuple:
     return tuple(_to_tuple_recursively(i) if isinstance(i, list) else i for i in lst)
 
 
-def _get_contractions_from_basic_moments(index_combo):
+def _get_contractions_from_basic_moments(index_combo) -> list:
     # For max 4 moments its okay to semi-explicitly enumerate them.
     moments = [(m[0], m[1], m[1]) for m in index_combo]
     if len(moments) == 1:
@@ -339,7 +340,7 @@ def _test_contraction(contraction):
     return last_contraction
 
 
-def extract_basic_moments(contractions):
+def extract_basic_moments(contractions: list) -> tuple:
     basic_moments = []
     for contraction in contractions:
         flat = _flatten_nested_pair_tuples(contraction)
@@ -349,7 +350,7 @@ def extract_basic_moments(contractions):
     return tuple(basic_moments)
 
 
-def extract_pair_contractions(contractions_list):
+def extract_pair_contractions(contractions_list: list) -> tuple:
     pair_contractions = []
     for contractions in contractions_list:
         lst = _extract_pair_contractions_from_mapping_rec(contractions)

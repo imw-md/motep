@@ -2,6 +2,7 @@
 
 from warnings import warn
 
+import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 
@@ -45,10 +46,11 @@ class MLIPMomentBasis:
 
         Parameters
         ----------
-        r_ijs : np.ndarray (number_of_neighbors, 3)
+        r_ijs_unit : np.ndarray (number_of_neighbors, 3)
             :math:`\mathbf{r}_j - \mathbf{r}_i`,
             where i is the center atom, and j are the neighboring atoms.
         rb_values : np.ndarray (max_mu, number_of_neighbors)
+            Precomputed radial basis values.
 
         Returns
         -------
@@ -103,13 +105,13 @@ def _contract_moments(
 
 
 class BasisConverter:
-    """Class to store and convert mapping between MTP basis functions and coefficients."""
+    """Class to store and convert mapping between MTP basis and coefficients."""
 
-    def __init__(self, moment_basis: MomentBasis):
+    def __init__(self, moment_basis: MomentBasis) -> None:
         self.moment_basis = moment_basis
         self.remapped_coeffs = None
 
-    def remap_mlip_moment_coeffs(self, mtp_data: MTPData):
+    def remap_mlip_moment_coeffs(self, mtp_data: MTPData) -> None:
         """Perform a remapping of the MLIP coeffs loaded to this potentials basis.
 
         This might be needed because the ordereing might be different or some basis elements omitted.
@@ -168,12 +170,12 @@ class BasisConverter:
 
 
 def _calc_moment_basis(
-    r_unit,
-    rb_values,
-    basic_moments,
-    pair_contractions,
-    scalar_contractions,
-):
+    r_unit: npt.NDArray[np.float64],
+    rb_values: npt.NDArray[np.float64],
+    basic_moments: tuple,
+    pair_contractions: tuple,
+    scalar_contractions: tuple,
+) -> list:
     calculated_moments = _calc_basic_moments(r_unit, rb_values, basic_moments)
     for contraction in pair_contractions:
         m1 = calculated_moments[contraction[0]]
@@ -188,7 +190,11 @@ def _calc_moment_basis(
     return basis
 
 
-def _calc_basic_moments(r_unit, rb_values, moment_descriptions):
+def _calc_basic_moments(
+    r_unit: npt.NDArray[np.float64],
+    rb_values: npt.NDArray[np.float64],
+    moment_descriptions: tuple,
+) -> dict:
     calculated_moments = {}
     for moment in moment_descriptions:
         mu, nu = moment[0:2]
