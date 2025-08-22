@@ -1,3 +1,11 @@
+"""Utility functions and classes for moment basis representation and creation.
+
+This module provides:
+- MomentBasis: Representation of moment basis;
+- extract_basic_moments: Extracts the basic moments given a list of contractions;
+- extract_pair_contractions: Extracts a list of all pair contractions.
+"""
+
 import json
 import os
 from copy import deepcopy
@@ -50,7 +58,11 @@ def _get_test_tensor(nu: int) -> npt.NDArray[np.float64]:
 def _find_possible_axes(ldim: int, rdim: int) -> list:
     """Find possible axes to sum over.
 
-    Returns the allowed axes to sum over (see np.tensordot) of a contraction between ldim and rdim dimensional moments.
+    Returns
+    -------
+    The allowed axes to sum over (see np.tensordot) of a contraction between
+    ldim and rdim dimensional moments.
+
     """
     # This is too brute force. ((0, 3), (0, 3), (0, 3), (0, 3)) finally results
     # in almost 5 million possible contractions.
@@ -118,10 +130,13 @@ class MomentBasis:
         self,
         max_level: int,
         max_contraction_length: int | None = DEFAULT_MAX_MOMENTS,
-    ):
-        """
+        max_mu: int | None = DEFAULT_MAX_MU,
+        max_nu: int | None = DEFAULT_MAX_NU,
+    ) -> None:
+        """Representation of moment basis.
+
         Parameters
-        ---------
+        ----------
         max_level : int
             Defines the maximum level of the moment contractions.
 
@@ -181,23 +196,21 @@ class MomentBasis:
         nu_max = int(np.max([self.max_level / 2 - 2, 0]))
         moment_index_list = list(product(range(mu_max + 1), range(nu_max + 1)))
         scalar_contractions = []
-        for nmoments in range(1, max_moments + 1):
-            for moment_combo in combinations_with_replacement(
-                moment_index_list, nmoments
-            ):
+        for nmoments in range(1, max_nmoments + 1):
+            combos = combinations_with_replacement(moment_index_list, nmoments)
+            for moment_combo in combos:
                 level = np.sum([2 + 4 * mu + nu for mu, nu in moment_combo])
                 if level > self.max_level:
                     continue
                 possible_contractions = _get_contractions_from_basic_moments(
-                    moment_combo
+                    moment_combo,
                 )
                 possible_contractions = [c for c in possible_contractions if c[2] == 0]
                 if len(possible_contractions) == 0:
                     continue
                 contractions = _extract_unique_contractions(possible_contractions)
                 scalar_contractions.extend(contractions)
-        scalar_contractions = tuple(scalar_contractions)
-        return scalar_contractions
+        return tuple(scalar_contractions)
 
     def read_moments(self, max_number_of_moments):
         filename = _get_filename(self.max_level, max_number_of_moments)

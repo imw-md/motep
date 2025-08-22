@@ -114,7 +114,13 @@ class BasisConverter:
     def remap_mlip_moment_coeffs(self, mtp_data: MTPData) -> None:
         """Perform a remapping of the MLIP coeffs loaded to this potentials basis.
 
-        This might be needed because the ordereing might be different or some basis elements omitted.
+        This might be needed because the ordereing might be different or some
+        basis elements omitted.
+
+        Raises
+        ------
+        RuntimeError: If the MLIP moment basis is not found.
+
         """
         r_unit = TEST_R_UNITS
         rb_values = TEST_RB_VALUES
@@ -152,14 +158,14 @@ class BasisConverter:
             else:
                 warn(
                     "Basis contraction was not found in the MLIP file. "
-                    f"It will now be omitted from the basis.\n{contraction}: {basis_value}"
+                    "It will now be omitted from the basis.\n"
+                    f"{contraction}: {basis_value}",
                 )
                 basis_contractions_to_remove.append(contraction)
 
         if len(remaining_mlip_bs) > 0:
-            raise RuntimeError(
-                "Not all MLIP contractions found:\n" f"{remaining_mlip_bs}\n"
-            )
+            msg = f"Not all MLIP contractions found:\n{remaining_mlip_bs}\n"
+            raise RuntimeError(msg)
 
         # Remove contractions not present in the MLIP potential file
         # [should rarely be needed, as they now agree perfectly (tested at least to lvl 22)]
