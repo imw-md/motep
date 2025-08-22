@@ -32,7 +32,7 @@ DEFAULT_MAX_NU = 10
 # Functions for finding moments and all unique contractions for some level
 #
 
-# Global dict to store calculated test moments
+# Global dict to store/cache calculated test moments
 calculated_test_moments = {}
 
 
@@ -67,20 +67,18 @@ def _find_possible_axes(ldim: int, rdim: int) -> list:
 
     """
     # This is too brute force. ((0, 3), (0, 3), (0, 3), (0, 3)) finally results
-    # in almost 5 million possible contractions.
-    # Need to reduce this...
-    if ldim == 0 or rdim == 0:
-        min_naxes = 0
-    else:
-        min_naxes = 1  # Up to (including) level 20, 0 should not be needed
+    # in almost 5 million possible contractions. Needs to be reduced...
+    # Up to (including) level 20, we can exclude 0
+    min_naxes = 0 if ldim == 0 or rdim == 0 else 1
     max_naxes = np.min([ldim, rdim]) + 1
+
     l_all_axes = list(range(ldim))
     r_all_axes = list(range(rdim))
+
     all_axes = []
     for naxes in range(min_naxes, max_naxes):
-        # for laxes in permutations(l_all_axes, naxes):
-        # for laxes in combinations(l_all_axes, naxes):
-        # We always have a symmetric left side moment, so below is enough
+        # We always have a symmetric left side moment, so the below combinations
+        # are enough
         laxes = tuple(l_all_axes[:naxes])
         for raxes in permutations(r_all_axes, naxes):
             axes = (laxes, raxes)
@@ -101,7 +99,7 @@ def _get_contraction_dimension(contraction: list[tuple]) -> int:
 
 
 def _get_cheapest_contraction(map_list: list) -> list[list[int | list[int]]]:
-    lowest_cost = 100_000_000  # Big
+    lowest_cost = 100_000_000  # Start with something big
     for mapping in map_list:
         cost = 0
         for contraction in _extract_pair_contractions_from_mapping_rec(mapping):
