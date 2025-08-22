@@ -24,6 +24,8 @@ import numpy.typing as npt
 from .utils import TEST_R_UNITS, TEST_RB_VALUES, make_tensor
 
 DEFAULT_MAX_MOMENTS = 4
+DEFAULT_MAX_MU = 5
+DEFAULT_MAX_NU = 10
 
 
 #
@@ -140,10 +142,11 @@ class MomentBasis:
         max_level : int
             Defines the maximum level of the moment contractions.
 
-        nmoments_max : int or None
-            Sets the upper limit for the number of moments in a contraction.
-            Defaults to 4, but can also be None, in which case it is set to
-            max_level / 2, i.e. all possible included (Warning, see Note.).
+        max_contraction_length, max_mu, max_nu : int or None
+            Sets the upper limit for the number of moments in a contraction, the
+            mu index and the nu index, respectively.  Defaults to 4, 5 and 10,
+            respectively, and can also be None, in which case all possible
+            according to the equation for max level is included (see Notes).
 
         Notes
         -----
@@ -164,7 +167,15 @@ class MomentBasis:
         if max_contraction_length is not None:
             self.max_contraction_length = max_contraction_length
         else:
-            self.max_contraction_length = int(max_level / 2)
+            self.max_contraction_length = int(self.max_level / 2)
+        if max_mu is not None:
+            self.max_mu = max_mu
+        else:
+            self.max_mu = int(np.floor((self.max_level - 2) / 4))
+        if max_nu is not None:
+            self.max_nu = max_nu
+        else:
+            self.max_nu = int(np.max([self.max_level / 2 - 2, 0]))
 
     def init_moment_mappings(self) -> None:
         """Initialize moment mappings."""
@@ -174,16 +185,15 @@ class MomentBasis:
 
     def get_moment_contractions(self) -> None:
         """Get the contraction list."""
-        max_moments = np.min([int(self.max_level / 2), self.max_contraction_length])
         try:
-            scalar_contractions = self.read_moments(max_moments)
+            scalar_contractions = self.read_moments()
         except FileNotFoundError:
-            scalar_contractions = self.find_moment_contractions(max_moments)
-        self.write_moments(scalar_contractions, max_moments)
+            scalar_contractions = self.find_moment_contractions()
+        self.write_moments(scalar_contractions)
         return scalar_contractions
 
-    def find_moment_contractions(self, max_moments):
-        """Enumerates all possible moments and contractions.
+    def find_moment_contractions(self) -> tuple:
+        """Enumerate all possible moments and contractions.
 
         Returns
         -------
@@ -192,9 +202,10 @@ class MomentBasis:
             in a unique scalar.
 
         """
-        mu_max = int(np.floor((self.max_level - 2) / 4))
-        nu_max = int(np.max([self.max_level / 2 - 2, 0]))
-        moment_index_list = list(product(range(mu_max + 1), range(nu_max + 1)))
+        max_mu = int(np.min([np.floor((self.max_level - 2) / 4), self.max_mu]))
+        max_nu = int(np.min([np.max([self.max_level / 2 - 2, 0]), self.max_nu]))
+        max_nmoments = int(np.min([self.max_level / 2, self.max_contraction_length]))
+        moment_index_list = list(product(range(max_mu + 1), range(max_nu + 1)))
         scalar_contractions = []
         for nmoments in range(1, max_nmoments + 1):
             combos = combinations_with_replacement(moment_index_list, nmoments)
@@ -212,7 +223,7 @@ class MomentBasis:
                 scalar_contractions.extend(contractions)
         return tuple(scalar_contractions)
 
-    def read_moments(self, max_number_of_moments: int) -> list:
+    def read_moments(self) -> list:
         """Read moment representations from a json file.
 
         Returns
@@ -220,25 +231,43 @@ class MomentBasis:
         List of the read moments.
 
         """
-        file = pathlib.Path(_get_filename(self.max_level, max_number_of_moments))
+        file = _get_file_path(
+            self.max_level,
+            self.max_mu,
+            self.max_nu,
+            self.max_contraction_length,
+        )
         with file.open() as f:
             moments = json.load(f)
         moments = _to_tuple_recursively(moments)
         return moments
 
-    def write_moments(self, moments: list, max_number_of_moments: int) -> None:
-        file = pathlib.Path(_get_filename(self.max_level, max_number_of_moments))
+    def write_moments(self, moments: list) -> None:
+        file = _get_file_path(
+            self.max_level,
+            self.max_mu,
+            self.max_nu,
+            self.max_contraction_length,
+        )
         with file.open("w") as f:
             json.dump(moments, f)
 
 
-def _get_filename(max_level: int, max_moments: int) -> str:
+def _get_file_path(
+    max_level: int,
+    max_mu: int,
+    max_nu: int,
+    max_moments: int,
+) -> pathlib.Path:
     data_path = pathlib.Path(__file__).parent / "precomputed_moments"
-    if max_moments != np.min([int(max_level / 2), DEFAULT_MAX_MOMENTS]):
-        filename = data_path / f"moments_level{max_level}_max{max_moments}moments.json"
-    else:
-        filename = data_path / f"moments_level{max_level}.json"
-    return filename
+    filename = data_path / f"moments_level{max_level}"
+    if max_mu != int(np.min([np.floor((max_level - 2) / 4), DEFAULT_MAX_MU])):
+        filename /= f"_maxmu{max_mu}"
+    if max_nu != int(np.min([np.max([max_level / 2 - 2, 0]), DEFAULT_MAX_NU])):
+        filename /= f"_maxnu{max_nu}"
+    if max_moments != int(np.min([max_level / 2, DEFAULT_MAX_MOMENTS])):
+        filename /= f"_max{max_moments}moments"
+    return filename.with_suffix(".json")
 
 
 def _to_tuple_recursively(lst: list) -> tuple:
