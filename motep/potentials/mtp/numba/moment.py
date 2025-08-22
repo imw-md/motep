@@ -137,32 +137,31 @@ def _calc_moment_basic(
     alpha_index_basic,
     rb_values,
     rb_derivs,
-    moment_components,
-    moment_jacobian,
+    moment_values,
+    moment_jac_rs,
 ) -> None:
     """Compute basic moment components and its jacobian wrt `r_ijs`."""
     # Precompute powers
     max_pow = int(np.max(alpha_index_basic))
     r_unit_pows = _calc_r_unit_pows(r_ijs_unit, max_pow)
 
-    number_of_js = moment_jacobian.shape[1]
-    for aib_i, aib in enumerate(alpha_index_basic):
+    for i_aib, aib in enumerate(alpha_index_basic):
         mu, xpow, ypow, zpow = aib
         xyzpow = xpow + ypow + zpow
-        for j in range(number_of_js):
+        for j in range(r_abs.size):
             mult0 = 1.0
             mult0 *= r_unit_pows[xpow, j, 0]
             mult0 *= r_unit_pows[ypow, j, 1]
             mult0 *= r_unit_pows[zpow, j, 2]
-            moment_components[aib_i] += rb_values[mu, j] * mult0
+            moment_values[i_aib] += rb_values[mu, j] * mult0
             for k in range(3):
-                moment_jacobian[aib_i, j, k] = (
+                moment_jac_rs[i_aib, j, k] = (
                     r_ijs_unit[j, k]
                     * mult0
                     * (rb_derivs[mu, j] - xyzpow * rb_values[mu, j] / r_abs[j])
                 )
             if xpow != 0:
-                moment_jacobian[aib_i, j, 0] += (
+                moment_jac_rs[i_aib, j, 0] += (
                     rb_values[mu, j]
                     * (xpow * r_unit_pows[xpow - 1, j, 0])
                     * r_unit_pows[ypow, j, 1]
@@ -170,7 +169,7 @@ def _calc_moment_basic(
                     / r_abs[j]
                 )
             if ypow != 0:
-                moment_jacobian[aib_i, j, 1] += (
+                moment_jac_rs[i_aib, j, 1] += (
                     rb_values[mu, j]
                     * r_unit_pows[xpow, j, 0]
                     * (ypow * r_unit_pows[ypow - 1, j, 1])
@@ -178,7 +177,7 @@ def _calc_moment_basic(
                     / r_abs[j]
                 )
             if zpow != 0:
-                moment_jacobian[aib_i, j, 2] += (
+                moment_jac_rs[i_aib, j, 2] += (
                     rb_values[mu, j]
                     * r_unit_pows[xpow, j, 0]
                     * r_unit_pows[ypow, j, 1]
@@ -193,12 +192,16 @@ def _contract_moments(
     moment_values: npt.NDArray[np.float64],
     moment_jac_rs: npt.NDArray[np.float64],
 ) -> None:
-    """Compute contractions of moments."""
-    number_of_js = moment_jac_rs.shape[1]
+    """Compute moment contractions."""
+    # Contract the moment values
     for ait in alpha_index_times:
         i1, i2, mult, i3 = ait
         moment_values[i3] += mult * moment_values[i1] * moment_values[i2]
-        for j in range(number_of_js):
+
+    # Contract the jacobians of all moment components
+    for ait in alpha_index_times:
+        i1, i2, mult, i3 = ait
+        for j in range(moment_jac_rs.shape[1]):
             for k in range(3):
                 moment_jac_rs[i3, j, k] += mult * (
                     moment_jac_rs[i1, j, k] * moment_values[i2]
@@ -216,36 +219,45 @@ def _contract_moments(
         nb.float64[:, :, :],
     ),
 )
-def _propagate_backward(
+def _contract_moments_backwards(
     alpha_index_basic,
     alpha_index_times,
     alpha_moment_mapping,
     moment_coeffs,
-    moment_components,
-    moment_jacobian,
+    moment_values,
+    moment_jac_rs,
 ):
-    """Calculate gradients using backward propagation."""
-    # alternatively with backpropagation: (saves in the order of 20% for higher levels)
-    alpha_moments_count, number_of_js, _ = moment_jacobian.shape
-    tmp_moment_ders = np.zeros((alpha_moments_count,))
+    """Compute moment contractions.
+
+    Propagates backwards for the gradient and returns it without computing all
+    moment jacobians. This speeds up around 4 times for level 20.
+
+    """
+    # First do the values as usual.
+    for ait in alpha_index_times:
+        i1, i2, mult, i3 = ait
+        moment_values[i3] += mult * moment_values[i1] * moment_values[i2]
+
+    # Now go backwards for the jacobians/gradient
+    tmp_moment_ders = np.zeros(moment_jac_rs.shape[0])
     for basis_i, moment_i in enumerate(alpha_moment_mapping):
         tmp_moment_ders[moment_i] = moment_coeffs[basis_i]
     for ait in alpha_index_times[::-1]:
         i1, i2, mult, i3 = ait
-        tmp_moment_ders[i2] += tmp_moment_ders[i3] * mult * moment_components[i1]
-        tmp_moment_ders[i1] += tmp_moment_ders[i3] * mult * moment_components[i2]
+        tmp_moment_ders[i2] += tmp_moment_ders[i3] * mult * moment_values[i1]
+        tmp_moment_ders[i1] += tmp_moment_ders[i3] * mult * moment_values[i2]
 
-    gradient = np.zeros((number_of_js, 3))
+    gradient = np.zeros(moment_jac_rs.shape[1:])
     for aib_i in range(alpha_index_basic.shape[0]):
-        for j in range(number_of_js):
+        for j in range(moment_jac_rs.shape[1]):
             for k in range(3):
-                gradient[j, k] += tmp_moment_ders[aib_i] * moment_jacobian[aib_i, j, k]
+                gradient[j, k] += tmp_moment_ders[aib_i] * moment_jac_rs[aib_i, j, k]
 
     return gradient
 
 
 @nb.njit(
-    nb.types.Tuple((nb.float64, nb.float64[:, :]))(
+    nb.types.Tuple((nb.float64[:], nb.float64[:, :]))(
         nb.float64[:, :],
         nb.float64[:],
         nb.float64[:, :],
@@ -257,7 +269,7 @@ def _propagate_backward(
         nb.float64[:],
     ),
 )
-def nb_calc_local_energy_and_gradient(
+def calc_moments_run(
     r_ijs_unit: npt.NDArray[np.float64],
     r_abs: npt.NDArray[np.float64],
     rb_values: npt.NDArray[np.float64],
@@ -268,9 +280,9 @@ def nb_calc_local_energy_and_gradient(
     alpha_index_times: npt.NDArray[np.int64],
     moment_coeffs: npt.NDArray[np.float64],
 ):
-    (number_of_js,) = r_abs.shape
-    moment_components = np.zeros(alpha_moments_count)
-    moment_jacobian = np.zeros((alpha_moments_count, number_of_js, 3))
+    amc = alpha_moments_count
+    moment_values = np.zeros(amc)
+    moment_jac_rs = np.zeros((amc, *r_ijs_unit.shape))
 
     _calc_moment_basic(
         r_abs,
@@ -278,30 +290,20 @@ def nb_calc_local_energy_and_gradient(
         alpha_index_basic,
         rb_values,
         rb_derivs,
-        moment_components,
-        moment_jacobian,
+        moment_values,
+        moment_jac_rs,
     )
 
-    # For moments and energy:
-    # Compute moment contraction components
-    for ait in alpha_index_times:
-        i1, i2, mult, i3 = ait
-        moment_components[i3] += mult * moment_components[i1] * moment_components[i2]
-    # Extract basis elements and multiply with moment coefficients
-    energy = 0.0
-    for basis_i, moment_i in enumerate(alpha_moment_mapping):
-        energy += moment_coeffs[basis_i] * moment_components[moment_i]
-
-    gradient = _propagate_backward(
+    gradient = _contract_moments_backwards(
         alpha_index_basic,
         alpha_index_times,
         alpha_moment_mapping,
         moment_coeffs,
-        moment_components,
-        moment_jacobian,
+        moment_values,
+        moment_jac_rs,
     )
 
-    return energy, gradient
+    return moment_values[alpha_moment_mapping], gradient
 
 
 @nb.njit(
@@ -329,8 +331,8 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
     rb_values: np.ndarray,
     rb_derivs: np.ndarray,
     rb_coeffs: np.ndarray,
-    moment_components: np.ndarray,
-    moment_jacobian: np.ndarray,
+    moment_values: np.ndarray,
+    moment_jac_rs: np.ndarray,
     moment_jac_cs: np.ndarray,
     moment_jac_rc: np.ndarray,
 ) -> None:
@@ -341,7 +343,7 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
 
     rbs = rb_coeffs.shape[3]
     der = np.zeros(3)
-    for aib_i, aib in enumerate(alpha_index_basic):
+    for i_aib, aib in enumerate(alpha_index_basic):
         mu, xpow, ypow, zpow = aib
         xyzpow = xpow + ypow + zpow
         for j, jtype in enumerate(jtypes):
@@ -349,17 +351,17 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
             mult0 *= r_unit_pows[xpow, j, 0]
             mult0 *= r_unit_pows[ypow, j, 1]
             mult0 *= r_unit_pows[zpow, j, 2]
-            for ib in range(rbs):
-                val = rb_values[ib, j] * mult0
+            for i_rb in range(rbs):
+                val = rb_values[i_rb, j] * mult0
                 for k in range(3):
                     der[k] = (
                         r_ijs_unit[j, k]
                         * mult0
-                        * (rb_derivs[ib, j] - xyzpow * rb_values[ib, j] / r_abs[j])
+                        * (rb_derivs[i_rb, j] - xyzpow * rb_values[i_rb, j] / r_abs[j])
                     )
                 if xpow != 0:
                     der[0] += (
-                        rb_values[ib, j]
+                        rb_values[i_rb, j]
                         * (xpow * r_unit_pows[xpow - 1, j, 0])
                         * r_unit_pows[ypow, j, 1]
                         * r_unit_pows[zpow, j, 2]
@@ -367,7 +369,7 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
                     )
                 if ypow != 0:
                     der[1] += (
-                        rb_values[ib, j]
+                        rb_values[i_rb, j]
                         * r_unit_pows[xpow, j, 0]
                         * (ypow * r_unit_pows[ypow - 1, j, 1])
                         * r_unit_pows[zpow, j, 2]
@@ -375,20 +377,20 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
                     )
                 if zpow != 0:
                     der[2] += (
-                        rb_values[ib, j]
+                        rb_values[i_rb, j]
                         * r_unit_pows[xpow, j, 0]
                         * r_unit_pows[ypow, j, 1]
                         * (zpow * r_unit_pows[zpow - 1, j, 2])
                         / r_abs[j]
                     )
-                c = rb_coeffs[itype, jtype, mu, ib]
+                c = rb_coeffs[itype, jtype, mu, i_rb]
 
-                moment_components[aib_i] += c * val
+                moment_values[i_aib] += c * val
                 for k in range(3):
-                    moment_jacobian[aib_i, j, k] += c * der[k]
-                moment_jac_cs[aib_i, jtype, mu, ib] += val
+                    moment_jac_rs[i_aib, j, k] += c * der[k]
+                moment_jac_cs[i_aib, jtype, mu, i_rb] += val
                 for k in range(3):
-                    moment_jac_rc[aib_i, jtype, mu, ib, j, k] += der[k]
+                    moment_jac_rc[i_aib, jtype, mu, i_rb, j, k] += der[k]
 
 
 @nb.njit(nb.float64[:, :, :](nb.int64[:], nb.float64[:], nb.float64[:, :, :, :]))
@@ -421,7 +423,7 @@ def _calc_dedcs(
         nb.float64[:, :, :, :, :, :],
     ),
 )
-def cald_dedcs_and_dgdcs(
+def _calc_dedcs_and_dgdcs(
     alpha_index_basic_count: np.int64,
     alpha_index_times: np.ndarray,
     alpha_moment_mapping: np.ndarray,
@@ -521,7 +523,7 @@ def cald_dedcs_and_dgdcs(
         nb.float64[:],
     ),
 )
-def nb_calc_moment(
+def calc_moments_train(
     itype,
     jtypes,
     r_abs: np.ndarray,
@@ -559,7 +561,7 @@ def nb_calc_moment(
 
     _contract_moments(alpha_index_times, moment_values, moment_jac_rs)
 
-    dedcs, dgdcs = cald_dedcs_and_dgdcs(
+    dedcs, dgdcs = _calc_dedcs_and_dgdcs(
         alpha_index_basic.shape[0],
         alpha_index_times,
         alpha_moment_mapping,
@@ -579,7 +581,7 @@ def nb_calc_moment(
 
 
 @nb.njit
-def store_radial_basis_values(
+def store_radial_basis(
     i: np.int64,
     itype: np.int64,
     js: np.ndarray,
