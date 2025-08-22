@@ -144,9 +144,11 @@ class MomentBasis:
 
         max_contraction_length, max_mu, max_nu : int or None
             Sets the upper limit for the number of moments in a contraction, the
-            mu index and the nu index, respectively.  Defaults to 4, 5 and 10,
+            mu index and the nu index, respectively. Defaults to 4, 5 and 10,
             respectively, and can also be None, in which case all possible
             according to the equation for max level is included (see Notes).
+            The attributes are set to the lowest of the given value and the
+            highest possible for a certain max_level.
 
         Notes
         -----
@@ -164,18 +166,25 @@ class MomentBasis:
         self.basic_moments = None
         self.pair_contractions = None
         self.scalar_contractions = None
-        if max_contraction_length is not None:
-            self.max_contraction_length = max_contraction_length
+
+        mcl = max_contraction_length
+        max_possible_mcl = int(self.max_level / 2)
+        if mcl is not None and mcl < max_possible_mcl:
+            self.max_contraction_length = mcl
         else:
-            self.max_contraction_length = int(self.max_level / 2)
-        if max_mu is not None:
+            self.max_contraction_length = max_possible_mcl
+
+        max_possible_mu = int(np.floor((self.max_level - 2) / 4))
+        if max_mu is not None and max_mu < max_possible_mu:
             self.max_mu = max_mu
         else:
-            self.max_mu = int(np.floor((self.max_level - 2) / 4))
-        if max_nu is not None:
+            self.max_mu = max_possible_mu
+
+        max_possible_nu = int(np.max([self.max_level / 2 - 2, 0]))
+        if max_nu is not None and max_nu < max_possible_nu:
             self.max_nu = max_nu
         else:
-            self.max_nu = int(np.max([self.max_level / 2 - 2, 0]))
+            self.max_nu = max_possible_nu
 
     def init_moment_mappings(self) -> None:
         """Initialize moment mappings."""
@@ -260,14 +269,14 @@ def _get_file_path(
     max_moments: int,
 ) -> pathlib.Path:
     data_path = pathlib.Path(__file__).parent / "precomputed_moments"
-    filename = data_path / f"moments_level{max_level}"
+    filename = f"moments_level{max_level}"
     if max_mu != int(np.min([np.floor((max_level - 2) / 4), DEFAULT_MAX_MU])):
-        filename /= f"_maxmu{max_mu}"
+        filename += f"_maxmu{max_mu}"
     if max_nu != int(np.min([np.max([max_level / 2 - 2, 0]), DEFAULT_MAX_NU])):
-        filename /= f"_maxnu{max_nu}"
+        filename += f"_maxnu{max_nu}"
     if max_moments != int(np.min([max_level / 2, DEFAULT_MAX_MOMENTS])):
-        filename /= f"_max{max_moments}moments"
-    return filename.with_suffix(".json")
+        filename += f"_max{max_moments}moments"
+    return data_path / (filename + ".json")
 
 
 def _to_tuple_recursively(lst: list) -> tuple:
