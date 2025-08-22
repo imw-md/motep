@@ -7,7 +7,7 @@ This module provides:
 """
 
 import json
-import os
+import pathlib
 from copy import deepcopy
 from functools import cache
 from itertools import (
@@ -212,25 +212,32 @@ class MomentBasis:
                 scalar_contractions.extend(contractions)
         return tuple(scalar_contractions)
 
-    def read_moments(self, max_number_of_moments):
-        filename = _get_filename(self.max_level, max_number_of_moments)
-        with open(filename, "r") as f:
+    def read_moments(self, max_number_of_moments: int) -> list:
+        """Read moment representations from a json file.
+
+        Returns
+        -------
+        List of the read moments.
+
+        """
+        file = pathlib.Path(_get_filename(self.max_level, max_number_of_moments))
+        with file.open() as f:
             moments = json.load(f)
         moments = _to_tuple_recursively(moments)
         return moments
 
-    def write_moments(self, moments, max_number_of_moments):
-        filename = _get_filename(self.max_level, max_number_of_moments)
-        with open(filename, "w") as f:
+    def write_moments(self, moments: list, max_number_of_moments: int) -> None:
+        file = pathlib.Path(_get_filename(self.max_level, max_number_of_moments))
+        with file.open("w") as f:
             json.dump(moments, f)
 
 
-def _get_filename(max_level, max_moments):
-    data_path = os.path.dirname(__file__) + "/precomputed_moments"
+def _get_filename(max_level: int, max_moments: int) -> str:
+    data_path = pathlib.Path(__file__).parent / "precomputed_moments"
     if max_moments != np.min([int(max_level / 2), DEFAULT_MAX_MOMENTS]):
-        filename = data_path + f"/moments_level{max_level}_max{max_moments}moments.json"
+        filename = data_path / f"moments_level{max_level}_max{max_moments}moments.json"
     else:
-        filename = data_path + f"/moments_level{max_level}.json"
+        filename = data_path / f"moments_level{max_level}.json"
     return filename
 
 
