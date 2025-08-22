@@ -48,12 +48,12 @@ def _get_test_moments(moments: list) -> dict:
 @cache
 def _get_test_moment(nu: int, mu: int) -> npt.NDArray[np.float64]:
     m = _get_test_tensor(nu)
-    return (m * TEST_RB_VALUES[mu]).sum(axis=-1)
+    return (m.T * TEST_RB_VALUES[mu, :]).sum(axis=-1)
 
 
 @cache
 def _get_test_tensor(nu: int) -> npt.NDArray[np.float64]:
-    make_tensor(TEST_R_UNITS, nu)
+    return make_tensor(TEST_R_UNITS, nu)
 
 
 @cache
