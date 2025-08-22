@@ -180,7 +180,7 @@ class BasisConverter:
         for contraction in basis_contractions_to_remove:
             moment_basis.scalar_contractions.remove(contraction)
 
-        self.remapped_coeffs = np.array(remapped_coeffs)
+        self.remapped_coeffs = jnp.array(remapped_coeffs)
 
 
 def _calc_moment_basis(
