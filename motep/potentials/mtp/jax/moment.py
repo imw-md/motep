@@ -281,62 +281,55 @@ def _to_tuple_recursively(lst: list) -> tuple:
     return tuple(_to_tuple_recursively(i) if isinstance(i, list) else i for i in lst)
 
 
+def _get_remaining_moments(
+    moments: list[tuple],
+    contraction: list[tuple],
+) -> list[tuple]:
+    remaining_moments = deepcopy(moments)
+    for m in [contraction[0], contraction[1]]:
+        remaining_moments.remove(m)
+    return remaining_moments
+
+
+def _find_pair_contractions(moments: list[tuple]) -> list[list[tuple]]:
+    contractions = []
+    # Loop over all pair combinations
+    for m1, m2 in list(combinations(moments, 2)):
+        # Get the possible axes and corresponding dimension for each pair
+        for axes in _find_possible_axes(m1[2], m2[2]):
+            dim = _get_contraction_dimension((m1, m2, None, axes))
+            contractions.append((m1, m2, dim, axes))
+    return contractions
+
+
 def _get_contractions_from_basic_moments(index_combo) -> list:
     # For max 4 moments its okay to semi-explicitly enumerate them.
     moments = [(m[0], m[1], m[1]) for m in index_combo]
     if len(moments) == 1:
         return moments
     elif len(moments) == 2:
-        m1, m2 = moments
-        contractions = []
-        for axes in _find_possible_axes(m1[2], m2[2]):
-            dim = _get_contraction_dimension((m1, m2, None, axes))
-            contractions.append((m1, m2, dim, axes))
-        return contractions
+        return _find_pair_contractions(moments)
     elif len(moments) == 3:
-        first_contractions = []
-        for m1, m2 in list(combinations(moments, 2)):
-            for axes in _find_possible_axes(m1[2], m2[2]):
-                dim = _get_contraction_dimension((m1, m2, None, axes))
-                first_contractions.append((m1, m2, dim, axes))
+        first_contractions = _find_pair_contractions(moments)
         second_contractions = []
-        for contraction1 in first_contractions:
-            remaining_moments = deepcopy(moments)
-            for m in [contraction1[0], contraction1[1]]:
-                remaining_moments.remove(m)
-            remaining_moment = remaining_moments[0]
-            m1 = remaining_moment
-            m2 = contraction1
-            contractions2 = []
-            for axes in _find_possible_axes(m1[2], m2[2]):
-                dim = _get_contraction_dimension((m1, m2, None, axes))
-                contractions2.append((m1, m2, dim, axes))
-            second_contractions.extend(contractions2)
+        for c1 in first_contractions:
+            remaining_moment = _get_remaining_moments(moments, c1)[0]
+            second_contractions.extend(_find_pair_contractions([remaining_moment, c1]))
         return second_contractions
     elif len(moments) == 4:
-        first_contractions = []
-        for m1, m2 in list(combinations(moments, 2)):
-            for axes in _find_possible_axes(m1[2], m2[2]):
-                dim = _get_contraction_dimension((m1, m2, None, axes))
-                first_contractions.append((m1, m2, dim, axes))
+        first_contractions = _find_pair_contractions(moments)
         second_contractions = []
-        for contraction1 in first_contractions:
-            remaining_moments = deepcopy(moments)
-            for m in [contraction1[0], contraction1[1]]:
-                remaining_moments.remove(m)
-            possible_other_contractions = []
-            for m1, m2 in list(combinations(remaining_moments, 2)):
-                for axes in _find_possible_axes(m1[2], m2[2]):
-                    dim = _get_contraction_dimension((m1, m2, None, axes))
-                    possible_other_contractions.append((m1, m2, dim, axes))
+        for c1 in first_contractions:
+            remaining_moments = _get_remaining_moments(moments, c1)
+            possible_other_contractions = _find_pair_contractions(remaining_moments)
             for other in chain(remaining_moments, possible_other_contractions):
                 m1 = other
-                m2 = contraction1
-                contractions2 = []
+                m2 = c1
+                cs = []
                 for axes in _find_possible_axes(m1[2], m2[2]):
                     dim = _get_contraction_dimension((m1, m2, None, axes))
-                    contractions2.append((m1, m2, dim, axes))
-                second_contractions.extend(contractions2)
+                    cs.append((m1, m2, dim, axes))
+                second_contractions.extend(cs)
         third_contractions = []
         for contraction2 in second_contractions:
             remaining_moments = deepcopy(moments)
