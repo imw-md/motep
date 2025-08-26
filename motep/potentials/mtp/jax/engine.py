@@ -5,6 +5,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import numpy as np
+import numpy.typing as npt
 from ase import Atoms
 
 from motep.potentials.mtp import get_types
@@ -80,21 +81,21 @@ class JaxMTPEngine(EngineBase):
 @partial(jax.jit, static_argnums=(9, 10, 11, 12))
 @partial(jax.vmap, in_axes=(0,) * 3 + (None,) * 10, out_axes=0)
 def _calc_local_energy_and_derivs(
-    r_ijs,
-    itype,
-    jtypes,
-    species_coeffs,
-    moment_coeffs,
-    radial_coeffs,
-    scaling,
-    min_dist,
-    max_dist,
+    r_ijs: npt.NDArray[np.float64],
+    itype: npt.NDArray[np.int64],
+    jtypes: npt.NDArray[np.int64],
+    species_coeffs: npt.NDArray[np.float64],
+    moment_coeffs: npt.NDArray[np.float64],
+    radial_coeffs: npt.NDArray[np.float64],
+    scaling: np.float64,
+    min_dist: np.float64,
+    max_dist: np.float64,
     # Static parameters:
-    rb_size,
-    basic_moments,
-    pair_contractions,
-    scalar_contractions,
-) -> tuple:
+    rb_size: int,
+    basic_moments: tuple,
+    pair_contractions: tuple,
+    scalar_contractions: tuple,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     energy = _calc_local_energy(
         r_ijs,
         itype,
@@ -131,21 +132,21 @@ def _calc_local_energy_and_derivs(
 
 
 def _calc_local_energy(
-    r_ijs,
-    itype,
-    jtypes,
-    species_coeffs,
-    moment_coeffs,
-    radial_coeffs,
-    scaling,
-    min_dist,
-    max_dist,
+    r_ijs: npt.NDArray[np.float64],
+    itype: npt.NDArray[np.int64],
+    jtypes: npt.NDArray[np.int64],
+    species_coeffs: npt.NDArray[np.float64],
+    moment_coeffs: npt.NDArray[np.float64],
+    radial_coeffs: npt.NDArray[np.float64],
+    scaling: np.float64,
+    min_dist: np.float64,
+    max_dist: np.float64,
     # Static parameters:
-    rb_size,
-    basic_moments,
-    pair_contractions,
-    scalar_contractions,
-) -> jnp.array:
+    rb_size: int,
+    basic_moments: tuple,
+    pair_contractions: tuple,
+    scalar_contractions: tuple,
+) -> npt.NDArray[np.float64]:
     r_abs = jnp.linalg.norm(r_ijs, axis=1)
     smoothing = jnp.where(r_abs < max_dist, (max_dist - r_abs) ** 2, 0)
     radial_basis = _chebyshev_basis(r_abs, min_dist, max_dist, rb_size)
@@ -156,19 +157,24 @@ def _calc_local_energy(
         * jnp.einsum("jmn, jn -> mj", radial_coeffs[itype, jtypes], radial_basis)
     )
     basis = _calc_basis(
-        r_ijs, r_abs, rb_values, basic_moments, pair_contractions, scalar_contractions
+        r_ijs,
+        r_abs,
+        rb_values,
+        basic_moments,
+        pair_contractions,
+        scalar_contractions,
     )
     return species_coeffs[itype] + jnp.dot(moment_coeffs, basis)
 
 
 def _calc_basis(
-    r_ijs,
-    r_abs,
-    rb_values,
+    r_ijs: npt.NDArray[np.float64],
+    r_abs: npt.NDArray[np.float64],
+    rb_values: npt.NDArray[np.float64],
     # Static parameters:
-    basic_moments,
-    pair_contractions,
-    scalar_contractions,
+    basic_moments: tuple,
+    pair_contractions: tuple,
+    scalar_contractions: tuple,
 ):
     calculated_moments = _calc_moments(r_ijs, r_abs, rb_values, basic_moments)
     for contraction in pair_contractions:
@@ -184,11 +190,12 @@ def _calc_basis(
 
 @partial(jax.vmap, in_axes=(0, None, None, None), out_axes=0)
 def _chebyshev_basis(
-    r: jnp.array,
-    min_dist: float,
-    max_dist: float,
-    size: int,
-) -> jnp.array:
+    r: npt.NDArray[np.float64],
+    min_dist: np.float64,
+    max_dist: np.float64,
+    # Static parameters:
+    size: np.int64,
+) -> npt.NDArray[np.float64]:
     r_scaled = (2 * r - (min_dist + max_dist)) / (max_dist - min_dist)
     rb = [1, r_scaled]
     for i in range(2, size):
@@ -197,11 +204,12 @@ def _chebyshev_basis(
 
 
 def _calc_moments(
-    r_ijs: jnp.array,
-    r_abs: jnp.array,
-    rb_values: jnp.array,
-    moments: tuple,
-) -> jnp.array:
+    r_ijs: npt.NDArray[np.float64],
+    r_abs: npt.NDArray[np.float64],
+    rb_values: npt.NDArray[np.float64],
+    # Static parameters:
+    moments: tuple[tuple[np.int64]],
+) -> dict[tuple, npt.NDArray[np.float64]]:
     calculated_moments = {}
     r_ijs_unit = (r_ijs.T / r_abs).T
     for moment in moments:
@@ -214,12 +222,19 @@ def _calc_moments(
 
 
 @partial(jax.vmap, in_axes=(0, None), out_axes=0)
-def _make_tensor(r: jnp.array, nu: int) -> jnp.array:
+def _make_tensor(
+    r: npt.NDArray[np.float64],
+    nu: np.int64,
+) -> npt.NDArray[np.float64]:
     m = 1
     for _ in range(nu):
         m = jnp.tensordot(r, m, axes=0)
     return m
 
 
-def _contract_over_axes(m1: jnp.array, m2: jnp.array, axes: tuple) -> jnp.array:
+def _contract_over_axes(
+    m1: npt.NDArray[np.float64],
+    m2: npt.NDArray[np.float64],
+    axes: tuple[np.int64],
+) -> npt.NDArray[np.float64]:
     return jnp.tensordot(m1, m2, axes=axes)

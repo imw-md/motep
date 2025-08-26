@@ -2,6 +2,7 @@
 
 from warnings import warn
 
+import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 
@@ -45,10 +46,11 @@ class MLIPMomentBasis:
 
         Parameters
         ----------
-        r_ijs : np.ndarray (number_of_neighbors, 3)
+        r_ijs_unit : np.ndarray (number_of_neighbors, 3)
             :math:`\mathbf{r}_j - \mathbf{r}_i`,
             where i is the center atom, and j are the neighboring atoms.
         rb_values : np.ndarray (max_mu, number_of_neighbors)
+            Precomputed radial basis values.
 
         Returns
         -------
@@ -103,16 +105,22 @@ def _contract_moments(
 
 
 class BasisConverter:
-    """Class to store and convert mapping between MTP basis functions and coefficients."""
+    """Class to store and convert mapping between MTP basis and coefficients."""
 
-    def __init__(self, moment_basis: MomentBasis):
+    def __init__(self, moment_basis: MomentBasis) -> None:
         self.moment_basis = moment_basis
         self.remapped_coeffs = None
 
-    def remap_mlip_moment_coeffs(self, mtp_data: MTPData):
+    def remap_mlip_moment_coeffs(self, mtp_data: MTPData) -> None:
         """Perform a remapping of the MLIP coeffs loaded to this potentials basis.
 
-        This might be needed because the ordereing might be different or some basis elements omitted.
+        This might be needed because the ordereing might be different or some
+        basis elements omitted.
+
+        Raises
+        ------
+        RuntimeError: If the MLIP moment basis is not found.
+
         """
         r_unit = TEST_R_UNITS
         rb_values = TEST_RB_VALUES
@@ -122,7 +130,11 @@ class BasisConverter:
         bc_map = {}
         mlip_moment_basis = MLIPMomentBasis(mtp_data)
         mlip_basis_values = mlip_moment_basis.calculate(r_unit, rb_values)
-        for coef, mlip_basis_value in zip(mtp_data.moment_coeffs, mlip_basis_values):
+        for coef, mlip_basis_value in zip(
+            mtp_data.moment_coeffs,
+            mlip_basis_values,
+            strict=True,
+        ):
             bc_map[float(mlip_basis_value)] = coef
 
         # Calculate our basis for test vectors
@@ -141,7 +153,11 @@ class BasisConverter:
         remaining_mlip_bs = list(bc_map.keys())
 
         relative_tolerance = 1e-8
-        for basis_value, contraction in zip(basis, moment_basis.scalar_contractions):
+        for basis_value, contraction in zip(
+            basis,
+            moment_basis.scalar_contractions,
+            strict=True,
+        ):
             for mlip_basis_value, coef in bc_map.items():
                 if np.isclose(mlip_basis_value, basis_value, rtol=relative_tolerance):
                     remapped_coeffs.append(coef)
@@ -150,30 +166,30 @@ class BasisConverter:
             else:
                 warn(
                     "Basis contraction was not found in the MLIP file. "
-                    f"It will now be omitted from the basis.\n{contraction}: {basis_value}"
+                    "It will now be omitted from the basis.\n"
+                    f"{contraction}: {basis_value}",
                 )
                 basis_contractions_to_remove.append(contraction)
 
         if len(remaining_mlip_bs) > 0:
-            raise RuntimeError(
-                "Not all MLIP contractions found:\n" f"{remaining_mlip_bs}\n"
-            )
+            msg = f"Not all MLIP contractions found:\n{remaining_mlip_bs}\n"
+            raise RuntimeError(msg)
 
         # Remove contractions not present in the MLIP potential file
         # [should rarely be needed, as they now agree perfectly (tested at least to lvl 22)]
         for contraction in basis_contractions_to_remove:
             moment_basis.scalar_contractions.remove(contraction)
 
-        self.remapped_coeffs = np.array(remapped_coeffs)
+        self.remapped_coeffs = jnp.array(remapped_coeffs)
 
 
 def _calc_moment_basis(
-    r_unit,
-    rb_values,
-    basic_moments,
-    pair_contractions,
-    scalar_contractions,
-):
+    r_unit: npt.NDArray[np.float64],
+    rb_values: npt.NDArray[np.float64],
+    basic_moments: tuple,
+    pair_contractions: tuple,
+    scalar_contractions: tuple,
+) -> list:
     calculated_moments = _calc_basic_moments(r_unit, rb_values, basic_moments)
     for contraction in pair_contractions:
         m1 = calculated_moments[contraction[0]]
@@ -188,7 +204,11 @@ def _calc_moment_basis(
     return basis
 
 
-def _calc_basic_moments(r_unit, rb_values, moment_descriptions):
+def _calc_basic_moments(
+    r_unit: npt.NDArray[np.float64],
+    rb_values: npt.NDArray[np.float64],
+    moment_descriptions: tuple,
+) -> dict:
     calculated_moments = {}
     for moment in moment_descriptions:
         mu, nu = moment[0:2]
