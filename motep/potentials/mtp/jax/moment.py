@@ -32,9 +32,6 @@ DEFAULT_MAX_NU = 10
 # Functions for finding moments and all unique contractions for some level
 #
 
-# Global dict to store/cache calculated test moments
-calculated_test_moments = {}
-
 
 def _get_test_moments(moments: list) -> dict:
     calculated_moments = {}
@@ -98,20 +95,20 @@ def _get_contraction_dimension(contraction: list[tuple]) -> int:
     return ldim + rdim - 2 * naxes
 
 
-def _get_cheapest_contraction(map_list: list) -> list[list[int | list[int]]]:
+def _get_cheapest_contraction(contractions: list) -> list[list[int | list[int]]]:
     lowest_cost = 100_000_000  # Start with something big
-    for mapping in map_list:
+    for contraction_tree in contractions:
         cost = 0
-        for contraction in _extract_pair_contractions_from_mapping_rec(mapping):
+        for contraction in _extract_pair_contractions(contraction_tree):
             dim = contraction[2]
             cost += dim  # Resulting dimension... Correct estimate?
         if cost < lowest_cost:
             lowest_cost = cost
-            cheapest_mapping = mapping
-    return cheapest_mapping
+            cheapest = contraction_tree
+    return cheapest
 
 
-def _flatten_nested_pair_tuples(tpl: tuple, lst: list | None = None) -> tuple:
+def _flatten_to_moments(tpl: tuple, lst: list | None = None) -> tuple:
     if lst is None:
         lst = []
     if type(tpl[0]) is not tuple:
@@ -119,8 +116,8 @@ def _flatten_nested_pair_tuples(tpl: tuple, lst: list | None = None) -> tuple:
             raise ValueError()
         lst.append(tpl)
         return tuple(lst)
-    _flatten_nested_pair_tuples(tpl[0], lst)
-    _flatten_nested_pair_tuples(tpl[1], lst)
+    _flatten_to_moments(tpl[0], lst)
+    _flatten_to_moments(tpl[1], lst)
     return tuple(lst)
 
 
@@ -212,22 +209,18 @@ class MomentBasis:
         max_mu = int(np.min([np.floor((self.max_level - 2) / 4), self.max_mu]))
         max_nu = int(np.min([np.max([self.max_level / 2 - 2, 0]), self.max_nu]))
         max_nmoments = int(np.min([self.max_level / 2, self.max_contraction_length]))
-        moment_index_list = list(product(range(max_mu + 1), range(max_nu + 1)))
+        index_list = list(product(range(max_mu + 1), range(max_nu + 1)))
         scalar_contractions = []
         for nmoments in range(1, max_nmoments + 1):
-            combos = combinations_with_replacement(moment_index_list, nmoments)
-            for moment_combo in combos:
-                level = np.sum([2 + 4 * mu + nu for mu, nu in moment_combo])
+            for index_combo in combinations_with_replacement(index_list, nmoments):
+                level = np.sum([2 + 4 * mu + nu for mu, nu in index_combo])
                 if level > self.max_level:
                     continue
-                possible_contractions = _get_contractions_from_basic_moments(
-                    moment_combo,
-                )
-                possible_contractions = [c for c in possible_contractions if c[2] == 0]
-                if len(possible_contractions) == 0:
+                moments = [(m[0], m[1], m[1]) for m in index_combo]
+                contractions = _get_contractions_from_moments(moments)
+                if len(contractions) == 0:
                     continue
-                contractions = _extract_unique_contractions(possible_contractions)
-                scalar_contractions.extend(contractions)
+                scalar_contractions.extend(_extract_unique_contractions(contractions))
         return tuple(scalar_contractions)
 
     def read_moments(self) -> list:
@@ -286,77 +279,116 @@ def _get_remaining_moments(
     contraction: list[tuple],
 ) -> list[tuple]:
     remaining_moments = deepcopy(moments)
-    for m in [contraction[0], contraction[1]]:
+    for m in _flatten_to_moments(contraction):
         remaining_moments.remove(m)
     return remaining_moments
 
 
-def _find_pair_contractions(moments: list[tuple]) -> list[list[tuple]]:
+def _generate_contractions(m1: tuple, m2: tuple) -> list:
+    """Generate contractions between two moments/pairs.
+
+    Returns
+    -------
+    A list of all possible contractions between `m1` and `m2`.
+
+    """
     contractions = []
-    # Loop over all pair combinations
-    for m1, m2 in list(combinations(moments, 2)):
-        # Get the possible axes and corresponding dimension for each pair
-        for axes in _find_possible_axes(m1[2], m2[2]):
-            dim = _get_contraction_dimension((m1, m2, None, axes))
-            contractions.append((m1, m2, dim, axes))
+    for axes in _find_possible_axes(m1[2], m2[2]):
+        dim = _get_contraction_dimension((m1, m2, None, axes))
+        contractions.append((m1, m2, dim, axes))
     return contractions
 
 
-def _get_contractions_from_basic_moments(index_combo) -> list:
-    # For max 4 moments its okay to semi-explicitly enumerate them.
-    moments = [(m[0], m[1], m[1]) for m in index_combo]
-    if len(moments) == 1:
-        return moments
-    elif len(moments) == 2:
-        return _find_pair_contractions(moments)
-    elif len(moments) == 3:
-        first_contractions = _find_pair_contractions(moments)
-        second_contractions = []
-        for c1 in first_contractions:
-            remaining_moment = _get_remaining_moments(moments, c1)[0]
-            second_contractions.extend(_find_pair_contractions([remaining_moment, c1]))
-        return second_contractions
-    elif len(moments) == 4:
-        first_contractions = _find_pair_contractions(moments)
-        second_contractions = []
-        for c1 in first_contractions:
-            remaining_moments = _get_remaining_moments(moments, c1)
-            possible_other_contractions = _find_pair_contractions(remaining_moments)
-            for other in chain(remaining_moments, possible_other_contractions):
-                m1 = other
-                m2 = c1
-                cs = []
-                for axes in _find_possible_axes(m1[2], m2[2]):
-                    dim = _get_contraction_dimension((m1, m2, None, axes))
-                    cs.append((m1, m2, dim, axes))
-                second_contractions.extend(cs)
-        third_contractions = []
-        for contraction2 in second_contractions:
-            remaining_moments = deepcopy(moments)
-            for m in _flatten_nested_pair_tuples(contraction2):
-                remaining_moments.remove(m)
-            if len(remaining_moments) == 0:
-                third_contractions.append(contraction2)
-            else:
-                remaining_moment = remaining_moments[0]
-                m1 = remaining_moment
-                m2 = contraction2
-                contractions3 = []
-                for axes in _find_possible_axes(m1[2], m2[2]):
-                    dim = _get_contraction_dimension((m1, m2, None, axes))
-                    contractions3.append((m1, m2, dim, axes))
-                third_contractions.extend(contractions3)
-        return third_contractions
+def _extend_contractions(current_node: tuple, node_pool: list) -> list:
+    """Extend a partially built contraction list.
+
+    Extend a partially built contraction list by combining `current_node` with
+    each possible continuation from `node_pool`.
+
+    The extension contains two main points:
+      1. Attach each contraction with a raw node from the pool, until
+      `node_pool` is exhausted.
+      2. Attach each possible recursively contracted tree from the pool.
+
+    Returns
+    -------
+    A list of contractions.
+
+    """
+    # Base case:
+    if len(node_pool) == 0:
+        return [current_node]
+
+    # Prepare a temporary list with 1) raw nodes
+    tmp_node_pool = list(node_pool)
+    # and 2) recursively contracted trees
+    if len(node_pool) > 1:
+        tmp_node_pool.extend(_build_contraction_trees(node_pool))
+
+    # Then contract all of them with the `current_node`, and continue the recursion
+    extension = []
+    for next_node in tmp_node_pool:
+        remaining_nodes = _get_remaining_moments(node_pool, next_node)
+        for contraction in _generate_contractions(next_node, current_node):
+            extension.extend(_extend_contractions(contraction, remaining_nodes))
+
+    return extension
 
 
-def _extract_unique_contractions(contractions):
+def _build_contraction_trees(nodes: list) -> list:
+    """Build all possible contraction trees, given a list of moments/contractions/nodes.
+
+    Builds the tree with the recursive helper function `_extend_contractions()`.
+
+    Returns
+    -------
+    A list of contraction trees.
+
+    """
+    if len(nodes) == 1:
+        return nodes
+
+    contractions = []
+    for node_a, node_b in combinations(nodes, 2):
+        remaining_nodes = _get_remaining_moments(nodes, [node_a, node_b])
+        for initial_contraction in _generate_contractions(node_a, node_b):
+            contractions.extend(
+                _extend_contractions(initial_contraction, remaining_nodes)
+            )
+
+    return contractions
+
+
+def _get_contractions_from_moments(moments: list[tuple]) -> list:
+    """Build a list of all possible contraction trees over the given basic moments.
+
+    Only the resulting scalar contraction trees are returned.
+
+    Returns
+    -------
+    A list of all possible scaler contraction trees.
+
+    """
+    contractions = _build_contraction_trees(moments)
+    return [_ for _ in contractions if _[2] == 0]
+
+
+def _extract_unique_contractions(
+    contractions: list[tuple],
+    rtol: float = 1e-8,
+) -> list[tuple]:
+    """Extract the unique contractions from a list by applying a test basis.
+
+    Returns
+    -------
+    A list of the numerically uniqie contractions.
+
+    """
     results = {}
-    relative_tolerance = 1e-8
     for contraction in contractions:
         res = float(_test_contraction(contraction))
-        for prev_res in results:
-            # if np.isclose(res, prev_res, rtol=relative_tolerance):  # Slower
-            if np.abs(res - prev_res) / prev_res < relative_tolerance:
+        for prev_res in results:  # noqa: PLC0206
+            if np.abs(res - prev_res) / prev_res < rtol:
                 results[prev_res].append(contraction)
                 break
         else:
@@ -371,53 +403,61 @@ def _extract_unique_contractions(contractions):
     return unique_contractions
 
 
-def _test_contraction(contraction):
+# Global dict to store/cache calculated test moments
+test_moments_global_cache = {}
+
+
+def _test_contraction(contraction: tuple) -> float:
+    """Apply a fixed test basis to get the numerical value of a contraction.
+
+    Returns
+    -------
+    A float that numerically represents the contraction for the test basis.
+
+    """
     moments = extract_basic_moments([contraction])
-    # calculated_moments = _get_test_moments(moments)
-    for m, c in _get_test_moments(moments).items():
-        calculated_test_moments[m] = c
+    test_moments_global_cache.update(_get_test_moments(moments))
     pair_contractions = extract_pair_contractions([contraction])
     if len(pair_contractions) == 0:
-        return calculated_test_moments[contraction]
-    for contraction in pair_contractions:
-        if contraction not in calculated_test_moments:
-            m1 = calculated_test_moments[contraction[0]]
-            m2 = calculated_test_moments[contraction[1]]
-            calculated_contraction = np.tensordot(m1, m2, axes=contraction[3])
-            calculated_test_moments[contraction] = calculated_contraction
-    last_contraction = calculated_test_moments[pair_contractions[-1]]
-    return last_contraction
+        return test_moments_global_cache[contraction]
+    for pair_contraction in pair_contractions:
+        if contraction not in test_moments_global_cache:
+            m1 = test_moments_global_cache[pair_contraction[0]]
+            m2 = test_moments_global_cache[pair_contraction[1]]
+            calculated_contraction = np.tensordot(m1, m2, axes=pair_contraction[3])
+            test_moments_global_cache[pair_contraction] = calculated_contraction
+    return test_moments_global_cache[pair_contractions[-1]]
 
 
-def extract_basic_moments(contractions: list) -> tuple:
+def extract_basic_moments(contractions: list[tuple]) -> tuple:
     basic_moments = []
-    for contraction in contractions:
-        flat = _flatten_nested_pair_tuples(contraction)
-        for moment in flat:
+    for contraction_tree in contractions:
+        all_moments = _flatten_to_moments(contraction_tree)
+        for moment in all_moments:
             if moment not in basic_moments:
                 basic_moments.append(moment)
     return tuple(basic_moments)
 
 
-def extract_pair_contractions(contractions_list: list) -> tuple:
+def extract_pair_contractions(contractions: list[tuple]) -> tuple:
     pair_contractions = []
-    for contractions in contractions_list:
-        lst = _extract_pair_contractions_from_mapping_rec(contractions)
+    for contraction_tree in contractions:
+        lst = _extract_pair_contractions(contraction_tree)
         for contraction in lst:
             if contraction not in pair_contractions:
                 pair_contractions.append(contraction)
     return tuple(pair_contractions)
 
 
-def _extract_pair_contractions_from_mapping_rec(mapping):
+def _extract_pair_contractions(contraction_tree: tuple) -> list[tuple]:
     pair_contractions = []
-    if type(mapping[0]) is tuple:
-        if type(mapping[1]) is not tuple:
+    if type(contraction_tree[0]) is tuple:
+        if type(contraction_tree[1]) is not tuple:
             raise ValueError()
-        lst1 = _extract_pair_contractions_from_mapping_rec(mapping[0])
-        lst2 = _extract_pair_contractions_from_mapping_rec(mapping[1])
+        lst1 = _extract_pair_contractions(contraction_tree[0])
+        lst2 = _extract_pair_contractions(contraction_tree[1])
         for contraction in chain(lst1, lst2):
             if contraction not in pair_contractions:
                 pair_contractions.append(contraction)
-        pair_contractions.append(mapping)
+        pair_contractions.append(contraction_tree)
     return pair_contractions

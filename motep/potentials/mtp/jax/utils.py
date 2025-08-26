@@ -6,7 +6,7 @@ TEST_RS = np.array(
         [0.987, 0.423, 0.765],
         [-1.120, 0.123, 0.563],
         [-0.120, 0.012, -0.001],
-    ]
+    ],
 )
 TEST_R_ABS = np.linalg.norm(TEST_RS, axis=1)
 TEST_RB_VALUES = np.array([TEST_R_ABS ** (mu + 1) for mu in range(10)])
