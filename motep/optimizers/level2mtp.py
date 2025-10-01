@@ -1,5 +1,7 @@
 """Optimizer for Level 2 MTP."""
 
+import logging
+import sys
 from math import sqrt
 from typing import Any
 
@@ -8,6 +10,10 @@ from scipy.optimize._optimize import OptimizeResult
 
 from motep.optimizers.lls import LLSOptimizerBase
 from motep.optimizers.scipy import Callback
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.setLevel(logging.INFO)
 
 
 class Level2MTPOptimizer(LLSOptimizerBase):
@@ -41,10 +47,16 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         callback(OptimizeResult(x=parameters, fun=loss_value))
 
         # Prepare and solve the LLS problem
-        matrix = self._calc_matrix()
-        vector = self._calc_vector()
-
-        coeffs, *_ = np.linalg.lstsq(matrix, vector, rcond=None)
+        if self.comm.Get_rank() == 0:
+            logger.info("Calculate `matrix`")
+            matrix = self._calc_matrix()
+            logger.info("Calculate `vector`")
+            vector = self._calc_vector()
+            logger.info("Calculate `coeffs`")
+            coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
+        else:
+            coeffs = None
+        coeffs = self.comm.bcast(coeffs, root=0)
 
         # Update `mtp_data` and `parameters`.
         parameters = self._update_parameters(coeffs)

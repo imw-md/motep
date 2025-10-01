@@ -1,5 +1,7 @@
 """Module for the optimizer based on linear least squares (LLS)."""
 
+import logging
+import sys
 from abc import abstractmethod
 from math import sqrt
 from typing import Any
@@ -12,6 +14,10 @@ from motep.loss import LossFunctionBase
 from motep.optimizers.base import OptimizerBase
 from motep.optimizers.scipy import Callback
 from motep.potentials.mtp import get_types
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.setLevel(logging.INFO)
 
 
 class LLSOptimizerBase(OptimizerBase):
@@ -195,18 +201,19 @@ class LLSOptimizer(LLSOptimizerBase):
         callback(OptimizeResult(x=parameters, fun=loss_value))
 
         # Prepare and solve the LLS problem
-        matrix = self._calc_matrix()
-        vector = self._calc_vector()
+        if self.comm.Get_rank() == 0:
+            logger.info("Calculate `matrix`")
+            matrix = self._calc_matrix()
+            logger.info("Calculate `vector`")
+            vector = self._calc_vector()
+            logger.info("Calculate `coeffs`")
+            coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
+        else:
+            coeffs = None
+        coeffs = self.comm.bcast(coeffs, root=0)
 
-        coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
-
-        # Update `mtp_data`
-        asm = self.loss.mtp_data.alpha_scalar_moments
-        self.loss.mtp_data.moment_coeffs = coeffs[:asm]
-        if "species_coeffs" in self.optimized:
-            self.loss.mtp_data.species_coeffs = coeffs[asm:]
-        # Update `parameters` by calling the property
-        parameters = self.loss.mtp_data.parameters
+        # Update `mtp_data` and `parameters`
+        parameters = self._update_parameters(coeffs)
 
         # Evaluate loss with the new parameters
         loss_value = self.loss(parameters)
@@ -214,6 +221,15 @@ class LLSOptimizer(LLSOptimizerBase):
 
         # Print the value of the loss function.
         callback(OptimizeResult(x=parameters, fun=loss_value))
+
+    def _update_parameters(self, coeffs: np.ndarray) -> np.ndarray:
+        mtp_data = self.loss.mtp_data
+        asm = mtp_data.alpha_scalar_moments
+        mtp_data.moment_coeffs = coeffs[:asm]
+        if "species_coeffs" in self.optimized:
+            mtp_data.species_coeffs = coeffs[asm:]
+
+        return mtp_data.parameters
 
     def _calc_matrix(self) -> np.ndarray:
         """Calculate the matrix for linear least squares (LLS)."""
