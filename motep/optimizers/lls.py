@@ -1,5 +1,7 @@
 """Module for the optimizer based on linear least squares (LLS)."""
 
+import logging
+import sys
 from abc import abstractmethod
 from math import sqrt
 from typing import Any
@@ -12,6 +14,10 @@ from motep.loss import LossFunctionBase
 from motep.optimizers.base import OptimizerBase
 from motep.optimizers.scipy import Callback
 from motep.potentials.mtp import get_types
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.setLevel(logging.INFO)
 
 
 class LLSOptimizerBase(OptimizerBase):
@@ -196,8 +202,11 @@ class LLSOptimizer(LLSOptimizerBase):
 
         # Prepare and solve the LLS problem
         if self.comm.Get_rank() == 0:
+            logger.info("Calculate `matrix`")
             matrix = self._calc_matrix()
+            logger.info("Calculate `vector`")
             vector = self._calc_vector()
+            logger.info("Calculate `coeffs`")
             coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
         else:
             coeffs = None
