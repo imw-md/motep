@@ -203,13 +203,8 @@ class LLSOptimizer(LLSOptimizerBase):
             coeffs = None
         coeffs = self.comm.bcast(coeffs, root=0)
 
-        # Update `mtp_data`
-        asm = self.loss.mtp_data.alpha_scalar_moments
-        self.loss.mtp_data.moment_coeffs = coeffs[:asm]
-        if "species_coeffs" in self.optimized:
-            self.loss.mtp_data.species_coeffs = coeffs[asm:]
-        # Update `parameters` by calling the property
-        parameters = self.loss.mtp_data.parameters
+        # Update `mtp_data` and `parameters`
+        parameters = self._update_parameters(coeffs)
 
         # Evaluate loss with the new parameters
         loss_value = self.loss(parameters)
@@ -217,6 +212,15 @@ class LLSOptimizer(LLSOptimizerBase):
 
         # Print the value of the loss function.
         callback(OptimizeResult(x=parameters, fun=loss_value))
+
+    def _update_parameters(self, coeffs: np.ndarray) -> np.ndarray:
+        mtp_data = self.loss.mtp_data
+        asm = mtp_data.alpha_scalar_moments
+        mtp_data.moment_coeffs = coeffs[:asm]
+        if "species_coeffs" in self.optimized:
+            mtp_data.species_coeffs = coeffs[asm:]
+
+        return mtp_data.parameters
 
     def _calc_matrix(self) -> np.ndarray:
         """Calculate the matrix for linear least squares (LLS)."""
