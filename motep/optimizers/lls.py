@@ -195,10 +195,13 @@ class LLSOptimizer(LLSOptimizerBase):
         callback(OptimizeResult(x=parameters, fun=loss_value))
 
         # Prepare and solve the LLS problem
-        matrix = self._calc_matrix()
-        vector = self._calc_vector()
-
-        coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
+        if self.comm.Get_rank() == 0:
+            matrix = self._calc_matrix()
+            vector = self._calc_vector()
+            coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
+        else:
+            coeffs = None
+        coeffs = self.comm.bcast(coeffs, root=0)
 
         # Update `mtp_data`
         asm = self.loss.mtp_data.alpha_scalar_moments
