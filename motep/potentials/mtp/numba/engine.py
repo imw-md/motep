@@ -28,7 +28,11 @@ class NumbaMTPEngine(EngineBase):
     def __init__(self, *args: tuple, **kwargs: dict) -> None:
         """Intialize the engine."""
         super().__init__(*args, **kwargs)
-        self._calculate = self._calc_train if self._is_trained else self._calc_run
+
+    def _calculate(self, atoms: Atoms) -> tuple:
+        if self._is_trained:
+            return self._calc_train(atoms)
+        return self._calc_run(atoms)
 
     def _calc_run(self, atoms: Atoms) -> tuple:
         mtp_data = self.mtp_data
@@ -37,6 +41,10 @@ class NumbaMTPEngine(EngineBase):
 
         itypes = get_types(atoms, mtp_data.species)
         all_jtypes = itypes[all_js]
+
+        self.mbd.clean()
+        self.rbd.clean()
+
         energies, gradient = _calc_run(
             all_r_ijs,
             itypes,
@@ -51,6 +59,7 @@ class NumbaMTPEngine(EngineBase):
             mtp_data.radial_coeffs,
             mtp_data.species_coeffs,
             mtp_data.moment_coeffs,
+            self.mbd.values,
         )
 
         forces = _calc_forces_from_gradient(gradient, all_js)
@@ -137,6 +146,7 @@ def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
         nb.float64[:, :, :, :],
         nb.float64[:],
         nb.float64[:],
+        nb.float64[:],
     ),
     # parallel=True,
 )
@@ -154,6 +164,7 @@ def _calc_run(
     radial_coeffs: npt.NDArray[np.float64],
     species_coeffs: npt.NDArray[np.float64],
     moment_coeffs: npt.NDArray[np.float64],
+    mbd_values: npt.NDArray[np.float64],
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
 
     energies = species_coeffs[itypes]
@@ -182,6 +193,8 @@ def _calc_run(
             alpha_index_times,
             moment_coeffs,
         )
+
+        update_mbd_values(mbd_values, basis_values)
 
         for basis_i, coeff in enumerate(moment_coeffs):
             energies[i] += coeff * basis_values[basis_i]

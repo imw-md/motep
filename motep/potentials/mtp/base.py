@@ -202,6 +202,30 @@ class EngineBase:
         all_r_ijs[self.all_js[:, :] < 0, :] = max_dist
         return self.all_js, all_r_ijs
 
+    def check_species(self, atoms: Atoms) -> None:
+        """Check if `atoms` comply with the `mtp_data.species`.
+
+        Raises
+        ------
+        ValueError
+            If the unique `atoms.numbers` is larger than `species_count`, or if
+            they are not present in `mtp_data.species` (only when not
+            `_is_trained`).
+
+        """
+        if np.unique(atoms.numbers).size > self.mtp_data.species_count:
+            msg = "The number of species in input atoms is larger than species_count."
+            raise ValueError(msg)
+        if not self._is_trained:
+            unique_species = np.unique(atoms.numbers)
+            if not all(_ in self.mtp_data.species for _ in unique_species):
+                msg = (
+                    "All species in input atoms are not in mtp_data.species.\n"
+                    f"  species in atoms: {unique_species}\n"
+                    f"  species in mtp_data: {self.mtp_data.species}"
+                )
+                raise ValueError(msg)
+
     @abstractmethod
     def _calculate(self, atoms: Atoms) -> tuple: ...
 
@@ -213,6 +237,7 @@ class EngineBase:
         Dictionary with energies, energy, forces and stress.
 
         """
+        self.check_species(atoms)
         self.update_neighbor_list(atoms)
 
         energies, forces, stress = self._calculate(atoms)
