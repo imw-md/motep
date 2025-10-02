@@ -30,9 +30,6 @@ class NumbaMTPEngine(EngineBase):
         super().__init__(*args, **kwargs)
 
     def _calculate(self, atoms: Atoms) -> tuple:
-        if len({_ for _ in atoms.numbers}) > self.mtp_data.species_count:
-            msg = "The number of species in input atoms is larger than species_count."
-            raise RuntimeError(msg)
         if self._is_trained:
             return self._calc_train(atoms)
         return self._calc_run(atoms)
