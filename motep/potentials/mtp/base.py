@@ -213,11 +213,11 @@ class EngineBase:
             `_is_trained`).
 
         """
-        if len(set(atoms.numbers)) > self.mtp_data.species_count:
+        if np.unique(atoms.numbers).size > self.mtp_data.species_count:
             msg = "The number of species in input atoms is larger than species_count."
             raise ValueError(msg)
         if not self._is_trained:
-            unique_species = sorted(set(atoms.numbers))
+            unique_species = np.unique(atoms.numbers)
             if not all(_ in self.mtp_data.species for _ in unique_species):
                 msg = (
                     "All species in input atoms are not in mtp_data.species.\n"
