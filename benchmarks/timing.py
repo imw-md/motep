@@ -1,9 +1,11 @@
 """Contains functions (including a main function) for benchmarking."""
 
+import argparse
 import pathlib
 import shutil
 from time import perf_counter
 
+import numba as nb
 import numpy as np
 from ase import Atoms
 
@@ -12,6 +14,20 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 
 fmt = "{:20s}"
+
+setup_map = {
+    "numpy": {"engine": "numpy"},
+    "numba": {"engine": "numba"},
+    "numba_train": {"engine": "numba", "is_trained": True},
+    "jax": {"engine": "jax"},
+}
+
+all_setups = ["numpy", "numba", "numba_train", "jax"]
+
+
+def print_num_threads():
+    print()
+    print(f"Running benchmarks with {nb.get_num_threads()} threads.\n")
 
 
 class Timer:
@@ -87,11 +103,13 @@ def _time_mtp(
     return np.array(energies)
 
 
-def main() -> None:
+def main(setup_names: list[str], levels: list[int] = None) -> None:
     """Run benchmarks."""
+    print_num_threads()
+    setups = [setup_map[_] for _ in setup_names or all_setups]
     data_path = pathlib.Path(__file__).parent / "../tests/data_path"
     crystal = "cubic"
-    for level in [6, 20]:
+    for level in levels or [6, 20]:
         for size_reps in [1, 3]:
             path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
             cfg_path = path / "out.cfg"
@@ -113,13 +131,6 @@ def main() -> None:
             except ImportError:
                 e_ref = None
 
-            setups = [
-                {"engine": "numpy"},
-                {"engine": "numba"},
-                {"engine": "numba", "is_trained": True},
-                {"engine": "jax"},
-            ]
-
             for setup in setups:
                 if number_of_atoms > 300 and setup != {"engine": "numba"}:
                     continue
@@ -132,4 +143,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("setups", nargs="*", choices=all_setups)
+    parser.add_argument("--levels", nargs="+", choices=list(range(2, 27, 2)), type=int)
+    args = parser.parse_args()
+    main(args.setups, args.levels)
