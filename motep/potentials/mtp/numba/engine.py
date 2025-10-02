@@ -28,7 +28,14 @@ class NumbaMTPEngine(EngineBase):
     def __init__(self, *args: tuple, **kwargs: dict) -> None:
         """Intialize the engine."""
         super().__init__(*args, **kwargs)
-        self._calculate = self._calc_train if self._is_trained else self._calc_run
+
+    def _calculate(self, atoms: Atoms) -> tuple:
+        if len({_ for _ in atoms.numbers}) > self.mtp_data.species_count:
+            msg = "The number of species in input atoms is larger than species_count."
+            raise RuntimeError(msg)
+        if self._is_trained:
+            return self._calc_train(atoms)
+        return self._calc_run(atoms)
 
     def _calc_run(self, atoms: Atoms) -> tuple:
         mtp_data = self.mtp_data
