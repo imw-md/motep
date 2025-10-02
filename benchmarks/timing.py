@@ -1,8 +1,8 @@
 """Contains functions (including a main function) for benchmarking."""
 
+import argparse
 import pathlib
 import shutil
-import sys
 from time import perf_counter
 
 import numba as nb
@@ -22,12 +22,7 @@ setup_map = {
     "jax": {"engine": "jax"},
 }
 
-default_setups = [
-    {"engine": "numpy"},
-    {"engine": "numba"},
-    {"engine": "numba", "is_trained": True},
-    {"engine": "jax"},
-]
+all_setups = ["numpy", "numba", "numba_train", "jax"]
 
 
 def print_num_threads():
@@ -108,13 +103,13 @@ def _time_mtp(
     return np.array(energies)
 
 
-def main(*args) -> None:
+def main(setup_names: list[str], levels: list[int] = None) -> None:
     """Run benchmarks."""
     print_num_threads()
-    setups = default_setups if len(args) == 0 else [setup_map[_] for _ in args]
+    setups = [setup_map[_] for _ in setup_names or all_setups]
     data_path = pathlib.Path(__file__).parent / "../tests/data_path"
     crystal = "cubic"
-    for level in [6, 20]:
+    for level in levels or [6, 20]:
         for size_reps in [1, 3]:
             path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
             cfg_path = path / "out.cfg"
@@ -148,4 +143,8 @@ def main(*args) -> None:
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("setups", nargs="*", choices=all_setups)
+    parser.add_argument("--levels", nargs="+", choices=list(range(2, 27, 2)), type=int)
+    args = parser.parse_args()
+    main(args.setups, args.levels)
