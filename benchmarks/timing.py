@@ -2,8 +2,10 @@
 
 import pathlib
 import shutil
+import sys
 from time import perf_counter
 
+import numba as nb
 import numpy as np
 from ase import Atoms
 
@@ -12,6 +14,25 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 
 fmt = "{:20s}"
+
+setup_map = {
+    "numpy": {"engine": "numpy"},
+    "numba": {"engine": "numba"},
+    "numba_train": {"engine": "numba", "is_trained": True},
+    "jax": {"engine": "jax"},
+}
+
+default_setups = [
+    {"engine": "numpy"},
+    {"engine": "numba"},
+    {"engine": "numba", "is_trained": True},
+    {"engine": "jax"},
+]
+
+
+def print_num_threads():
+    print()
+    print(f"Running benchmarks with {nb.get_num_threads()} threads.\n")
 
 
 class Timer:
@@ -87,8 +108,10 @@ def _time_mtp(
     return np.array(energies)
 
 
-def main() -> None:
+def main(*args) -> None:
     """Run benchmarks."""
+    print_num_threads()
+    setups = default_setups if len(args) == 0 else [setup_map[_] for _ in args]
     data_path = pathlib.Path(__file__).parent / "../tests/data_path"
     crystal = "cubic"
     for level in [6, 20]:
@@ -113,13 +136,6 @@ def main() -> None:
             except ImportError:
                 e_ref = None
 
-            setups = [
-                {"engine": "numpy"},
-                {"engine": "numba"},
-                {"engine": "numba", "is_trained": True},
-                {"engine": "jax"},
-            ]
-
             for setup in setups:
                 if number_of_atoms > 300 and setup != {"engine": "numba"}:
                     continue
@@ -132,4 +148,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(*sys.argv[1:])
