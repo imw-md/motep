@@ -33,7 +33,10 @@ class AlgorithmBase(ABC):
         self.mtp_data = mtp_data
         self.engine = engine
         self.rng = rng
+        self.update()
 
+    def update(self) -> None:
+        """Reevaluates the matrix and active set."""
         self.matrix = self.calc_matrix(self.images_training)
         self.indices = []
 
