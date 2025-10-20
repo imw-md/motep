@@ -1,6 +1,8 @@
 """motep."""
 
 import argparse
+import logging
+import sys
 
 from motep import (
     applier,
@@ -8,6 +10,12 @@ from motep import (
     trainer,
     upconverter,
 )
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+stdout_handler = logging.StreamHandler(sys.stdout)
+stdout_handler.setLevel(logging.INFO)
+logger.addHandler(stdout_handler)
 
 
 def main() -> None:

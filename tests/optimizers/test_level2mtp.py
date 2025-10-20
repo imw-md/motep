@@ -1,5 +1,6 @@
 """Tests for `Level2MTPOptimizer`."""
 
+import logging
 import pathlib
 
 import numpy as np
@@ -14,6 +15,8 @@ from motep.optimizers.ideal import NoInteractionOptimizer
 from motep.optimizers.level2mtp import Level2MTPOptimizer
 from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting
+
+logger = logging.getLogger(__name__)
 
 
 def make_molecules(
@@ -156,9 +159,9 @@ def test_molecules(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f_ref = loss(mtp_data.parameters)  # update paramters
-    ErrorPrinter(loss).print()
+    ErrorPrinter(loss).log()
 
     parameters_ref = np.array(mtp_data.parameters, copy=True)
 
@@ -169,9 +172,9 @@ def test_molecules(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f_e00 = loss(mtp_data.parameters)  # update paramters
-    ErrorPrinter(loss).print()
+    ErrorPrinter(loss).log()
 
     # Check if `parameters` are updated.
     assert (mtp_data.parameters.size != parameters_ref.size) or (
@@ -261,9 +264,9 @@ def test_crystals(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     loss(mtp_data.parameters)  # update parameters
-    ErrorPrinter(loss).print()
+    ErrorPrinter(loss).log()
 
     parameters_ref = np.array(mtp_data.parameters, copy=True)
 
@@ -272,9 +275,9 @@ def test_crystals(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f0 = loss(mtp_data.parameters)  # update parameters
-    errors0 = ErrorPrinter(loss).print()
+    errors0 = ErrorPrinter(loss).log()
 
     # Check if `parameters` are updated.
     parameters = mtp_data.parameters
@@ -287,9 +290,9 @@ def test_crystals(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f1 = loss(mtp_data.parameters)  # update parameters
-    errors1 = ErrorPrinter(loss).print()
+    errors1 = ErrorPrinter(loss).log()
 
     # Check RMSEs
     # When only the RMSE of the energies is minimized, it should be smaller than
@@ -302,9 +305,9 @@ def test_crystals(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f2 = loss(mtp_data.parameters)  # update parameters
-    errors2 = ErrorPrinter(loss).print()
+    errors2 = ErrorPrinter(loss).log()
 
     # Check RMSEs
     assert errors1["stress"]["RMS"] > errors2["stress"]["RMS"]
@@ -358,7 +361,7 @@ def test_species_coeffs(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     loss(mtp_data.parameters)  # update parameters
 
     optimized = ["radial_coeffs"]
@@ -366,7 +369,7 @@ def test_species_coeffs(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f0 = loss(mtp_data.parameters)  # update parameters
 
     optimized = ["radial_coeffs", "species_coeffs"]
@@ -374,7 +377,7 @@ def test_species_coeffs(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f1 = loss(mtp_data.parameters)  # update parameters
 
     # Check loss functions
