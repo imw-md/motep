@@ -1,5 +1,6 @@
 """Tests for `LLSOptimizer`."""
 
+import logging
 import pathlib
 
 import numpy as np
@@ -13,6 +14,8 @@ from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers.lls import LLSOptimizer
 from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting
+
+logger = logging.getLogger(__name__)
 
 
 def make_molecules(
@@ -68,7 +71,7 @@ def test_without_forces(data_path: pathlib.Path) -> None:
     mtp_data.optimized = optimized
     mtp_data.initialize(rng=rng)
 
-    mtp_data.print()
+    mtp_data.log()
 
     loss = LossFunction(
         images,
@@ -108,7 +111,7 @@ def test_molecules(
     mtp_data.optimized = optimized
     mtp_data.initialize(rng=rng)
 
-    mtp_data.print()
+    mtp_data.log()
 
     loss = LossFunction(
         images,
@@ -120,16 +123,16 @@ def test_molecules(
 
     parameters_ref = np.array(mtp_data.parameters, copy=True)
     loss(parameters_ref)  # update paramters
-    ErrorPrinter(loss).print()
+    ErrorPrinter(loss).log()
 
     minimized = ["energy"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f0 = loss(mtp_data.parameters)  # update paramters
-    errors0 = ErrorPrinter(loss).print()
+    errors0 = ErrorPrinter(loss).log()
 
     # Check if `parameters` are updated.
     assert (mtp_data.parameters.size != parameters_ref.size) or (
@@ -141,9 +144,9 @@ def test_molecules(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f1 = loss(mtp_data.parameters)  # update parameters
-    errors1 = ErrorPrinter(loss).print()
+    errors1 = ErrorPrinter(loss).log()
 
     # Check loss functions
     # The value should be smaller when considering both energies and forces than
@@ -227,18 +230,18 @@ def test_crystals(
     )
 
     parameters_ref = np.array(mtp_data.parameters, copy=True)
-    mtp_data.print()
+    mtp_data.log()
     loss(parameters_ref)  # update parameters
-    ErrorPrinter(loss).print()
+    ErrorPrinter(loss).log()
 
     minimized = ["energy"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f0 = loss(mtp_data.parameters)  # update parameters
-    errors0 = ErrorPrinter(loss).print()
+    errors0 = ErrorPrinter(loss).log()
 
     # Check if `parameters` are updated.
     assert (mtp_data.parameters.size != parameters_ref.size) or (
@@ -250,9 +253,9 @@ def test_crystals(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f1 = loss(mtp_data.parameters)  # update parameters
-    errors1 = ErrorPrinter(loss).print()
+    errors1 = ErrorPrinter(loss).log()
 
     # Check RMSEs
     # When only the RMSE of the energies is minimized, it should be smaller than
@@ -265,9 +268,9 @@ def test_crystals(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f2 = loss(mtp_data.parameters)  # update parameters
-    errors2 = ErrorPrinter(loss).print()
+    errors2 = ErrorPrinter(loss).log()
 
     # Check RMSEs
     assert errors1["stress"]["RMS"] > errors2["stress"]["RMS"]
@@ -318,7 +321,7 @@ def test_species_coeffs(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f0 = loss(mtp_data.parameters)  # update parameters
 
     optimized = ["moment_coeffs", "species_coeffs"]
@@ -326,7 +329,7 @@ def test_species_coeffs(
     optimizer.optimize()
     print()
 
-    mtp_data.print()
+    mtp_data.log()
     f1 = loss(mtp_data.parameters)  # update parameters
 
     # Check loss functions

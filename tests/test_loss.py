@@ -1,5 +1,6 @@
 """Tests for trainer.py."""
 
+import logging
 import pathlib
 
 import numpy as np
@@ -10,6 +11,8 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss import ErrorPrinter, LossFunction
 from motep.setting import LossSetting
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.mark.parametrize("forces_per_atom", [False, True])
@@ -42,7 +45,7 @@ def test_without_forces(*, forces_per_atom: bool, data_path: pathlib.Path) -> No
 
     loss(mtp_data.parameters)
     loss.jac(mtp_data.parameters)
-    ErrorPrinter(loss).print()
+    ErrorPrinter(loss).log(logger)
 
 
 @pytest.mark.parametrize(

@@ -1,8 +1,9 @@
 """`motep grade` command."""
 
 import argparse
+import logging
 import pathlib
-import pprint
+from pprint import pformat
 
 import numpy as np
 from mpi4py import MPI
@@ -12,6 +13,8 @@ from motep.active import AlgorithmBase, make_algorithm
 from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.setting import load_setting_grade
+
+logger = logging.getLogger(__name__)
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -27,8 +30,10 @@ def grade(filename_setting: str, comm: MPI.Comm) -> None:
     rank = comm.Get_rank()
     setting = load_setting_grade(filename_setting)
     if rank == 0:
-        pprint.pp(setting)
-        print(flush=True)
+        logger.info(pformat(setting))
+        logger.info("")
+        for handler in logger.handlers:
+            handler.flush()
 
     rng = np.random.default_rng(setting.seed)
 
@@ -61,10 +66,11 @@ def grade(filename_setting: str, comm: MPI.Comm) -> None:
     )
 
     if rank == 0:
-        print(f"{'':=^72s}\n")
-        print("[data_active]")
-        print(optimality.indices)
-        print(flush=True)
+        logger.info(f"{'':=^72s}\n")
+        logger.info("[data_active]")
+        logger.info(optimality.indices)
+        for handler in logger.handlers:
+            handler.flush()
 
     images_in = read_images(
         setting.data_in,

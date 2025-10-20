@@ -1,10 +1,12 @@
 """Initializer."""
 
+import logging
 from dataclasses import dataclass, field
-from typing import Any
 
 import numpy as np
 import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -130,17 +132,15 @@ class MTPData:
             tmp.extend([(-np.inf, +np.inf)] * self.radial_coeffs.size)
         return np.vstack(tmp)
 
-    def print(self, **kwargs: dict[str, Any]) -> None:
-        """Print parameters.
-
-        `**kwargs` are used to, e.g., give `flush=True` for `print` at the end
-        of each block.
-        """
-        print("scaling:", self.scaling)
-        print("moment_coeffs:")
-        print(self.moment_coeffs)
-        print("species_coeffs:")
-        print(self.species_coeffs)
-        print("radial_coeffs:")
-        print(self.radial_coeffs)
-        print(**kwargs)
+    def log(self) -> None:
+        """Log parameters."""
+        logger.debug(f"scaling: {self.scaling}")
+        logger.debug("moment_coeffs:")
+        logger.debug(self.moment_coeffs)
+        logger.debug("species_coeffs:")
+        logger.debug(self.species_coeffs)
+        logger.debug("radial_coeffs:")
+        logger.debug(self.radial_coeffs)
+        logger.debug("")
+        for handler in logger.handlers:
+            handler.flush()

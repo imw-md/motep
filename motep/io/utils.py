@@ -1,9 +1,13 @@
 """IO unils."""
 
+import logging
+
 from ase import Atoms
 from mpi4py import MPI
 
 import motep.io
+
+logger = logging.getLogger(__name__)
 
 
 def get_dummy_species(images: list[Atoms]) -> list[int]:
@@ -24,11 +28,11 @@ def read_images(
     rank = comm.Get_rank()
     images = []
     if rank == 0:
-        print(f"{'':=^72s}\n")
-        print(f"[{title}]")
+        logger.info(f"{'':=^72s}\n")
+        logger.info(f"[{title}]")
         for filename in filenames:
             images_local = motep.io.read(filename, species)
             images.extend(images_local)
-            print(f'"{filename}" = {len(images_local)}')
-        print()
+            logger.info(f'"{filename}" = {len(images_local)}')
+        logger.info("")
     return comm.bcast(images, root=0)

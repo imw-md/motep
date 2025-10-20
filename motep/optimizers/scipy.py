@@ -1,8 +1,8 @@
 """Optimizers based on SciPy."""
 
+import logging
 from typing import Any
 
-import numpy as np
 from scipy.optimize import (
     OptimizeResult,
     differential_evolution,
@@ -12,6 +12,8 @@ from scipy.optimize import (
 
 from motep.loss import LossFunctionBase
 from motep.optimizers.base import OptimizerBase
+
+logger = logging.getLogger(__name__)
 
 
 class Callback:
@@ -24,7 +26,9 @@ class Callback:
     def __call__(self, intermediate_result: OptimizeResult):
         fun = intermediate_result.fun
         if self.loss.comm.Get_rank() == 0:
-            print(f"loss {self.iter:4d}:", fun, flush=True)
+            logger.info(f"loss {self.iter:4d}: {fun}")
+            for handler in logger.handlers:
+                handler.flush()
         self.iter += 1
 
 
@@ -40,15 +44,17 @@ class ScipyOptimizerBase(OptimizerBase):
     def print_result(self, result: OptimizeResult) -> None:
         """Print `result`."""
         if self.loss.comm.Get_rank() == 0:
-            print(flush=True)
-            print("Optimization result:")
-            print("  Message:", result.message)
-            print("  Success:", result.success)
-            print("  Status code:", result.status)
-            print("  Number of function evaluations:", result.nfev)
-            print("  Number of iterations:", result.nit)
-            # print("  Final parameters:", result.x)
-            # print("  Final function value:", result.fun)
+            logger.info("")
+            for handler in logger.handlers:
+                handler.flush()
+            logger.info(f"Optimization result:")
+            logger.info(f"  Message: {result.message}")
+            logger.info(f"  Success: {result.success}")
+            logger.info(f"  Status code: {result.status}")
+            logger.info(f"  Number of function evaluations: {result.nfev}")
+            logger.info(f"  Number of iterations: {result.nit}")
+            # logger.info(f"  Final parameters: {result.x}")
+            # logger.info(f"  Final function value: {result.fun}")
 
 
 class ScipyDualAnnealingOptimizer(ScipyOptimizerBase):

@@ -1,7 +1,7 @@
 """Loss function."""
 
+import logging
 from abc import ABC, abstractmethod
-from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -13,6 +13,8 @@ from scipy.constants import eV
 from motep.calculator import MTP
 from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting
+
+logger = logging.getLogger(__name__)
 
 
 def _calc_errors_from_diff(diff: np.ndarray) -> dict[str, float]:
@@ -457,11 +459,8 @@ class ErrorPrinter:
         errors["stress"] = self._calc_errors_stress()  # eV/Ang^3
         return errors
 
-    def print(self, **kwargs: dict[str, Any]) -> dict[str, float]:
-        """Print errors.
-
-        `**kwargs` are used to, e.g., give `flush=True` for `print` at the end
-        of each block.
+    def log(self) -> dict[str, float]:
+        """Log errors.
 
         Returns
         -------
@@ -472,32 +471,32 @@ class ErrorPrinter:
         errors = self.calculate()
 
         key0 = "energy"
-        print("Energy (eV):")
-        print(f"    Errors checked for {errors[key0]['N']} configurations")
+        logger.info("Energy (eV):")
+        logger.info(f"    Errors checked for {errors[key0]['N']} configurations")
         for key1 in ["MAX", "ABS", "RMS"]:
-            print(f"    {key1} error: {errors[key0][key1]}")
-        print(**kwargs)
+            logger.info(f"    {key1} error: {errors[key0][key1]}")
+        logger.info("")
 
         key0 = "energy_per_atom"
-        print("Energy per atom (eV/atom):")
-        print(f"    Errors checked for {errors[key0]['N']} configurations")
+        logger.info("Energy per atom (eV/atom):")
+        logger.info(f"    Errors checked for {errors[key0]['N']} configurations")
         for key1 in ["MAX", "ABS", "RMS"]:
-            print(f"    {key1} error: {errors[key0][key1]}")
-        print(**kwargs)
+            logger.info(f"    {key1} error: {errors[key0][key1]}")
+        logger.info("")
 
         key0 = "forces"
-        print("Forces per component (eV/angstrom):")
-        print(f"    Errors checked for {errors[key0]['N'] // 3} atoms")
+        logger.info("Forces per component (eV/angstrom):")
+        logger.info(f"    Errors checked for {errors[key0]['N'] // 3} atoms")
         for key1 in ["MAX", "ABS", "RMS"]:
-            print(f"    {key1} error: {errors[key0][key1]}")
-        print(**kwargs)
+            logger.info(f"    {key1} error: {errors[key0][key1]}")
+        logger.info("")
 
         key0 = "stress"
-        print("Stress per component (GPa):")
-        print(f"    Errors checked for {errors[key0]['N'] // 9} configurations")
+        logger.info("Stress per component (GPa):")
+        logger.info(f"    Errors checked for {errors[key0]['N'] // 9} configurations")
         for key1 in ["MAX", "ABS", "RMS"]:
-            print(f"    {key1} error: {errors[key0][key1] * eV * 1e21}")
-        print(**kwargs)
+            logger.info(f"    {key1} error: {errors[key0][key1] * eV * 1e21}")
+        logger.info("")
 
         return errors
 

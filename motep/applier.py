@@ -1,8 +1,9 @@
 """`motep run` command."""
 
 import argparse
+import logging
 import pathlib
-import pprint
+from pprint import pformat
 
 from mpi4py import MPI
 
@@ -11,6 +12,8 @@ from motep.calculator import MTP
 from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.setting import load_setting_apply
+
+logger = logging.getLogger(__name__)
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -23,8 +26,10 @@ def apply(filename_setting: str, comm: MPI.Comm) -> None:
     rank = comm.Get_rank()
     setting = load_setting_apply(filename_setting)
     if rank == 0:
-        pprint.pp(setting)
-        print(flush=True)
+        logger.info(pformat(setting))
+        logger.info("")
+        for handler in logger.handlers:
+            handler.flush()
 
     mtp_file = str(pathlib.Path(setting.potential_final).resolve())
 
