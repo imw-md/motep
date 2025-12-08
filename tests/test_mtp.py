@@ -195,3 +195,45 @@ def test_stress(
     print(stress_ref[sindex], s)
 
     assert stress_ref[sindex] == pytest.approx(s, abs=1e-4)
+
+
+@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize("crystal", ["size", "multi"])
+@pytest.mark.parametrize("engine", [NumbaMTPEngine])  # , JaxMTPEngine])
+def test_basis_data(
+    engine: Any,
+    crystal: int,
+    level: int,
+    data_path: pathlib.Path,
+) -> None:
+    """Test PyMTP."""
+    is_trained = True
+    path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
+    if not (path / "pot.mtp").exists():
+        pytest.skip()
+    parameters = read_mtp(path / "pot.mtp")
+    # Assume NumpyMTPEngine as reference
+    ref = NumpyMTPEngine(parameters, is_trained=is_trained)
+    mtp = engine(parameters, is_trained=is_trained)
+    images = [read_cfg(path / "out.cfg", index=-1)]
+    ref._initiate_neighbor_list(images[0])
+    mtp._initiate_neighbor_list(images[0])
+
+    for atoms in images:
+        ref.calculate(atoms)
+        mtp.calculate(atoms)
+
+        mbd = mtp.mbd
+        mbd_ref = ref.mbd
+        np.testing.assert_allclose(mbd.values, mbd_ref.values, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dbdris, mbd_ref.dbdris, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dbdeps, mbd_ref.dbdeps, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dedcs, mbd_ref.dedcs, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dgdcs, mbd_ref.dgdcs, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dsdcs, mbd_ref.dsdcs, rtol=0.0, atol=1e-6)
+
+        rbd = mtp.rbd
+        rbd_ref = ref.rbd
+        np.testing.assert_allclose(rbd.values, rbd_ref.values, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(rbd.dqdris, rbd_ref.dqdris, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(rbd.dqdeps, rbd_ref.dqdeps, rtol=0.0, atol=1e-6)
