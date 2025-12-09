@@ -5,6 +5,7 @@ import logging
 import pathlib
 from pprint import pformat
 
+import numpy as np
 from ase import Atoms
 from mpi4py import MPI
 
@@ -38,10 +39,19 @@ class Trainer:
         self.setting = setting
         self.comm = comm
 
+    def update_mindist(self, images: list[Atoms]) -> None:
+        """Update min_dist of the MTP potential."""
+        self.mtp_data.min_dist = np.min([_.get_all_distances(mic=True) for _ in images])
+
     def train(self, images: list[Atoms]) -> LossFunction:
+        """Train."""
         setting = self.setting
+
+        if setting.update_mindist:
+            self.update_mindist(images)
+
         loss_args = (images, self.mtp_data, setting.loss)
-        if self.setting.engine == "mlippy":
+        if setting.engine == "mlippy":
             from motep.mlippy_loss import MlippyLossFunction
 
             loss = MlippyLossFunction(*loss_args, comm=self.comm)
@@ -77,6 +87,7 @@ class Trainer:
                     write_mtp(f"intermediate_{i}.mtp", self.mtp_data)
 
                     ErrorPrinter(loss).log()
+        return loss
 
 
 def train(filename_setting: str, comm: MPI.Comm) -> None:

@@ -75,6 +75,7 @@ class TrainSetting(Setting):
             {"method": "minimize"},
         ],
     )
+    update_mindist: bool = False
 
     def __post_init__(self) -> None:
         """Postprocess attributes."""
