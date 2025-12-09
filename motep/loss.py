@@ -2,6 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
+from copy import copy
 
 import numpy as np
 import numpy.typing as npt
@@ -324,7 +325,7 @@ class LossFunctionBase(ABC):
             MPI.Comm object.
 
         """
-        self.images = images
+        self.images = [copy(_) for _ in images]
         self.mtp_data = mtp_data
         self.setting = setting
         self.comm = comm
