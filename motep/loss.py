@@ -324,6 +324,12 @@ class LossFunctionBase(ABC):
         comm : MPI.Comm
             MPI.Comm object.
 
+        Notes
+        -----
+        This class creates a lightweight shallow copy of the provided Atoms
+        objects. Atomic positions and arrays are treated as immutable and are
+        shared with the input. Only the calculator is replaced internally.
+
         """
         self.images = [copy(_) for _ in images]
         self.mtp_data = mtp_data
