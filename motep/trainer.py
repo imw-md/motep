@@ -14,7 +14,7 @@ from motep.io.utils import get_dummy_species, read_images
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
 from motep.potentials.mtp.data import MTPData
-from motep.setting import TrainSetting, load_setting_train
+from motep.setting import LossSetting, load_setting_train
 from motep.utils import measure_time
 
 logger = logging.getLogger(__name__)
@@ -31,34 +31,76 @@ class Trainer:
     def __init__(
         self,
         mtp_data: MTPData,
-        setting: TrainSetting,
+        seed: int | None = None,
+        rng: np.random.Generator | None = None,
+        engine: str = "numba",
+        loss: dict | LossSetting | None = None,
+        steps: list[dict] | None = None,
+        *,
         comm: MPI.Comm,
+        update_mindist: bool = False,
     ) -> None:
-        """Initialize."""
+        """Initialize.
+
+        Parameters
+        ----------
+        mtp_data : MTPData
+            MTPData object with MTP parameters.
+        seed : int | None (optional)
+            Seed for the random number generator. Disregarded if `rng` is given.
+        rng : np.random.Generator | None (optional)
+            Pseudo-random-number generator (PRNG) with the NumPy API.
+        engine : str (optional)
+            Engine name.
+        loss : dict | LossSetting | None (optional)
+            Dict with settings of the loss function.
+        steps : list[dict] | None (optional)
+            List of optimization steps.
+        comm : MPI.Comm
+            MPI.Comm object.
+        update_mindist : bool (optional)
+            Whether to update min_dist of the MTP potential before training.
+
+        """
         self.mtp_data = mtp_data
-        self.setting = setting
+        self.seed = seed or comm.bcast(np.random.SeedSequence().entropy, root=0)
+        self.rng = rng or np.random.default_rng(self.seed)
+        self.engine = engine
+        self.loss = LossSetting.from_any(loss)
+        self.steps = steps or [{"method": "minimize"}]
         self.comm = comm
+        self.should_update_mindist = update_mindist
 
     def update_mindist(self, images: list[Atoms]) -> None:
         """Update min_dist of the MTP potential."""
         self.mtp_data.min_dist = np.min([_.get_all_distances(mic=True) for _ in images])
 
     def train(self, images: list[Atoms]) -> LossFunction:
-        """Train."""
-        setting = self.setting
+        """Train.
 
-        if setting.update_mindist:
+        Parameters
+        ----------
+        images : list[Atoms]
+            List of ASE Atoms objects.
+
+        Returns
+        -------
+        loss : LossFunction
+            LossFunction object after training.
+
+        """
+        if self.should_update_mindist:
             self.update_mindist(images)
 
-        loss_args = (images, self.mtp_data, setting.loss)
-        if setting.engine == "mlippy":
+        loss_args = (images, self.mtp_data, self.loss)
+        if self.engine == "mlippy":
             from motep.mlippy_loss import MlippyLossFunction
 
             loss = MlippyLossFunction(*loss_args, comm=self.comm)
         else:
-            loss = LossFunction(*loss_args, engine=setting.engine, comm=self.comm)
+            loss = LossFunction(*loss_args, engine=self.engine, comm=self.comm)
 
-        for i, step in enumerate(setting.steps):
+        for i, step in enumerate(self.steps):
             with measure_time(f"step {i}: {step['method']}", self.comm):
                 if self.comm.rank == 0:
                     logger.info(f"{'':=^72s}\n")
@@ -68,7 +110,7 @@ class Trainer:
                         handler.flush()
 
                 # Print parameters before optimization.
-                self.mtp_data.initialize(setting.rng)
+                self.mtp_data.initialize(self.rng)
                 if self.comm.rank == 0:
                     self.mtp_data.log()
 
@@ -114,7 +156,15 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
     mtp_data = read_mtp(untrained_mtp)
     mtp_data.species = species
 
-    trainer = Trainer(mtp_data, setting, comm)
+    trainer = Trainer(
+        mtp_data,
+        seed=setting.seed,
+        engine=setting.engine,
+        loss=setting.loss,
+        steps=setting.steps,
+        comm=comm,
+        update_mindist=setting.update_mindist,
+    )
     trainer.train(images)
 
     if comm.rank == 0:
