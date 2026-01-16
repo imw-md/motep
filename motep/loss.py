@@ -2,6 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
+from copy import copy
 
 import numpy as np
 import numpy.typing as npt
@@ -323,8 +324,14 @@ class LossFunctionBase(ABC):
         comm : MPI.Comm
             MPI.Comm object.
 
+        Notes
+        -----
+        This class creates a lightweight shallow copy of the provided Atoms
+        objects. Atomic positions and arrays are treated as immutable and are
+        shared with the input. Only the calculator is replaced internally.
+
         """
-        self.images = images
+        self.images = [copy(_) for _ in images]
         self.mtp_data = mtp_data
         self.setting = setting
         self.comm = comm
