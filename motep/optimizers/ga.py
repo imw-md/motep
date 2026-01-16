@@ -1,5 +1,6 @@
 """Optiimzers based on genetic algorithm (GA)."""
 
+import logging
 import random
 from collections.abc import Callable
 from typing import Any
@@ -8,6 +9,8 @@ import numpy as np
 from scipy.optimize import minimize
 
 from motep.optimizers.base import OptimizerBase
+
+logger = logging.getLogger(__name__)
 
 
 def _limit_bounds(bounds: np.ndarray) -> np.ndarray:
@@ -254,7 +257,7 @@ class GeneticAlgorithm:
 
 
 def elite_callback(gen: int, elite: float) -> None:
-    print(f"Generation {gen}: Top Elite - {elite}")
+    logger.info(f"Generation {gen}: Top Elite - {elite}")
 
 
 class GeneticAlgorithmOptimizer(OptimizerBase):

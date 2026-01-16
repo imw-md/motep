@@ -1,8 +1,9 @@
 """`motep train` command."""
 
 import argparse
+import logging
 import pathlib
-import pprint
+from pprint import pformat
 
 import numpy as np
 from mpi4py import MPI
@@ -13,6 +14,8 @@ from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
 from motep.setting import load_setting_train
 from motep.utils import measure_time
+
+logger = logging.getLogger(__name__)
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -26,8 +29,10 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
 
     setting = load_setting_train(filename_setting)
     if rank == 0:
-        pprint.pp(setting)
-        print(flush=True)
+        logger.info(pformat(setting))
+        logger.info("")
+        for handler in logger.handlers:
+            handler.flush()
 
     setting.rng = np.random.default_rng(setting.seed)
 
@@ -62,31 +67,35 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
     for i, step in enumerate(setting.steps):
         with measure_time(f"step {i}: {step['method']}", comm):
             if rank == 0:
-                print(f"{'':=^72s}\n")
-                pprint.pp(step)
-                print(flush=True)
+                logger.info(f"{'':=^72s}\n")
+                logger.info(pformat(step))
+                logger.info("")
+                for handler in logger.handlers:
+                    handler.flush()
 
             # Print parameters before optimization.
             mtp_data.initialize(setting.rng)
             if rank == 0:
-                mtp_data.print(flush=True)
+                mtp_data.log()
 
             # Instantiate an `Optimizer` class
             optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
             optimizer.optimize(**step.get("kwargs", {}))
             loss.broadcast()  # be sure that all processes have the same data
             if rank == 0:
-                print(flush=True)
+                logger.info("")
+                for handler in logger.handlers:
+                    handler.flush()
 
                 # Print parameters after optimization.
-                mtp_data.print(flush=True)
+                mtp_data.log()
 
                 write_mtp(f"intermediate_{i}.mtp", mtp_data)
 
-                ErrorPrinter(loss).print(flush=True)
+                ErrorPrinter(loss).log()
 
     if rank == 0:
-        print(f"{'':=^72s}\n")
+        logger.info(f"{'':=^72s}\n")
         write_mtp(setting.potential_final, mtp_data)
 
 
