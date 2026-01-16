@@ -4,13 +4,31 @@ from __future__ import annotations
 
 import pathlib
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Any, Self
 
 from scipy.optimize._minimize import MINIMIZE_METHODS  # noqa: PLC2701
 
 
+class DataclassFromAny:
+    """Mixin to create class from any."""
+
+    @classmethod
+    def from_any(
+        cls: type[Self],
+        value: Self | Mapping[str, Any] | None = None,
+    ) -> Self:
+        """Create instance from `value`."""
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, Mapping):
+            return cls(**value)
+        return cls()
+
+
 @dataclass
-class LossSetting:
+class LossSetting(DataclassFromAny):
     """Setting of the loss function."""
 
     energy_weight: float = 1.0
@@ -34,7 +52,7 @@ class UpconvertPotentials:
 
 
 @dataclass
-class Setting:
+class Setting(DataclassFromAny):
     """Setting of the training."""
 
     data_training: list[str] = field(default_factory=lambda: ["training.cfg"])
@@ -69,6 +87,7 @@ class TrainSetting(Setting):
             {"method": "minimize"},
         ],
     )
+    update_mindist: bool = False
 
     def __post_init__(self) -> None:
         """Postprocess attributes."""
