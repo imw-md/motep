@@ -62,6 +62,7 @@ class ScipyDualAnnealingOptimizer(ScipyOptimizerBase):
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
         callback = Callback(self.loss)
+        callback(OptimizeResult(x=parameters, fun=self.loss(parameters)))
         result = dual_annealing(
             self.loss,
             bounds=bounds,
@@ -78,6 +79,7 @@ class ScipyDifferentialEvolutionOptimizer(ScipyOptimizerBase):
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
         callback = Callback(self.loss)
+        callback(OptimizeResult(x=parameters, fun=self.loss(parameters)))
         result = differential_evolution(
             self.loss,
             bounds,
@@ -112,6 +114,7 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
         }:
             bounds = None
         callback = Callback(self.loss)
+        callback(OptimizeResult(x=parameters, fun=self.loss(parameters)))
         result = minimize(
             self.loss,
             parameters,
