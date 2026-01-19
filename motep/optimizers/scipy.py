@@ -56,17 +56,22 @@ class ScipyOptimizerBase(OptimizerBase):
             # logger.info(f"  Final parameters: {result.x}")
             # logger.info(f"  Final function value: {result.fun}")
 
+    def optimize(self) -> None:
+        """Optimize with a `scipy.optimize` function."""
+        p = self.loss.mtp_data.parameters
+        self.callback = Callback(self.loss)
+        self.callback(OptimizeResult(x=p, fun=self.loss(p)))
+
 
 class ScipyDualAnnealingOptimizer(ScipyOptimizerBase):
     def optimize(self, **kwargs: dict[str, Any]) -> None:
+        super().optimize()
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
-        callback = Callback(self.loss)
-        callback(OptimizeResult(x=parameters, fun=self.loss(parameters)))
         result = dual_annealing(
             self.loss,
             bounds=bounds,
-            callback=callback,
+            callback=self.callback,
             seed=40,
             x0=parameters,
         )
@@ -76,15 +81,14 @@ class ScipyDualAnnealingOptimizer(ScipyOptimizerBase):
 
 class ScipyDifferentialEvolutionOptimizer(ScipyOptimizerBase):
     def optimize(self, **kwargs: dict[str, Any]) -> None:
+        super().optimize()
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
-        callback = Callback(self.loss)
-        callback(OptimizeResult(x=parameters, fun=self.loss(parameters)))
         result = differential_evolution(
             self.loss,
             bounds,
             popsize=30,
-            callback=callback,
+            callback=self.callback,
             x0=parameters,
         )
         self.print_result(result)
@@ -96,6 +100,7 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
 
     def optimize(self, **kwargs: dict[str, Any]) -> None:
         """Optimizer using `scipy.optimize.minimize`."""
+        super().optimize()
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
 
@@ -113,13 +118,12 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
             "trust-krylov",
         }:
             bounds = None
-        callback = Callback(self.loss)
-        callback(OptimizeResult(x=parameters, fun=self.loss(parameters)))
+
         result = minimize(
             self.loss,
             parameters,
             bounds=bounds,
-            callback=callback,
+            callback=self.callback,
             **kwargs,
         )
         self.print_result(result)
