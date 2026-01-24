@@ -63,8 +63,12 @@ class Trainer:
 
         """
         self.mtp_data = mtp_data
-        self.seed = seed or comm.bcast(np.random.SeedSequence().entropy, root=0)
-        self.rng = rng or np.random.default_rng(self.seed)
+
+        seed = seed or comm.bcast(np.random.SeedSequence().entropy % (2**32), root=0)
+        if seed is not None and comm.rank == 0:
+            logger.info("[random seed] = %d", seed)
+        self.rng = rng or np.random.default_rng(seed)
+
         self.engine = engine
         self.loss = LossSetting.from_any(loss)
         self.steps = steps or [{"method": "minimize"}]
