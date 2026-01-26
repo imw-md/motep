@@ -50,13 +50,16 @@ class JaxMTPEngine(EngineBase):
     def _calculate(self, atoms: Atoms) -> tuple:
         mtp_data = self.mtp_data
         itypes = jnp.array(get_types(atoms, mtp_data.species))
-        all_js, all_rijs = [jnp.array(_) for _ in self._get_all_distances(atoms)]
-        all_jtypes = itypes[all_js]
+        if not self._is_trained:
+            js, rijs = [jnp.array(_) for _ in self._get_all_distances(atoms)]
+        else:
+            js, rijs = jnp.array(self.all_js), jnp.array(self.all_r_ijs)
+        jtypes = itypes[js]
 
         energies, gradients = _calc_local_energy_and_derivs(
-            all_rijs,
+            rijs,
             itypes,
-            all_jtypes,
+            jtypes,
             mtp_data.species_coeffs,
             self.basis_converter.remapped_coeffs,
             mtp_data.radial_coeffs,
@@ -71,9 +74,9 @@ class JaxMTPEngine(EngineBase):
         )
 
         forces = np.array(gradients.sum(axis=1))
-        np.subtract.at(forces, all_js, gradients)
+        np.subtract.at(forces, js, gradients)
 
-        stress = np.array((all_rijs.transpose((0, 2, 1)) @ gradients).sum(axis=0))
+        stress = np.array((rijs.transpose((0, 2, 1)) @ gradients).sum(axis=0))
 
         return energies, forces, stress
 
