@@ -59,7 +59,10 @@ class NumpyMTPEngine(EngineBase):
 
         moment_coeffs = self.mtp_data.moment_coeffs
 
-        js, r_ijs = self._get_all_distances(atoms)
+        if not self._is_trained:
+            js, r_ijs = self._get_all_distances(atoms)
+        else:
+            js, r_ijs = self.all_js, self.all_r_ijs
 
         for i, itype in enumerate(itypes):
             js_i = js[i, :]

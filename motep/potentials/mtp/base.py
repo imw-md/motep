@@ -158,7 +158,13 @@ class EngineBase:
 
     def update_neighbor_list(self, atoms: Atoms) -> None:
         """Update the ASE `PrimitiveNeighborList` object."""
-        if self._neighbor_list is None:
+        if self._is_trained:
+            if not hasattr(self, "all_r_ijs"):
+                self._initiate_neighbor_list(atoms)
+                self.all_js, self.all_r_ijs = self._get_all_distances(atoms)
+                self._neighbor_list = None
+                del self.all_offsets
+        elif self._neighbor_list is None:
             self._initiate_neighbor_list(atoms)
         elif self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
             self.all_js, self.all_offsets = self._compute_all_offsets(atoms)
