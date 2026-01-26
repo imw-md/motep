@@ -1,10 +1,9 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=80", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "motep"
-version = "0.1.0"
 dependencies = [
     "ase",
     "mpi4py",
@@ -17,6 +16,7 @@ authors = [
     {name = "Axel Forslund"},  # calculator
     {name = "Yuji Ikeda"},  # testing
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 jax = [
@@ -28,6 +28,8 @@ motep = "motep.__init__:main"
 
 [tool.setuptools.packages]
 find = {}
+
+[tool.setuptools_scm]
 
 [tool.ruff.lint]
 preview = true  # necessary to activate many pycodestyle rules
