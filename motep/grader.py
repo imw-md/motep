@@ -27,9 +27,8 @@ def grade(filename_setting: str, comm: MPI.Comm) -> None:
 
     This adds `MV_grade` to `atoms.info`.
     """
-    rank = comm.Get_rank()
     setting = load_setting_grade(filename_setting)
-    if rank == 0:
+    if comm.rank == 0:
         logger.info(pformat(setting))
         logger.info("")
         for handler in logger.handlers:
@@ -65,7 +64,7 @@ def grade(filename_setting: str, comm: MPI.Comm) -> None:
         rng=rng,
     )
 
-    if rank == 0:
+    if comm.rank == 0:
         logger.info(f"{'':=^72s}\n")
         logger.info("[data_active]")
         logger.info(optimality.indices)
