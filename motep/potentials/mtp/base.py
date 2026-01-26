@@ -198,7 +198,9 @@ class EngineBase:
         max_dist = self.mtp_data.max_dist
         positions = atoms.positions
         offsets = self.all_offsets
-        all_r_ijs = positions[self.all_js] + offsets - positions[:, None, :]
+        all_r_ijs = positions[self.all_js]  # r_j
+        all_r_ijs += offsets  # account for periodic images
+        all_r_ijs -= positions[:, None, :]  # r_i
         all_r_ijs[self.all_js[:, :] < 0, :] = max_dist
         return self.all_js, all_r_ijs
 
