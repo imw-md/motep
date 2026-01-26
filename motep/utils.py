@@ -44,5 +44,5 @@ def measure_time(name: str, comm: MPI.Comm = MPI.COMM_WORLD) -> typing.Generator
         yield
     finally:
         end_time = time.perf_counter()
-        if comm.Get_rank() == 0:
+        if comm.rank == 0:
             print(f"Time ({name}): {end_time - start_time} (s)\n", flush=True)

@@ -198,7 +198,7 @@ class LLSOptimizer(LLSOptimizerBase):
         callback(OptimizeResult(x=parameters, fun=loss_value))
 
         # Prepare and solve the LLS problem
-        if self.comm.Get_rank() == 0:
+        if self.comm.rank == 0:
             logger.debug("Calculate `matrix`")
             matrix = self._calc_matrix()
             logger.debug("Calculate `vector`")

@@ -141,8 +141,6 @@ def run(args: argparse.Namespace) -> None:
     """Run."""
     comm = MPI.COMM_WORLD
 
-    rank = comm.Get_rank()
-
     setting = load_setting_upconvert(args.setting)
 
     src = read_mtp(setting.potentials.base)
@@ -150,5 +148,5 @@ def run(args: argparse.Namespace) -> None:
 
     upconvert(src, dst)
 
-    if rank == 0:
+    if comm.rank == 0:
         write_mtp(setting.potentials.final, dst)

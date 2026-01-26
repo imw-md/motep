@@ -23,9 +23,8 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 def apply(filename_setting: str, comm: MPI.Comm) -> None:
     """Run."""
-    rank = comm.Get_rank()
     setting = load_setting_apply(filename_setting)
-    if rank == 0:
+    if comm.rank == 0:
         logger.info(pformat(setting))
         logger.info("")
         for handler in logger.handlers:

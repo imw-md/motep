@@ -25,9 +25,8 @@ def read_images(
     title: str = "data",
 ) -> list[Atoms]:
     """Read images."""
-    rank = comm.Get_rank()
     images = []
-    if rank == 0:
+    if comm.rank == 0:
         logger.info(f"{'':=^72s}\n")
         logger.info(f"[{title}]")
         for filename in filenames:

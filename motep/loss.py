@@ -66,11 +66,9 @@ class LossFunctionEnergy:
             Energy contribution to the loss function.
 
         """
-        rank = self.comm.Get_rank()
-        size = self.comm.Get_size()
         ncnf = len(self.images)
         loss_cnf = 0.0
-        for i in range(rank, ncnf, size):
+        for i in range(self.comm.rank, ncnf, self.comm.size):
             atoms = self.images[i]
             target = atoms.calc.targets["energy"]
             result = atoms.calc.results["energy"]
@@ -90,13 +88,11 @@ class LossFunctionEnergy:
             Energy contribution to the loss function Jacobian.
 
         """
-        rank = self.comm.Get_rank()
-        size = self.comm.Get_size()
         ncnf = len(self.images)
         nprm = self.mtp_data.number_of_parameters_optimized
         jac_cnf = np.zeros(nprm)
         jac_all = np.zeros(nprm)
-        for i in range(rank, ncnf, size):
+        for i in range(self.comm.rank, ncnf, self.comm.size):
             atoms = self.images[i]
             target = atoms.calc.targets["energy"]
             result = atoms.calc.results["energy"]
@@ -158,11 +154,9 @@ class LossFunctionForces:
             Force contribution to the loss function.
 
         """
-        rank = self.comm.Get_rank()
-        size = self.comm.Get_size()
         ncnf = len(self.images)
         loss_cnf = 0.0
-        for i in range(rank, ncnf, size):
+        for i in range(self.comm.rank, ncnf, self.comm.size):
             if i not in self.idcs_frc:
                 continue
             atoms = self.images[i]
@@ -184,12 +178,10 @@ class LossFunctionForces:
             Force contribution to the loss function Jacobian.
 
         """
-        rank = self.comm.Get_rank()
-        size = self.comm.Get_size()
         ncnf = len(self.images)
         jac_cnf = np.zeros(self.mtp_data.number_of_parameters_optimized)
         jac_all = np.zeros(self.mtp_data.number_of_parameters_optimized)
-        for i in range(rank, ncnf, size):
+        for i in range(self.comm.rank, ncnf, self.comm.size):
             if i not in self.idcs_frc:
                 continue
             atoms = self.images[i]
@@ -252,12 +244,10 @@ class LossFunctionStress:
             Stress contribution to the loss function.
 
         """
-        rank = self.comm.Get_rank()
-        size = self.comm.Get_size()
         ncnf = len(self.images)
         f = voigt_6_to_full_3x3_stress
         loss_cnf = 0.0
-        for i in range(rank, ncnf, size):
+        for i in range(self.comm.rank, ncnf, self.comm.size):
             if i not in self.idcs_str:
                 continue
             atoms = self.images[i]
@@ -279,13 +269,11 @@ class LossFunctionStress:
             Stress contribution to the loss function Jacobian.
 
         """
-        rank = self.comm.Get_rank()
-        size = self.comm.Get_size()
         ncnf = len(self.images)
         f = voigt_6_to_full_3x3_stress
         jac_cnf = np.zeros(self.mtp_data.number_of_parameters_optimized)
         jac_all = np.zeros(self.mtp_data.number_of_parameters_optimized)
-        for i in range(rank, ncnf, size):
+        for i in range(self.comm.rank, ncnf, self.comm.size):
             if i not in self.idcs_str:
                 continue
             atoms = self.images[i]
@@ -364,15 +352,13 @@ class LossFunctionBase(ABC):
 
     def _run_calculations(self) -> None:
         """Run calculations of the properties."""
-        rank = self.comm.Get_rank()
-        size = self.comm.Get_size()
         ncnf = len(self.images)
-        for i in range(rank, ncnf, size):
+        for i in range(self.comm.rank, ncnf, self.comm.size):
             self.images[i].get_potential_energy()
 
     def broadcast(self) -> None:
         """Broadcast data."""
-        size = self.comm.Get_size()
+        size = self.comm.size
         ncnf = len(self.images)
         for i in range(ncnf):
             results = self.images[i].calc.results
