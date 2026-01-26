@@ -325,16 +325,21 @@ def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
 
 def _compute_all_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
     cell = atoms.cell
-    js = [nl.get_neighbors(i)[0] for i in range(len(atoms))]
-    offsets = [nl.get_neighbors(i)[1] @ cell for i in range(len(atoms))]
-    num_js = [_.shape[0] for _ in js]
-    max_num_js = np.max([_.shape[0] for _ in offsets])
-    pads = [(0, max_num_js - n) for n in num_js]
-    # Pad dummy indices as -1 to recognize later
-    padded_js = [
-        np.pad(js_, pad_width=pad, constant_values=-1) for js_, pad in zip(js, pads)
-    ]
-    padded_offsets = [
-        np.pad(offset, pad_width=(pad, (0, 0))) for offset, pad in zip(offsets, pads)
-    ]
-    return np.array(padded_js, dtype=int), np.array(padded_offsets)
+    n_atoms = len(atoms)
+    # First pass: find max_num_js
+    max_num_js = 0
+    for i in range(n_atoms):
+        _, offsets_i = nl.get_neighbors(i)
+        max_num_js = max(max_num_js, offsets_i.shape[0])
+
+    # Preallocate arrays
+    js = np.full((n_atoms, max_num_js), -1, dtype=int)
+    offsets = np.zeros((n_atoms, max_num_js, 3))
+
+    for i in range(n_atoms):
+        js_i, offsets_i = nl.get_neighbors(i)
+        n_neighbors = js_i.shape[0]
+        js[i, :n_neighbors] = js_i
+        offsets[i, :n_neighbors] = offsets_i @ cell
+
+    return js, offsets
