@@ -356,18 +356,34 @@ class LossFunctionBase(ABC):
         for i in range(self.comm.rank, ncnf, self.comm.size):
             self.images[i].get_potential_energy()
 
-    def broadcast(self) -> None:
+    def broadcast_results(self) -> None:
         """Broadcast data."""
         size = self.comm.size
         ncnf = len(self.images)
         for i in range(ncnf):
             results = self.images[i].calc.results
             results.update(self.comm.bcast(results, root=i % size))
-            if hasattr(self.images[i].calc, "engine"):
-                mbd = self.images[i].calc.engine.mbd
-                self.images[i].calc.engine.mbd = self.comm.bcast(mbd, root=i % size)
-                rbd = self.images[i].calc.engine.rbd
-                self.images[i].calc.engine.rbd = self.comm.bcast(rbd, root=i % size)
+
+    def gather_data(self) -> None:
+        """Gather data to root process."""
+        rank = self.comm.Get_rank()
+        size = self.comm.Get_size()
+        ncnf = len(self.images)
+        if rank == 0:
+            for i in range(ncnf):
+                root = i % size
+                if root != 0 and hasattr(self.images[i].calc, "engine"):
+                    mbd = self.comm.recv(source=root, tag=i + ncnf)
+                    self.images[i].calc.engine.mbd = mbd
+                    rbd = self.comm.recv(source=root, tag=i + 2 * ncnf)
+                    self.images[i].calc.engine.rbd = rbd
+        else:
+            for i in range(rank, ncnf, size):
+                if hasattr(self.images[i].calc, "engine"):
+                    self.comm.send(self.images[i].calc.engine.mbd, dest=0, tag=i + ncnf)
+                    self.comm.send(
+                        self.images[i].calc.engine.rbd, dest=0, tag=i + 2 * ncnf
+                    )
 
     def calc_loss_function(self) -> float:
         """Calculate the value of the loss function."""

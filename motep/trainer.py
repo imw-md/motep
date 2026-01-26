@@ -121,7 +121,7 @@ class Trainer:
                 # Instantiate an `Optimizer` class
                 optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
                 optimizer.optimize(**step.get("kwargs", {}))
-                loss.broadcast()  # be sure that all processes have the same data
+                loss.broadcast_results()
                 if self.comm.rank == 0:
                     logger.info("")
                     for handler in logger.handlers:
