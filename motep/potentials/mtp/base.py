@@ -161,9 +161,7 @@ class EngineBase:
         if self._neighbor_list is None:
             self._initiate_neighbor_list(atoms)
         elif self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
-            self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
-            all_precomp = _compute_all_offsets(self._neighbor_list, atoms)
-            self.all_js, self.all_offsets = all_precomp
+            self.all_js, self.all_offsets = self._compute_all_offsets(atoms)
 
     def _initiate_neighbor_list(self, atoms: Atoms) -> None:
         """Initialize the ASE `PrimitiveNeighborList` object."""
@@ -174,25 +172,12 @@ class EngineBase:
             bothways=True,  # return both ij and ji
         )
         self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
-        self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
-        all_precomp = _compute_all_offsets(self._neighbor_list, atoms)
-        self.all_js, self.all_offsets = all_precomp
+        self.all_js, self.all_offsets = self._compute_all_offsets(atoms)
 
         natoms = len(atoms)
 
         self.mbd.initialize(natoms, self.mtp_data)
         self.rbd.initialize(natoms, self.mtp_data)
-
-    def _get_distances(
-        self,
-        atoms: Atoms,
-        index: int,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        indices_js, _ = self._neighbor_list.get_neighbors(index)
-        offsets = self.precomputed_offsets[index]
-        pos_js = atoms.positions[indices_js] + offsets
-        dist_vectors = pos_js - atoms.positions[index]
-        return indices_js, dist_vectors
 
     def _get_all_distances(self, atoms: Atoms) -> tuple[np.ndarray, np.ndarray]:
         max_dist = self.mtp_data.max_dist
@@ -319,29 +304,24 @@ class EngineBase:
         jac.optimized = self.mtp_data.optimized
         return jac
 
+    def _compute_all_offsets(self, atoms: Atoms):
+        nl = self._neighbor_list
+        cell = atoms.cell
+        n_atoms = len(atoms)
+        # First pass: find max_num_js
+        max_num_js = 0
+        for i in range(n_atoms):
+            _, offsets_i = nl.get_neighbors(i)
+            max_num_js = max(max_num_js, offsets_i.shape[0])
 
-def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
-    cell = atoms.cell
-    return [nl.get_neighbors(j)[1] @ cell for j in range(len(atoms))]
+        # Preallocate arrays
+        js = np.full((n_atoms, max_num_js), -1, dtype=int)
+        offsets = np.zeros((n_atoms, max_num_js, 3))
 
+        for i in range(n_atoms):
+            js_i, offsets_i = nl.get_neighbors(i)
+            n_neighbors = js_i.shape[0]
+            js[i, :n_neighbors] = js_i
+            offsets[i, :n_neighbors] = offsets_i @ cell
 
-def _compute_all_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
-    cell = atoms.cell
-    n_atoms = len(atoms)
-    # First pass: find max_num_js
-    max_num_js = 0
-    for i in range(n_atoms):
-        _, offsets_i = nl.get_neighbors(i)
-        max_num_js = max(max_num_js, offsets_i.shape[0])
-
-    # Preallocate arrays
-    js = np.full((n_atoms, max_num_js), -1, dtype=int)
-    offsets = np.zeros((n_atoms, max_num_js, 3))
-
-    for i in range(n_atoms):
-        js_i, offsets_i = nl.get_neighbors(i)
-        n_neighbors = js_i.shape[0]
-        js[i, :n_neighbors] = js_i
-        offsets[i, :n_neighbors] = offsets_i @ cell
-
-    return js, offsets
+        return js, offsets
