@@ -366,8 +366,8 @@ class LossFunctionBase(ABC):
 
     def gather_data(self) -> None:
         """Gather data to root process."""
-        rank = self.comm.Get_rank()
-        size = self.comm.Get_size()
+        rank = self.comm.rank
+        size = self.comm.size
         ncnf = len(self.images)
         if rank == 0:
             for i in range(ncnf):
