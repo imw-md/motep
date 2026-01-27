@@ -148,7 +148,7 @@ def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
         nb.float64[:],
         nb.float64[:],
     ),
-    # parallel=True,
+    parallel=True,
 )
 def _calc_run(
     all_r_ijs: npt.NDArray[np.float64],
@@ -232,7 +232,7 @@ def _calc_run(
         nb.float64[:, :, :, :, :, :],
         nb.float64[:, :, :, :, :, :],
     ),
-    # parallel=True,
+    parallel=True,
 )
 def _calc_train(
     all_js: npt.NDArray[np.int64],
@@ -259,6 +259,14 @@ def _calc_train(
     mbd_dgdcs: npt.NDArray[np.float64],
     mbd_dsdcs: npt.NDArray[np.float64],
 ):
+    _, species_count, rfs, rbs = radial_coeffs.shape
+    rb_vals = np.empty((itypes.size, radial_coeffs.shape[3], all_js.shape[1]))
+    rb_ders = np.empty((itypes.size, radial_coeffs.shape[3], all_js.shape[1]))
+    mb_vals = np.empty((itypes.size, alpha_moment_mapping.size))
+    mb_ders = np.empty((itypes.size, alpha_moment_mapping.size, *all_r_ijs.shape[1:]))
+    dedcs_l = np.empty((itypes.size, species_count, rfs, rbs))
+    dgdcs_l = np.empty((itypes.size, species_count, rfs, rbs, *all_r_ijs.shape[1:]))
+
     energies = species_coeffs[itypes]
     for i in nb.prange(itypes.size):
         js = all_js[i, :]
@@ -272,19 +280,6 @@ def _calc_train(
             scaling,
             min_dist,
             max_dist,
-        )
-        store_radial_basis(
-            i,
-            itypes[i],
-            js,
-            jtypes,
-            r_ijs,
-            r_ijs_unit,
-            rb_values,
-            rb_derivs,
-            rbd_values,
-            rbd_dqdris,
-            rbd_dqdeps,
         )
         basis_values, basis_jac_rs, dedcs, dgdcs = calc_moments_train(
             itypes[i],
@@ -301,15 +296,41 @@ def _calc_train(
             moment_coeffs,
         )
 
-        update_mbd_values(mbd_values, basis_values)
-        update_mbd_dbdris(i, js, mbd_dbdris, basis_jac_rs)
-        update_mbd_dbdeps(js, r_ijs, mbd_dbdeps, basis_jac_rs)
-        update_mbd_dedcs(itypes[i], mbd_dedcs, dedcs)
-        update_mbd_dgdcs(i, itypes[i], js, mbd_dgdcs, dgdcs)
-        update_mbd_dsdcs(itypes[i], js, r_ijs, mbd_dsdcs, dgdcs)
-
         for basis_i, coeff in enumerate(moment_coeffs):
             energies[i] += coeff * basis_values[basis_i]
+
+        rb_vals[i] = rb_values
+        rb_ders[i] = rb_derivs
+        mb_vals[i] = basis_values
+        mb_ders[i] = basis_jac_rs
+        dedcs_l[i] = dedcs
+        dgdcs_l[i] = dgdcs
+
+    for i in range(itypes.size):
+        js = all_js[i, :]
+        r_ijs = all_r_ijs[i, :, :]
+        jtypes = all_jtypes[i, :]
+        r_abs = _nb_linalg_norm(r_ijs)
+        r_ijs_unit = _calc_r_unit(r_ijs, r_abs)
+        store_radial_basis(
+            i,
+            itypes[i],
+            js,
+            jtypes,
+            r_ijs,
+            r_ijs_unit,
+            rb_vals[i],
+            rb_ders[i],
+            rbd_values,
+            rbd_dqdris,
+            rbd_dqdeps,
+        )
+        update_mbd_values(mbd_values, mb_vals[i])
+        update_mbd_dbdris(i, js, mbd_dbdris, mb_ders[i])
+        update_mbd_dbdeps(js, r_ijs, mbd_dbdeps, mb_ders[i])
+        update_mbd_dedcs(itypes[i], mbd_dedcs, dedcs_l[i])
+        update_mbd_dgdcs(i, itypes[i], js, mbd_dgdcs, dgdcs_l[i])
+        update_mbd_dsdcs(itypes[i], js, r_ijs, mbd_dsdcs, dgdcs_l[i])
 
     return energies
 
