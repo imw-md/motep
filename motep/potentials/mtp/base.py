@@ -158,12 +158,16 @@ class EngineBase:
 
     def update_neighbor_list(self, atoms: Atoms) -> None:
         """Update the ASE `PrimitiveNeighborList` object."""
-        if self._neighbor_list is None:
+        if self._is_trained:
+            if not hasattr(self, "all_r_ijs"):
+                self._initiate_neighbor_list(atoms)
+                self.all_js, self.all_r_ijs = self._get_all_distances(atoms)
+                self._neighbor_list = None
+                del self.all_offsets
+        elif self._neighbor_list is None:
             self._initiate_neighbor_list(atoms)
         elif self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
-            self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
-            all_precomp = _compute_all_offsets(self._neighbor_list, atoms)
-            self.all_js, self.all_offsets = all_precomp
+            self.all_js, self.all_offsets = self._compute_all_offsets(atoms)
 
     def _initiate_neighbor_list(self, atoms: Atoms) -> None:
         """Initialize the ASE `PrimitiveNeighborList` object."""
@@ -174,31 +178,20 @@ class EngineBase:
             bothways=True,  # return both ij and ji
         )
         self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
-        self.precomputed_offsets = _compute_offsets(self._neighbor_list, atoms)
-        all_precomp = _compute_all_offsets(self._neighbor_list, atoms)
-        self.all_js, self.all_offsets = all_precomp
+        self.all_js, self.all_offsets = self._compute_all_offsets(atoms)
 
         natoms = len(atoms)
 
         self.mbd.initialize(natoms, self.mtp_data)
         self.rbd.initialize(natoms, self.mtp_data)
 
-    def _get_distances(
-        self,
-        atoms: Atoms,
-        index: int,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        indices_js, _ = self._neighbor_list.get_neighbors(index)
-        offsets = self.precomputed_offsets[index]
-        pos_js = atoms.positions[indices_js] + offsets
-        dist_vectors = pos_js - atoms.positions[index]
-        return indices_js, dist_vectors
-
     def _get_all_distances(self, atoms: Atoms) -> tuple[np.ndarray, np.ndarray]:
         max_dist = self.mtp_data.max_dist
         positions = atoms.positions
         offsets = self.all_offsets
-        all_r_ijs = positions[self.all_js] + offsets - positions[:, None, :]
+        all_r_ijs = positions[self.all_js]  # r_j
+        all_r_ijs += offsets  # account for periodic images
+        all_r_ijs -= positions[:, None, :]  # r_i
         all_r_ijs[self.all_js[:, :] < 0, :] = max_dist
         return self.all_js, all_r_ijs
 
@@ -317,24 +310,24 @@ class EngineBase:
         jac.optimized = self.mtp_data.optimized
         return jac
 
+    def _compute_all_offsets(self, atoms: Atoms):
+        nl = self._neighbor_list
+        cell = atoms.cell
+        n_atoms = len(atoms)
+        # First pass: find max_num_js
+        max_num_js = 0
+        for i in range(n_atoms):
+            _, offsets_i = nl.get_neighbors(i)
+            max_num_js = max(max_num_js, offsets_i.shape[0])
 
-def _compute_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
-    cell = atoms.cell
-    return [nl.get_neighbors(j)[1] @ cell for j in range(len(atoms))]
+        # Preallocate arrays
+        js = np.full((n_atoms, max_num_js), -1, dtype=int)
+        offsets = np.zeros((n_atoms, max_num_js, 3))
 
+        for i in range(n_atoms):
+            js_i, offsets_i = nl.get_neighbors(i)
+            n_neighbors = js_i.shape[0]
+            js[i, :n_neighbors] = js_i
+            offsets[i, :n_neighbors] = offsets_i @ cell
 
-def _compute_all_offsets(nl: PrimitiveNeighborList, atoms: Atoms):
-    cell = atoms.cell
-    js = [nl.get_neighbors(i)[0] for i in range(len(atoms))]
-    offsets = [nl.get_neighbors(i)[1] @ cell for i in range(len(atoms))]
-    num_js = [_.shape[0] for _ in js]
-    max_num_js = np.max([_.shape[0] for _ in offsets])
-    pads = [(0, max_num_js - n) for n in num_js]
-    # Pad dummy indices as -1 to recognize later
-    padded_js = [
-        np.pad(js_, pad_width=pad, constant_values=-1) for js_, pad in zip(js, pads)
-    ]
-    padded_offsets = [
-        np.pad(offset, pad_width=(pad, (0, 0))) for offset, pad in zip(offsets, pads)
-    ]
-    return np.array(padded_js, dtype=int), np.array(padded_offsets)
+        return js, offsets

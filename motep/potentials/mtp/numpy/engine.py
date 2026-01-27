@@ -59,15 +59,21 @@ class NumpyMTPEngine(EngineBase):
 
         moment_coeffs = self.mtp_data.moment_coeffs
 
+        if not self._is_trained:
+            js, r_ijs = self._get_all_distances(atoms)
+        else:
+            js, r_ijs = self.all_js, self.all_r_ijs
+
         for i, itype in enumerate(itypes):
-            js, r_ijs = self._get_distances(atoms, i)
-            jtypes = itypes[js]
+            js_i = js[i, :]
+            r_ijs_i = r_ijs[i, :, :]
+            jtypes = itypes[js_i]
             basis_values, basis_jac_rs, dedcs, dgdcs = self._calc_basis(
                 i,
                 itype,
-                js,
+                js_i,
                 jtypes,
-                r_ijs,
+                r_ijs_i,
             )
 
             self.mbd.values += basis_values
@@ -82,17 +88,17 @@ class NumpyMTPEngine(EngineBase):
             # 2. The force on the i-th atom is defined as the negative of the gradient
             #    with respect to the i-th atom.
             # Thus, the negative signs of the two contributions are cancelled out below.
-            for k, j in enumerate(js):
+            for k, j in enumerate(js_i):
                 self.mbd.dbdris[:, i] -= basis_jac_rs[:, k]
                 self.mbd.dbdris[:, j] += basis_jac_rs[:, k]
-            self.mbd.dbdeps += r_ijs.T @ basis_jac_rs
+            self.mbd.dbdeps += r_ijs_i.T @ basis_jac_rs
 
             self.mbd.dedcs[itype] += dedcs
 
-            for k, j in enumerate(js):
+            for k, j in enumerate(js_i):
                 self.mbd.dgdcs[itype, :, :, :, i] -= dgdcs[:, :, :, k]
                 self.mbd.dgdcs[itype, :, :, :, j] += dgdcs[:, :, :, k]
-            self.mbd.dsdcs[itype] += r_ijs.T @ dgdcs
+            self.mbd.dsdcs[itype] += r_ijs_i.T @ dgdcs
 
         forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1).T * -1.0
         stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T

@@ -70,7 +70,7 @@ class NumbaMTPEngine(EngineBase):
     def _calc_train(self, atoms: Atoms) -> tuple:
         mtp_data = self.mtp_data
 
-        all_js, all_r_ijs = self._get_all_distances(atoms)
+        all_js, all_r_ijs = self.all_js, self.all_r_ijs
 
         itypes = get_types(atoms, mtp_data.species)
         all_jtypes = itypes[all_js]
