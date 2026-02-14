@@ -5,6 +5,7 @@ import pathlib
 import shutil
 from time import perf_counter
 
+import mpi4py
 import numba as nb
 import numpy as np
 from ase import Atoms
@@ -12,6 +13,8 @@ from ase import Atoms
 from motep.calculator import MTP
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
+
+comm = mpi4py.MPI.COMM_WORLD
 
 fmt = "{:20s}"
 
@@ -26,8 +29,9 @@ all_setups = ["numpy", "numba", "numba_train", "jax"]
 
 
 def print_num_threads():
-    print()
-    print(f"Running benchmarks with {nb.get_num_threads()} threads.\n")
+    if comm.rank == 0:
+        print()
+        print(f"Running benchmarks with {nb.get_num_threads()} threads.\n", flush=True)
 
 
 class Timer:
@@ -45,8 +49,8 @@ class Timer:
         self.time = perf_counter() - self.start
         name = " " + self.name if self.name != "" else ""
         readout = f"Time{name}: {self.time * 1000:.3f} ms"
-        if self.print:
-            print(readout)
+        if self.print and comm.rank == 0:
+            print(readout, flush=True)
 
 
 def _init_mlippy(pot_path: pathlib.Path, atom_number_list: list[int]):
@@ -98,8 +102,10 @@ def _time_mtp(
     with Timer(fmt.format(engine + suffix + " (0th)")):
         calc.get_potential_energy(images[-1])
 
+    comm.barrier()
     with Timer(fmt.format(engine + suffix)):
         energies = [calc.get_potential_energy(_) for _ in images]
+        comm.barrier()
     return np.array(energies)
 
 
@@ -119,15 +125,18 @@ def main(setup_names: list[str], levels: list[int] = None) -> None:
             images = read_cfg(cfg_path, index=index)
             images = [_.repeat(size_reps) for _ in images]
             number_of_atoms = len(images[0])
-            print(
-                f"\nTiming for {len(images)} images"
-                f" of {number_of_atoms} atoms"
-                f" with level {level}:"
-            )
+            if comm.rank == 0:
+                print(
+                    f"\nTiming for {len(images)} images"
+                    f" of {number_of_atoms} atoms"
+                    f" with level {level}"
+                    f" on {comm.size} ranks:",
+                    flush=True,
+                )
             pot_path = path / "pot.mtp"
 
             try:
-                e_ref = _time_mlippy(pot_path, images)
+                e_ref = _time_mlippy(pot_path, images) if comm.rank == 0 else None
             except ImportError:
                 e_ref = None
 
