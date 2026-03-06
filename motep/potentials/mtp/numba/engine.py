@@ -8,7 +8,7 @@ from ase import Atoms
 from motep.potentials.mtp import get_types
 from motep.potentials.mtp.base import EngineBase
 
-from .chebyshev import calc_radial_basis, calc_radial_funcs
+from .chebyshev import calc_radial_basis, sum_radial_terms
 from .moment import (
     calc_moments_run,
     calc_moments_train,
@@ -179,15 +179,11 @@ def _calc_run(
         r_abs = _nb_linalg_norm(rs[i, :, :])
         r_unit = _calc_r_unit(rs[i, :, :], r_abs)
 
-        rfvals, drfdrs = calc_radial_funcs(
-            r_abs,
-            itypes[i],
-            jtypes[i, :],
-            radial_coeffs,
-            scaling,
-            min_dist,
-            max_dist,
-        )
+        rbs = radial_coeffs.shape[3]
+        rbasis, drbdrs = calc_radial_basis(r_abs, rbs, scaling, min_dist, max_dist)
+        rfvals = sum_radial_terms(itypes[i], jtypes[i, :], rbasis, radial_coeffs)
+        drfdrs = sum_radial_terms(itypes[i], jtypes[i, :], drbdrs, radial_coeffs)
+
         mb_values, local_gradient = calc_moments_run(
             r_unit,
             r_abs,
