@@ -5,11 +5,13 @@ import pathlib
 
 import numpy as np
 import pytest
+from ase import Atoms
+from ase.calculators.singlepoint import SinglePointCalculator
 from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.loss import ErrorPrinter, LossFunction
+from motep.loss import ErrorPrinter, LossFunction, LossFunctionStress
 from motep.setting import LossSetting
 
 logger = logging.getLogger(__name__)
@@ -134,3 +136,65 @@ def test_jac(
 
     np.testing.assert_allclose(jac_nmr, jac_anl, rtol=5e-1, atol=0.00)
     np.testing.assert_allclose(jac_nmr, jac_anl, rtol=0.00, atol=1e-6)
+
+
+def test_stress_weight_scaling() -> None:
+    """Test that the stress weight scales as intended.
+
+    With stress_times_volume=True and energy_per_atom=False the per-configuration
+    weight factor is V^2.  Enabling energy_per_atom=True additionally multiplies
+    by (1/N)^2, so the ratio between the two losses must equal 1/N^2.
+    """
+    n_atoms = 4
+    a = 5.0
+    atoms = Atoms(
+        "H" * n_atoms,
+        positions=[(i * a / n_atoms, 0.0, 0.0) for i in range(n_atoms)],
+        cell=[a, a, a],
+        pbc=True,
+    )
+
+    # Nonzero residual so the loss is nonzero
+    stress_result = np.array([0.1, 0.2, 0.3, 0.0, 0.0, 0.0])
+    stress_target = np.zeros(6)
+
+    calc = SinglePointCalculator(atoms)
+    calc.results["stress"] = stress_result
+    calc.targets = {"stress": stress_target}
+    atoms.calc = calc
+
+    images = [atoms]
+
+    # stress_times_volume=True, energy_per_atom=False -> weight = V^2
+    loss_no_epa = LossFunctionStress(
+        images,
+        mtp_data=None,
+        stress_times_volume=True,
+        energy_per_atom=False,
+        comm=MPI.COMM_WORLD,
+    )
+    val_no_epa = loss_no_epa.calculate()
+
+    # stress_times_volume=True, energy_per_atom=True -> weight = V^2 / N^2
+    loss_with_epa = LossFunctionStress(
+        images,
+        mtp_data=None,
+        stress_times_volume=True,
+        energy_per_atom=True,
+        comm=MPI.COMM_WORLD,
+    )
+    val_with_epa = loss_with_epa.calculate()
+
+    expected_ratio = 1.0 / n_atoms**2
+    np.testing.assert_allclose(val_with_epa / val_no_epa, expected_ratio)
+
+    loss_no_stv = LossFunctionStress(
+        images,
+        mtp_data=None,
+        stress_times_volume=False,
+        comm=MPI.COMM_WORLD,
+    )
+    val_no_stv = loss_no_stv.calculate()
+    volume = a**3
+    expected_ratio = 1.0 / volume**2
+    np.testing.assert_allclose(val_no_stv / val_no_epa, expected_ratio)
