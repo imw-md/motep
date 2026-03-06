@@ -20,6 +20,10 @@ def make_mtp_engine(engine: str = "numpy") -> EngineBase:
         from motep.potentials.mtp.jax.engine import JaxMTPEngine
 
         return JaxMTPEngine
+    elif engine == "cext":
+        from motep.potentials.mtp.cext.engine import CExtMTPEngine
+
+        return CExtMTPEngine
     else:
         raise ValueError(engine)
 
