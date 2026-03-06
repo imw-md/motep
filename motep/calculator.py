@@ -40,12 +40,11 @@ class MTP(Calculator):
         mtp_data: MTPData,
         *args,
         engine: str = "numpy",
-        is_trained: bool = False,
+        mode: str = "run",
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.engine = make_mtp_engine(engine)(mtp_data, is_trained=is_trained)
-        self.engine.update(mtp_data)
+        self.engine: EngineBase = make_mtp_engine(engine)(mtp_data, mode=mode)
 
     def update_parameters(self, mtp_data: MTPData) -> None:
         self.engine.update(mtp_data)

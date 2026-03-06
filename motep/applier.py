@@ -46,7 +46,7 @@ def apply(filename_setting: str, comm: MPI.Comm) -> None:
     mtp_data.species = species
 
     for atoms in images_in:
-        atoms.calc = MTP(mtp_data, engine=setting.engine, is_trained=False)
+        atoms.calc = MTP(mtp_data, engine=setting.engine, mode="run")
         atoms.get_potential_energy()
 
     motep.io.write(setting.data_out[0], images_in)

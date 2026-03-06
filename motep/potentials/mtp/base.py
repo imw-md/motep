@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from typing import ClassVar
 
 import numpy as np
 import numpy.typing as npt
@@ -9,8 +10,25 @@ from ase.neighborlist import PrimitiveNeighborList
 from motep.potentials.mtp.data import MTPData
 
 
+class ModeBase:
+    """Base class for operating modes."""
+
+    all_modes: ClassVar[list[str]] = ["run", "train"]
+
+    @property
+    def mode(self) -> str:
+        """Get the current operating mode."""
+        return self._mode
+
+    @mode.setter
+    def mode(self, mode: str) -> None:
+        if mode not in self.all_modes:
+            raise NotImplementedError(mode)
+        self._mode = mode
+
+
 @dataclass
-class MomentBasisData:
+class MomentBasisData(ModeBase):
     """Data related to the moment basis.
 
     Attributes
@@ -30,6 +48,8 @@ class MomentBasisData:
 
     """
 
+    mode: str = field(default="run")
+
     values: npt.NDArray[np.float64] | None = None
     dbdris: npt.NDArray[np.float64] | None = None
     dbdeps: npt.NDArray[np.float64] | None = None
@@ -45,24 +65,26 @@ class MomentBasisData:
         asm = mtp_data.alpha_scalar_moments
 
         self.values = np.full((asm), np.nan)
-        self.dbdris = np.full((asm, natoms, 3), np.nan)
-        self.dbdeps = np.full((asm, 3, 3), np.nan)
-        self.dedcs = np.full((spc, spc, rfc, rbs), np.nan)
-        self.dgdcs = np.full((spc, spc, rfc, rbs, natoms, 3), np.nan)
-        self.dsdcs = np.full((spc, spc, rfc, rbs, 3, 3), np.nan)
+        if "train" in self.mode:
+            self.dbdris = np.full((asm, natoms, 3), np.nan)
+            self.dbdeps = np.full((asm, 3, 3), np.nan)
+            self.dedcs = np.full((spc, spc, rfc, rbs), np.nan)
+            self.dgdcs = np.full((spc, spc, rfc, rbs, natoms, 3), np.nan)
+            self.dsdcs = np.full((spc, spc, rfc, rbs, 3, 3), np.nan)
 
     def clean(self) -> None:
         """Clean up moment basis properties."""
         self.values[...] = 0.0
-        self.dbdris[...] = 0.0
-        self.dbdeps[...] = 0.0
-        self.dedcs[...] = 0.0
-        self.dgdcs[...] = 0.0
-        self.dsdcs[...] = 0.0
+        if "train" in self.mode:
+            self.dbdris[...] = 0.0
+            self.dbdeps[...] = 0.0
+            self.dedcs[...] = 0.0
+            self.dgdcs[...] = 0.0
+            self.dsdcs[...] = 0.0
 
 
 @dataclass
-class RadialBasisData:
+class RadialBasisData(ModeBase):
     """Data related to the radial basis.
 
     Attributes
@@ -74,6 +96,8 @@ class RadialBasisData:
 
     """
 
+    mode: str = field(default="run")
+
     values: npt.NDArray[np.float64] | None = None
     dqdris: npt.NDArray[np.float64] | None = None
     dqdeps: npt.NDArray[np.float64] | None = None
@@ -83,15 +107,17 @@ class RadialBasisData:
         spc = mtp_data.species_count
         rbs = mtp_data.radial_basis_size
 
-        self.values = np.full((spc, spc, rbs), np.nan)
-        self.dqdris = np.full((spc, spc, rbs, natoms, 3), np.nan)
-        self.dqdeps = np.full((spc, spc, rbs, 3, 3), np.nan)
+        if "train" in self.mode:
+            self.values = np.full((spc, spc, rbs), np.nan)
+            self.dqdris = np.full((spc, spc, rbs, natoms, 3), np.nan)
+            self.dqdeps = np.full((spc, spc, rbs, 3, 3), np.nan)
 
     def clean(self) -> None:
         """Clean up radial basis properties."""
-        self.values[...] = 0.0
-        self.dqdris[...] = 0.0
-        self.dqdeps[...] = 0.0
+        if "train" in self.mode:
+            self.values[...] = 0.0
+            self.dqdris[...] = 0.0
+            self.dqdeps[...] = 0.0
 
 
 @dataclass
@@ -120,14 +146,94 @@ class Jac:
         return np.concatenate(tmp)
 
 
-class EngineBase:
+class EngineWithNeighborlist(ModeBase):
+    """Class for getting interatomic vectors and hanling neighbor list."""
+
+    def __init__(self) -> None:
+        self.neighbor_list: PrimitiveNeighborList | None = None
+        self.mtp_data: MTPData | None = None
+
+    def _initiate_neighbor_list(self, atoms: Atoms) -> None:
+        """Initialize the ASE `PrimitiveNeighborList` object."""
+        self.neighbor_list = PrimitiveNeighborList(
+            cutoffs=[0.5 * self.mtp_data.max_dist] * len(atoms),
+            skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
+            self_interaction=False,  # Exclude [0, 0, 0]
+            bothways=True,  # return both ij and ji
+        )
+        self.neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
+        self._neighbors, self._offsets = self._get_neighbors_and_offsets(atoms)
+
+    def update_neighbor_list(self, atoms: Atoms) -> None:
+        """Update the ASE `PrimitiveNeighborList` object.
+
+        Notes
+        -----
+        If in training mode, only the interatomic vectors are computed once, and
+        the neighborlist then discarded.
+
+        """
+        # Special handling if in train mode
+        if "train" in self.mode:
+            if not hasattr(self, "_interatomic_vectors"):
+                self._initiate_neighbor_list(atoms)
+                self._interatomic_vectors = self._get_interatomic_vectors(atoms)
+                self.neighbor_list = None
+                del self._offsets
+                return True
+            return False
+
+        if self.neighbor_list is None:
+            self._initiate_neighbor_list(atoms)
+            return True
+        if self.neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
+            self._neighbors, self._offsets = self._get_neighbors_and_offsets(atoms)
+            return True
+        return False
+
+    def _get_interatomic_vectors(self, atoms: Atoms) -> np.ndarray:
+        if "train" in self.mode and hasattr(self, "_interatomic_vectors"):
+            return self._interatomic_vectors
+        max_dist = self.mtp_data.max_dist
+        positions = atoms.positions
+        offsets = self._offsets
+        interatomic_vectors = positions[self._neighbors]  # r_j
+        interatomic_vectors += offsets  # account for periodic images
+        interatomic_vectors -= positions[:, None, :]  # r_i
+        interatomic_vectors[self._neighbors[:, :] < 0, :] = max_dist
+        return interatomic_vectors
+
+    def _get_neighbors_and_offsets(self, atoms: Atoms) -> tuple[np.ndarray, np.ndarray]:
+        nl = self.neighbor_list
+        cell = atoms.cell
+        n_atoms = len(atoms)
+        # First pass: find max_num_js
+        max_num_js = 0
+        for i in range(n_atoms):
+            _, offsets_i = nl.get_neighbors(i)
+            max_num_js = max(max_num_js, offsets_i.shape[0])
+
+        # Preallocate arrays
+        js = np.full((n_atoms, max_num_js), -1, dtype=np.int32)
+        offsets = np.zeros((n_atoms, max_num_js, 3))
+
+        for i in range(n_atoms):
+            js_i, offsets_i = nl.get_neighbors(i)
+            n_neighbors = js_i.shape[0]
+            js[i, :n_neighbors] = js_i
+            offsets[i, :n_neighbors] = offsets_i @ cell
+
+        return js, offsets
+
+
+class EngineBase(EngineWithNeighborlist):
     """Engine to compute an MTP."""
 
     def __init__(
         self,
         mtp_data: MTPData,
         *,
-        is_trained: bool = False,
+        mode: str = "run",
     ) -> None:
         """MLIP-2 MTP.
 
@@ -135,65 +241,27 @@ class EngineBase:
         ----------
         mtp_data : :class:`motep.potentials.mtp.data.MTPData`
             Parameters in the MLIP .mtp file.
-        is_trained : bool, default False
-            If True, basis data for training is computed and stored.
+        mode : {'run', 'train'}, default 'run'
+            Mode of operation. `'train'` computes and stores basis data for
+            training; `'run'` is the default mode suitable for MD.
 
         """
         self.update(mtp_data)
         self.results = {}
-        self._neighbor_list = None
-        self._is_trained = is_trained
+        self.neighbor_list = None
+        self.mode = mode
 
         # moment basis data
-        self.mbd = MomentBasisData()
+        self.mbd = MomentBasisData(mode=mode)
 
         # used for `Level2MTPOptimizer`
-        self.rbd = RadialBasisData()
+        self.rbd = RadialBasisData(mode=mode)
 
     def update(self, mtp_data: MTPData) -> None:
         """Update MTP parameters."""
         self.mtp_data = mtp_data
         if self.mtp_data.species is None:
             self.mtp_data.species = list(range(self.mtp_data.species_count))
-
-    def update_neighbor_list(self, atoms: Atoms) -> None:
-        """Update the ASE `PrimitiveNeighborList` object."""
-        if self._is_trained:
-            if not hasattr(self, "all_r_ijs"):
-                self._initiate_neighbor_list(atoms)
-                self.all_js, self.all_r_ijs = self._get_all_distances(atoms)
-                self._neighbor_list = None
-                del self.all_offsets
-        elif self._neighbor_list is None:
-            self._initiate_neighbor_list(atoms)
-        elif self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions):
-            self.all_js, self.all_offsets = self._compute_all_offsets(atoms)
-
-    def _initiate_neighbor_list(self, atoms: Atoms) -> None:
-        """Initialize the ASE `PrimitiveNeighborList` object."""
-        self._neighbor_list = PrimitiveNeighborList(
-            cutoffs=[0.5 * self.mtp_data.max_dist] * len(atoms),
-            skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
-            self_interaction=False,  # Exclude [0, 0, 0]
-            bothways=True,  # return both ij and ji
-        )
-        self._neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
-        self.all_js, self.all_offsets = self._compute_all_offsets(atoms)
-
-        natoms = len(atoms)
-
-        self.mbd.initialize(natoms, self.mtp_data)
-        self.rbd.initialize(natoms, self.mtp_data)
-
-    def _get_all_distances(self, atoms: Atoms) -> tuple[np.ndarray, np.ndarray]:
-        max_dist = self.mtp_data.max_dist
-        positions = atoms.positions
-        offsets = self.all_offsets
-        all_r_ijs = positions[self.all_js]  # r_j
-        all_r_ijs += offsets  # account for periodic images
-        all_r_ijs -= positions[:, None, :]  # r_i
-        all_r_ijs[self.all_js[:, :] < 0, :] = max_dist
-        return self.all_js, all_r_ijs
 
     def check_species(self, atoms: Atoms) -> None:
         """Check if `atoms` comply with the `mtp_data.species`.
@@ -202,14 +270,14 @@ class EngineBase:
         ------
         ValueError
             If the unique `atoms.numbers` is larger than `species_count`, or if
-            they are not present in `mtp_data.species` (only when not
-            `_is_trained`).
+            they are not present in `mtp_data.species` (only when not in
+            `'train'` mode).
 
         """
         if np.unique(atoms.numbers).size > self.mtp_data.species_count:
             msg = "The number of species in input atoms is larger than species_count."
             raise ValueError(msg)
-        if not self._is_trained:
+        if self.mode != "train":
             unique_species = np.unique(atoms.numbers)
             if not all(_ in self.mtp_data.species for _ in unique_species):
                 msg = (
@@ -218,6 +286,12 @@ class EngineBase:
                     f"  species in mtp_data: {self.mtp_data.species}"
                 )
                 raise ValueError(msg)
+
+    def initialize_basis_data(self, atoms: Atoms) -> None:
+        """(Re)initialize moment and radial basis data."""
+        natoms = len(atoms)
+        self.mbd.initialize(natoms, self.mtp_data)
+        self.rbd.initialize(natoms, self.mtp_data)
 
     @abstractmethod
     def _calculate(self, atoms: Atoms) -> tuple: ...
@@ -231,7 +305,8 @@ class EngineBase:
 
         """
         self.check_species(atoms)
-        self.update_neighbor_list(atoms)
+        if self.update_neighbor_list(atoms):
+            self.initialize_basis_data(atoms)
 
         energies, forces, stress = self._calculate(atoms)
 
@@ -249,17 +324,19 @@ class EngineBase:
             volume = atoms.get_volume()
             stress += stress.T
             stress *= 0.5 / volume
-            self.mbd.dbdeps += self.mbd.dbdeps.transpose(0, 2, 1)
-            self.mbd.dbdeps *= 0.5 / volume
-            self.mbd.dsdcs += self.mbd.dsdcs.swapaxes(-2, -1)
-            self.mbd.dsdcs *= 0.5 / volume
-            axes = 0, 1, 2, 4, 3
-            self.rbd.dqdeps += self.rbd.dqdeps.transpose(axes)
-            self.rbd.dqdeps *= 0.5 / volume
+            if "train" in self.mode:
+                self.mbd.dbdeps += self.mbd.dbdeps.transpose(0, 2, 1)
+                self.mbd.dbdeps *= 0.5 / volume
+                self.mbd.dsdcs += self.mbd.dsdcs.swapaxes(-2, -1)
+                self.mbd.dsdcs *= 0.5 / volume
+                axes = 0, 1, 2, 4, 3
+                self.rbd.dqdeps += self.rbd.dqdeps.transpose(axes)
+                self.rbd.dqdeps *= 0.5 / volume
         else:
             stress[:, :] = np.nan
-            self.mbd.dbdeps[:, :, :] = np.nan
-            self.rbd.dqdeps[:, :, :] = np.nan
+            if "train" in self.mode:
+                self.mbd.dbdeps[:, :, :] = np.nan
+                self.rbd.dqdeps[:, :, :] = np.nan
 
     def jac_energy(self, atoms: Atoms) -> MTPData:
         """Calculate the Jacobian of the energy with respect to the MTP parameters."""
@@ -309,25 +386,3 @@ class EngineBase:
         )  # placeholder of the Jacobian with respect to the parameters
         jac.optimized = self.mtp_data.optimized
         return jac
-
-    def _compute_all_offsets(self, atoms: Atoms):
-        nl = self._neighbor_list
-        cell = atoms.cell
-        n_atoms = len(atoms)
-        # First pass: find max_num_js
-        max_num_js = 0
-        for i in range(n_atoms):
-            _, offsets_i = nl.get_neighbors(i)
-            max_num_js = max(max_num_js, offsets_i.shape[0])
-
-        # Preallocate arrays
-        js = np.full((n_atoms, max_num_js), -1, dtype=int)
-        offsets = np.zeros((n_atoms, max_num_js, 3))
-
-        for i in range(n_atoms):
-            js_i, offsets_i = nl.get_neighbors(i)
-            n_neighbors = js_i.shape[0]
-            js[i, :n_neighbors] = js_i
-            offsets[i, :n_neighbors] = offsets_i @ cell
-
-        return js, offsets

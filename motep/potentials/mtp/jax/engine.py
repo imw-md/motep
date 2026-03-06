@@ -50,10 +50,8 @@ class JaxMTPEngine(EngineBase):
     def _calculate(self, atoms: Atoms) -> tuple:
         mtp_data = self.mtp_data
         itypes = jnp.array(get_types(atoms, mtp_data.species))
-        if not self._is_trained:
-            js, rijs = [jnp.array(_) for _ in self._get_all_distances(atoms)]
-        else:
-            js, rijs = jnp.array(self.all_js), jnp.array(self.all_r_ijs)
+        js = jnp.array(self._neighbors)
+        rijs = jnp.array(self._get_interatomic_vectors(atoms))
         jtypes = itypes[js]
 
         energies, gradients = _calc_local_energy_and_derivs(

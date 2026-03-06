@@ -35,12 +35,12 @@ def get_scale(component: str, d: float) -> np.ndarray:
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
-@pytest.mark.parametrize("is_trained", [False, True])
+@pytest.mark.parametrize("mode", ["run", "train"])
 @pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine])
 # @pytest.mark.parametrize("molecule", [762])
 def test_molecules(
     engine: Any,
-    is_trained: bool,
+    mode: str,
     molecule: int,
     level: int,
     data_path: pathlib.Path,
@@ -48,12 +48,10 @@ def test_molecules(
     """Test PyMTP."""
     path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (path / "pot.mtp").exists():
-        pytest.skip()
-    parameters = read_mtp(path / "pot.mtp")
-    # parameters["species"] = species
-    mtp = engine(parameters, is_trained=is_trained)
+        pytest.skip("Test data not available")
+    mtp_data = read_mtp(path / "pot.mtp")
+    mtp = engine(mtp_data, mode=mode)
     images = [read_cfg(path / "out.cfg", index=0)]
-    mtp._initiate_neighbor_list(images[0])
 
     results_all = [mtp.calculate(atoms) for atoms in images]
 
@@ -71,12 +69,12 @@ def test_molecules(
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 # @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("crystal", ["size", "multi"])
-@pytest.mark.parametrize("is_trained", [False, True])
+@pytest.mark.parametrize("mode", ["run", "train"])
 # @pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
 @pytest.mark.parametrize("engine", [NumbaMTPEngine, JaxMTPEngine])
 def test_crystals(
     engine: Any,
-    is_trained: bool,
+    mode: str,
     crystal: int,
     level: int,
     data_path: pathlib.Path,
@@ -84,12 +82,10 @@ def test_crystals(
     """Test PyMTP."""
     path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (path / "pot.mtp").exists():
-        pytest.skip()
-    parameters = read_mtp(path / "pot.mtp")
-    # parameters["species"] = species
-    mtp = engine(parameters, is_trained=is_trained)
+        pytest.skip("Test data not available")
+    mtp_data = read_mtp(path / "pot.mtp")
+    mtp = engine(mtp_data, mode=mode)
     images = [read_cfg(path / "out.cfg", index=-1)]
-    mtp._initiate_neighbor_list(images[0])
 
     results_all = [mtp.calculate(atoms) for atoms in images]
 
@@ -123,11 +119,9 @@ def test_forces(
     path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
-    parameters = read_mtp(path / "pot.mtp")
-    # parameters["species"] = species
-    mtp = engine(parameters)
+    mtp_data = read_mtp(path / "pot.mtp")
+    mtp = engine(mtp_data)
     atoms_ref = read_cfg(path / "out.cfg", index=-1)
-    mtp._initiate_neighbor_list(atoms_ref)
 
     forces_ref = mtp.calculate(atoms_ref)["forces"]
 
@@ -170,11 +164,9 @@ def test_stress(
     path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
-    parameters = read_mtp(path / "pot.mtp")
-    # parameters["species"] = species
-    mtp = engine(parameters)
+    mtp_data = read_mtp(path / "pot.mtp")
+    mtp = engine(mtp_data)
     atoms_ref = read_cfg(path / "out.cfg", index=-1)
-    mtp._initiate_neighbor_list(atoms_ref)
 
     stress_ref = mtp.calculate(atoms_ref)["stress"]
 

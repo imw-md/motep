@@ -30,25 +30,28 @@ class NumbaMTPEngine(EngineBase):
         super().__init__(*args, **kwargs)
 
     def _calculate(self, atoms: Atoms) -> tuple:
-        if self._is_trained:
+        if self.mode == "run":
+            return self._calc_run(atoms)
+        if self.mode == "train":
             return self._calc_train(atoms)
-        return self._calc_run(atoms)
+        raise NotImplementedError(self.mode)
 
     def _calc_run(self, atoms: Atoms) -> tuple:
         mtp_data = self.mtp_data
 
-        all_js, all_r_ijs = self._get_all_distances(atoms)
+        js = self._neighbors
+        rs = self._get_interatomic_vectors(atoms)
 
         itypes = get_types(atoms, mtp_data.species)
-        all_jtypes = itypes[all_js]
+        jtypes = itypes[js]
 
         self.mbd.clean()
         self.rbd.clean()
 
         energies, gradient = _calc_run(
-            all_r_ijs,
+            rs,
             itypes,
-            all_jtypes,
+            jtypes,
             mtp_data.alpha_moments_count,
             mtp_data.alpha_moment_mapping,
             mtp_data.alpha_index_basic,
@@ -62,27 +65,28 @@ class NumbaMTPEngine(EngineBase):
             self.mbd.values,
         )
 
-        forces = _calc_forces_from_gradient(gradient, all_js)
-        stress = np.einsum("ijk, ijl -> lk", all_r_ijs, gradient)
+        forces = _calc_forces_from_gradient(gradient, js)
+        stress = np.einsum("ijk, ijl -> lk", rs, gradient)
 
         return energies, forces, stress
 
     def _calc_train(self, atoms: Atoms) -> tuple:
         mtp_data = self.mtp_data
 
-        all_js, all_r_ijs = self.all_js, self.all_r_ijs
+        js = self._neighbors
+        rs = self._get_interatomic_vectors(atoms)
 
         itypes = get_types(atoms, mtp_data.species)
-        all_jtypes = itypes[all_js]
+        jtypes = itypes[js]
 
         self.mbd.clean()
         self.rbd.clean()
 
         energies = _calc_train(
-            all_js,
-            all_r_ijs,
+            js,
+            rs,
             itypes,
-            all_jtypes,
+            jtypes,
             mtp_data.alpha_moments_count,
             mtp_data.alpha_moment_mapping,
             mtp_data.alpha_index_basic,
@@ -124,11 +128,11 @@ def _nb_linalg_norm(r_ijs: np.ndarray) -> np.ndarray:
 
 @nb.njit(nb.float64[:, :](nb.float64[:, :], nb.float64[:]))
 def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
-    r_ijs_unit = np.zeros((r_ijs.shape[0], 3))
+    r_unit = np.zeros((r_ijs.shape[0], 3))
     for j in range(r_ijs.shape[0]):
         for k in range(3):
-            r_ijs_unit[j, k] = r_ijs[j, k] / r_abs[j]
-    return r_ijs_unit
+            r_unit[j, k] = r_ijs[j, k] / r_abs[j]
+    return r_unit
 
 
 @nb.njit(

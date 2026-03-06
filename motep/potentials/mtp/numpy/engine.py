@@ -21,7 +21,9 @@ class NumpyMTPEngine(EngineBase):
     def __init__(self, mtp_data: MTPData, **kwargs: dict) -> None:
         """Intialize the engine."""
         self.rb = ChebyshevArrayRadialBasis(mtp_data)
-        super().__init__(mtp_data, **kwargs)
+        # Always initialize with train mode to allocate buffers for basis data
+        super().__init__(mtp_data, **{**kwargs, "mode": "train"})
+        self.mode = kwargs.get("mode", "run")
 
     def update(self, mtp_data: MTPData) -> None:
         """Update MTP parameters."""
@@ -59,21 +61,19 @@ class NumpyMTPEngine(EngineBase):
 
         moment_coeffs = self.mtp_data.moment_coeffs
 
-        if not self._is_trained:
-            js, r_ijs = self._get_all_distances(atoms)
-        else:
-            js, r_ijs = self.all_js, self.all_r_ijs
+        js = self._neighbors
+        rs = self._get_interatomic_vectors(atoms)
 
         for i, itype in enumerate(itypes):
             js_i = js[i, :]
-            r_ijs_i = r_ijs[i, :, :]
+            rs_i = rs[i, :, :]
             jtypes = itypes[js_i]
             basis_values, basis_jac_rs, dedcs, dgdcs = self._calc_basis(
                 i,
                 itype,
                 js_i,
                 jtypes,
-                r_ijs_i,
+                rs_i,
             )
 
             self.mbd.values += basis_values
@@ -91,14 +91,14 @@ class NumpyMTPEngine(EngineBase):
             for k, j in enumerate(js_i):
                 self.mbd.dbdris[:, i] -= basis_jac_rs[:, k]
                 self.mbd.dbdris[:, j] += basis_jac_rs[:, k]
-            self.mbd.dbdeps += r_ijs_i.T @ basis_jac_rs
+            self.mbd.dbdeps += rs_i.T @ basis_jac_rs
 
             self.mbd.dedcs[itype] += dedcs
 
             for k, j in enumerate(js_i):
                 self.mbd.dgdcs[itype, :, :, :, i] -= dgdcs[:, :, :, k]
                 self.mbd.dgdcs[itype, :, :, :, j] += dgdcs[:, :, :, k]
-            self.mbd.dsdcs[itype] += r_ijs_i.T @ dgdcs
+            self.mbd.dsdcs[itype] += rs_i.T @ dgdcs
 
         forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1).T * -1.0
         stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T

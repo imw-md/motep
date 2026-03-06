@@ -21,7 +21,7 @@ fmt = "{:20s}"
 setup_map = {
     "numpy": {"engine": "numpy"},
     "numba": {"engine": "numba"},
-    "numba_train": {"engine": "numba", "is_trained": True},
+    "numba_train": {"engine": "numba", "mode": "train"},
     "jax": {"engine": "jax"},
 }
 
@@ -76,7 +76,7 @@ def _time_mlippy(pot_path: pathlib.Path, images: list[Atoms]) -> np.ndarray:
     calc = _init_mlippy(pot_path, atom_number_list)
     # Make initial calc to not time things like compile time and things that are cachable
     calc.get_potential_energy(images[-1])
-    with Timer(fmt.format("mlippy")):
+    with Timer(fmt.format("mlippy (run)")):
         energies = [calc.get_potential_energy(_) for _ in images]
     return np.array(energies)
 
@@ -86,17 +86,17 @@ def _time_mtp(
     images: list[Atoms],
     *,
     engine: str,
-    is_trained: bool = False,
+    mode: str = "run",
 ) -> np.ndarray:
     mtp_data = read_mtp(pot_path)
     mtp_data.species = []
     for atomic_number in images[0].numbers:
         if atomic_number not in mtp_data.species:
             mtp_data.species.append(atomic_number)
-    calc = MTP(mtp_data, engine=engine, is_trained=is_trained)
+    calc = MTP(mtp_data, engine=engine, mode=mode)
     calc.use_cache = False
 
-    suffix = " (train)" if is_trained else " (run)"
+    suffix = f" ({mode})"
 
     # Make initial calc to not time things like compile time and things that are cachable
     with Timer(fmt.format(engine + suffix + " (0th)")):
