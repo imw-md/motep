@@ -63,6 +63,10 @@ class LLSOptimizerBase(OptimizerBase):
         if "stress" in self.minimized:
             shape = (9 * len(images), len(species))
             tmp.append(np.zeros(shape))
+        if "mgrad" in self.minimized:
+            nmmg = sum(atoms.calc.targets["mgrad"].size for atoms in images)
+            shape = (nmmg, len(species))
+            tmp.append(np.zeros(shape))
         return np.vstack(tmp)
 
     def _calc_matrix_energies_species_coeffs(self) -> np.ndarray:
@@ -89,6 +93,8 @@ class LLSOptimizerBase(OptimizerBase):
             tmp.append(np.sqrt(setting.forces_weight) * self._calc_vector_forces())
         if "stress" in self.minimized:
             tmp.append(np.sqrt(setting.stress_weight) * self._calc_vector_stress())
+        if "mgrad" in self.minimized:
+            tmp.append(np.sqrt(setting.forces_weight) * self._calc_vector_mgrad())
         return np.hstack(tmp)
 
     def _calc_vector_energy(self) -> np.ndarray:
@@ -165,6 +171,30 @@ class LLSOptimizerBase(OptimizerBase):
         if self.loss.setting.stress_per_conf:
             stresses /= sqrt(len(images))
         return stresses.flat
+
+    def _calc_vector_mgrad(self) -> np.ndarray:
+        if not self.loss.loss_mgrad.idcs_mgd.size:
+            return np.empty(0)
+        key = "mgrad"
+        images = self.loss.images
+        idcs_mmg = self.loss.loss_mgrad.idcs_mgd
+        if self.loss.setting.forces_per_atom:
+            vector = -1.0 * np.hstack(
+                [
+                    (
+                        images[i].calc.targets[key]
+                        * sqrt(self.loss.loss_mgrad.inverse_numbers_of_atoms[i])
+                    ).flat
+                    for i in idcs_mmg
+                ],
+            )
+        else:
+            vector = -1.0 * np.hstack(
+                [images[i].calc.targets[key].flat for i in idcs_mmg],
+            )
+        if self.loss.setting.forces_per_conf:
+            vector /= sqrt(len(images))
+        return vector
 
 
 class LLSOptimizer(LLSOptimizerBase):
@@ -244,6 +274,8 @@ class LLSOptimizer(LLSOptimizerBase):
             tmp.append(np.sqrt(setting.forces_weight) * self._calc_matrix_forces())
         if "stress" in self.minimized:
             tmp.append(np.sqrt(setting.stress_weight) * self._calc_matrix_stress())
+        if "mgrad" in self.minimized:
+            tmp.append(np.sqrt(setting.mgrad_weight) * self._calc_matrix_mgrad())
         return np.vstack(tmp)
 
     def _calc_matrix_energy(self) -> np.ndarray:
@@ -283,5 +315,26 @@ class LLSOptimizer(LLSOptimizerBase):
         if self.loss.setting.stress_times_volume:
             matrix = (matrix.T * self.loss.loss_stress.volumes[idcs_str]).T
         if self.loss.setting.stress_per_conf:
+            matrix /= sqrt(len(images))
+        return matrix.reshape((-1, self.loss.mtp_data.alpha_scalar_moments))
+
+    def _calc_matrix_mgrad(self) -> np.ndarray:
+        if not self.loss.loss_mgrad.idcs_mgd.size:
+            return np.empty((0, self.loss.mtp_data.alpha_scalar_moments))
+        images = self.loss.images
+        idcs_mmg = self.loss.loss_mgrad.idcs_mgd
+        if self.loss.setting.forces_per_atom:
+            matrix = np.vstack(
+                [
+                    images[i].calc.engine.mbd.dbdmis.transpose(1, 0)
+                    * sqrt(self.loss.loss_mgrad.inverse_numbers_of_atoms[i])
+                    for i in idcs_mmg
+                ],
+            )
+        else:
+            matrix = np.vstack(
+                [images[i].calc.engine.mbd.dbdmis.transpose(1, 0) for i in idcs_mmg],
+            )
+        if self.loss.setting.forces_per_conf:
             matrix /= sqrt(len(images))
         return matrix.reshape((-1, self.loss.mtp_data.alpha_scalar_moments))

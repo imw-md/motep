@@ -152,7 +152,7 @@ def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
         nb.float64[:],
         nb.float64[:],
     ),
-    # parallel=True,
+    parallel=True,
 )
 def _calc_run(
     rs: npt.NDArray[np.float64],
@@ -237,7 +237,7 @@ def _calc_run(
         nb.float64[:, :, :, :, :, :],
         nb.float64[:, :, :, :, :, :],
     ),
-    # parallel=True,
+    parallel=True,
 )
 def _calc_train(
     js: npt.NDArray[np.int32],

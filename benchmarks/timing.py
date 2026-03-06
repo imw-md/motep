@@ -13,6 +13,7 @@ from ase import Atoms
 from motep.calculator import MTP
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
+from motep.potentials.mmtp.data import MagMTPData
 
 comm = mpi4py.MPI.COMM_WORLD
 
@@ -22,12 +23,31 @@ setup_map = {
     "numpy": {"engine": "numpy"},
     "numba": {"engine": "numba"},
     "numba_train": {"engine": "numba", "mode": "train"},
+    "numba_mag": {"engine": "numba_mag"},
+    "numba_mag_train": {"engine": "numba_mag", "mode": "train"},
+    "numba_mag_train_mgrad": {"engine": "numba_mag", "mode": "train_mgrad"},
     "jax": {"engine": "jax"},
     "cext": {"engine": "cext"},
     "cext_train": {"engine": "cext", "mode": "train"},
+    "cext_mag": {"engine": "cext_mag"},
+    "cext_mag_train": {"engine": "cext_mag", "mode": "train"},
+    "cext_mag_train_mgrad": {"engine": "cext_mag", "mode": "train_mgrad"},
 }
 
-all_setups = ["numpy", "numba", "numba_train", "jax", "cext", "cext_train"]
+all_setups = [
+    "numpy",
+    "numba",
+    "numba_train",
+    "numba_mag",
+    "numba_mag_train",
+    "numba_mag_train_mgrad",
+    "jax",
+    "cext",
+    "cext_train",
+    "cext_mag",
+    "cext_mag_train",
+    "cext_mag_train_mgrad",
+]
 
 
 def print_num_threads():
@@ -92,6 +112,13 @@ def _time_mtp(
 ) -> np.ndarray:
     mtp_data = read_mtp(pot_path)
     mtp_data.species = []
+
+    # Reinitialize radial coefficients if magnetic, since they change size
+    if "mag" in engine:
+        mtp_data = MagMTPData.from_base(mtp_data)
+        mtp_data.radial_coeffs = None
+        mtp_data.initialize(np.random.default_rng(123))
+
     for atomic_number in images[0].numbers:
         if atomic_number not in mtp_data.species:
             mtp_data.species.append(atomic_number)
