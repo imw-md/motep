@@ -111,6 +111,7 @@ class GradeSetting(Setting):
     """Setting for the extrapolation-grade calculations."""
 
     algorithm: str = "maxvol"
+    maxiter: int = 100_000
 
 
 @dataclass
