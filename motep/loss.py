@@ -213,6 +213,7 @@ class LossFunctionStress:
         *,
         stress_times_volume: bool = False,
         stress_per_conf: bool = True,
+        energy_per_atom: bool = False,
         comm: MPI.Comm = MPI.COMM_WORLD,
     ) -> None:
         """Initialize."""
@@ -220,6 +221,7 @@ class LossFunctionStress:
         self.mtp_data = mtp_data
         self.stress_times_volume = stress_times_volume
         self.stress_per_conf = stress_per_conf
+        self.energy_per_atom = energy_per_atom
         self.comm = comm
 
         self.idcs_str = np.fromiter(
@@ -232,6 +234,13 @@ class LossFunctionStress:
             dtype=float,
             count=self.idcs_str.size,
         )
+
+        numbers_of_atoms = np.fromiter(
+            (len(atoms) for atoms in images),
+            dtype=float,
+            count=len(images),
+        )
+        self.inverse_numbers_of_atoms = 1.0 / numbers_of_atoms
 
         self.configuration_weight = np.ones(len(self.images))
 
@@ -256,6 +265,8 @@ class LossFunctionStress:
             c = self.configuration_weight[i]
             if self.stress_times_volume:
                 c *= self.volumes[i] ** 2
+                if self.energy_per_atom:
+                    c *= self.inverse_numbers_of_atoms[i] ** 2
             loss_cnf += c * np.sum((f(target - result)) ** 2)
         loss_all = self.comm.allreduce(loss_cnf, op=MPI.SUM)
         return loss_all / ncnf if self.stress_per_conf else loss_all
@@ -282,6 +293,8 @@ class LossFunctionStress:
             c = self.configuration_weight[i]
             if self.stress_times_volume:
                 c *= self.volumes[i] ** 2
+                if self.energy_per_atom:
+                    c *= self.inverse_numbers_of_atoms[i] ** 2
             dsdp = atoms.calc.engine.jac_stress(atoms).parameters
             jac_cnf += c * 2.0 * np.sum(f(result - target) * dsdp, axis=(-2, -1))
         self.comm.Allreduce(jac_cnf, jac_all, op=MPI.SUM)
@@ -343,6 +356,7 @@ class LossFunctionBase(ABC):
             mtp_data=self.mtp_data,
             stress_times_volume=self.setting.stress_times_volume,
             stress_per_conf=self.setting.stress_per_conf,
+            energy_per_atom=self.setting.energy_per_atom,
             comm=self.comm,
         )
 
@@ -468,7 +482,7 @@ class ErrorPrinter:
         errors["stress"] = self._calc_errors_stress()  # eV/Ang^3
         return errors
 
-    def log(self) -> dict[str, float]:
+    def log(self, logger: logging.Logger = logger) -> dict[str, float]:
         """Log errors.
 
         Returns

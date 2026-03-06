@@ -36,7 +36,7 @@ class LossSetting(DataclassFromAny):
     stress_weight: float = 0.001
     energy_per_atom: bool = True
     forces_per_atom: bool = True
-    stress_times_volume: bool = False
+    stress_times_volume: bool = True
     energy_per_conf: bool = True
     forces_per_conf: bool = True
     stress_per_conf: bool = True
