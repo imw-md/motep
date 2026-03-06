@@ -110,7 +110,7 @@ class LossFunctionForces:
 
     Attributes
     ----------
-    idcs_frc : npt.NDArray[np.int64]
+    idcs_frc : npt.NDArray[np.int32]
         Indices of images that have forces.
 
     """
@@ -201,7 +201,7 @@ class LossFunctionStress:
 
     Attributes
     ----------
-    idcs_str : npt.NDArray[np.int64]
+    idcs_str : npt.NDArray[np.int32]
         Indices of images that have 3D cells.
 
     """

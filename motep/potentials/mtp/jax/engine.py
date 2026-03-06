@@ -83,8 +83,8 @@ class JaxMTPEngine(EngineBase):
 @partial(jax.vmap, in_axes=(0,) * 3 + (None,) * 10, out_axes=0)
 def _calc_local_energy_and_derivs(
     r_ijs: npt.NDArray[np.float64],
-    itype: npt.NDArray[np.int64],
-    jtypes: npt.NDArray[np.int64],
+    itype: npt.NDArray[np.int32],
+    jtypes: npt.NDArray[np.int32],
     species_coeffs: npt.NDArray[np.float64],
     moment_coeffs: npt.NDArray[np.float64],
     radial_coeffs: npt.NDArray[np.float64],
@@ -134,8 +134,8 @@ def _calc_local_energy_and_derivs(
 
 def _calc_local_energy(
     r_ijs: npt.NDArray[np.float64],
-    itype: npt.NDArray[np.int64],
-    jtypes: npt.NDArray[np.int64],
+    itype: npt.NDArray[np.int32],
+    jtypes: npt.NDArray[np.int32],
     species_coeffs: npt.NDArray[np.float64],
     moment_coeffs: npt.NDArray[np.float64],
     radial_coeffs: npt.NDArray[np.float64],
@@ -195,7 +195,7 @@ def _chebyshev_basis(
     min_dist: np.float64,
     max_dist: np.float64,
     # Static parameters:
-    size: np.int64,
+    size: np.int32,
 ) -> npt.NDArray[np.float64]:
     r_scaled = (2 * r - (min_dist + max_dist)) / (max_dist - min_dist)
     rb = [1, r_scaled]
@@ -209,7 +209,7 @@ def _calc_moments(
     r_abs: npt.NDArray[np.float64],
     rb_values: npt.NDArray[np.float64],
     # Static parameters:
-    moments: tuple[tuple[np.int64]],
+    moments: tuple[tuple[np.int32]],
 ) -> dict[tuple, npt.NDArray[np.float64]]:
     calculated_moments = {}
     r_ijs_unit = (r_ijs.T / r_abs).T
@@ -225,7 +225,7 @@ def _calc_moments(
 @partial(jax.vmap, in_axes=(0, None), out_axes=0)
 def _make_tensor(
     r: npt.NDArray[np.float64],
-    nu: np.int64,
+    nu: np.int32,
 ) -> npt.NDArray[np.float64]:
     m = 1
     for _ in range(nu):
@@ -236,6 +236,6 @@ def _make_tensor(
 def _contract_over_axes(
     m1: npt.NDArray[np.float64],
     m2: npt.NDArray[np.float64],
-    axes: tuple[np.int64],
+    axes: tuple[np.int32],
 ) -> npt.NDArray[np.float64]:
     return jnp.tensordot(m1, m2, axes=axes)

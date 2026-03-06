@@ -12,10 +12,10 @@ def update_mbd_values(
         mbd_values[iamc] += basis_values[iamc]
 
 
-@nb.njit((nb.int64, nb.int64[:], nb.float64[:, :, :], nb.float64[:, :, :]))
+@nb.njit((nb.int32, nb.int32[:], nb.float64[:, :, :], nb.float64[:, :, :]))
 def update_mbd_dbdris(
-    i: np.int64,
-    js: npt.NDArray[np.int64],
+    i: np.int32,
+    js: npt.NDArray[np.int32],
     mbd_dbdris: npt.NDArray[np.float64],
     basis_jac_rs: npt.NDArray[np.float64],
 ) -> None:
@@ -26,9 +26,9 @@ def update_mbd_dbdris(
                 mbd_dbdris[iamc, j, ixyz0] += basis_jac_rs[iamc, k, ixyz0]
 
 
-@nb.njit((nb.int64[:], nb.float64[:, :], nb.float64[:, :, :], nb.float64[:, :, :]))
+@nb.njit((nb.int32[:], nb.float64[:, :], nb.float64[:, :, :], nb.float64[:, :, :]))
 def update_mbd_dbdeps(
-    js: npt.NDArray[np.int64],
+    js: npt.NDArray[np.int32],
     r_ijs: npt.NDArray[np.float64],
     mbd_dbdeps: npt.NDArray[np.float64],
     basis_jac_rs: npt.NDArray[np.float64],
@@ -42,9 +42,9 @@ def update_mbd_dbdeps(
                     )
 
 
-@nb.njit((nb.int64, nb.float64[:, :, :, :], nb.float64[:, :, :]))
+@nb.njit((nb.int32, nb.float64[:, :, :, :], nb.float64[:, :, :]))
 def update_mbd_dedcs(
-    itype: np.int64,
+    itype: np.int32,
     mbd_dedcs: npt.NDArray[np.float64],
     tmp_dedcs: npt.NDArray[np.float64],
 ) -> None:
@@ -57,17 +57,17 @@ def update_mbd_dedcs(
 
 @nb.njit(
     (
-        nb.int64,
-        nb.int64,
-        nb.int64[:],
+        nb.int32,
+        nb.int32,
+        nb.int32[:],
         nb.float64[:, :, :, :, :, :],
         nb.float64[:, :, :, :, :],
     ),
 )
 def update_mbd_dgdcs(
-    i: np.int64,
-    itype: np.int64,
-    js: npt.NDArray[np.int64],
+    i: np.int32,
+    itype: np.int32,
+    js: npt.NDArray[np.int32],
     mbd_dgdcs: npt.NDArray[np.float64],
     tmp_dgdcs: npt.NDArray[np.float64],
 ) -> None:
@@ -84,16 +84,16 @@ def update_mbd_dgdcs(
 
 @nb.njit(
     (
-        nb.int64,
-        nb.int64[:],
+        nb.int32,
+        nb.int32[:],
         nb.float64[:, :],
         nb.float64[:, :, :, :, :, :],
         nb.float64[:, :, :, :, :],
     ),
 )
 def update_mbd_dsdcs(
-    itype: np.int64,
-    js: npt.NDArray[np.int64],
+    itype: np.int32,
+    js: npt.NDArray[np.int32],
     r_ijs: npt.NDArray[np.float64],
     mbd_dsdcs: npt.NDArray[np.float64],
     tmp_dgdcs: npt.NDArray[np.float64],
@@ -124,7 +124,7 @@ def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
     (
         nb.float64[:],
         nb.float64[:, :],
-        nb.int64[:, :],
+        nb.int32[:, :],
         nb.float64[:, :],
         nb.float64[:, :],
         nb.float64[:],
@@ -186,9 +186,9 @@ def _calc_moment_basic(
                 )
 
 
-@nb.njit((nb.int64[:, :], nb.float64[:], nb.float64[:, :, :]))
+@nb.njit((nb.int32[:, :], nb.float64[:], nb.float64[:, :, :]))
 def _contract_moments(
-    alpha_index_times: npt.NDArray[np.int64],
+    alpha_index_times: npt.NDArray[np.int32],
     moment_values: npt.NDArray[np.float64],
     moment_jac_rs: npt.NDArray[np.float64],
 ) -> None:
@@ -211,9 +211,9 @@ def _contract_moments(
 
 @nb.njit(
     nb.float64[:, :](
-        nb.int64[:, :],
-        nb.int64[:, :],
-        nb.int64[:],
+        nb.int32[:, :],
+        nb.int32[:, :],
+        nb.int32[:],
         nb.float64[:],
         nb.float64[:],
         nb.float64[:, :, :],
@@ -234,22 +234,20 @@ def _contract_moments_backwards(
 
     """
     # First do the values as usual.
-    for ait in alpha_index_times:
-        i1, i2, mult, i3 = ait
+    for i1, i2, mult, i3 in alpha_index_times:
         moment_values[i3] += mult * moment_values[i1] * moment_values[i2]
 
+    amc, njs, _ = moment_jac_rs.shape
     # Now go backwards for the jacobians/gradient
-    tmp_moment_ders = np.zeros(moment_jac_rs.shape[0])
-    for basis_i, moment_i in enumerate(alpha_moment_mapping):
-        tmp_moment_ders[moment_i] = moment_coeffs[basis_i]
-    for ait in alpha_index_times[::-1]:
-        i1, i2, mult, i3 = ait
+    tmp_moment_ders = np.zeros(amc)
+    tmp_moment_ders[alpha_moment_mapping] = moment_coeffs
+    for i1, i2, mult, i3 in alpha_index_times[::-1]:
         tmp_moment_ders[i2] += tmp_moment_ders[i3] * mult * moment_values[i1]
         tmp_moment_ders[i1] += tmp_moment_ders[i3] * mult * moment_values[i2]
 
-    gradient = np.zeros(moment_jac_rs.shape[1:])
+    gradient = np.zeros((njs, 3))
     for aib_i in range(alpha_index_basic.shape[0]):
-        for j in range(moment_jac_rs.shape[1]):
+        for j in range(njs):
             for k in range(3):
                 gradient[j, k] += tmp_moment_ders[aib_i] * moment_jac_rs[aib_i, j, k]
 
@@ -262,10 +260,10 @@ def _contract_moments_backwards(
         nb.float64[:],
         nb.float64[:, :],
         nb.float64[:, :],
-        nb.int64,
-        nb.int64[:],
-        nb.int64[:, :],
-        nb.int64[:, :],
+        nb.int32,
+        nb.int32[:],
+        nb.int32[:, :],
+        nb.int32[:, :],
         nb.float64[:],
     ),
 )
@@ -274,12 +272,12 @@ def calc_moments_run(
     r_abs: npt.NDArray[np.float64],
     rb_values: npt.NDArray[np.float64],
     rb_derivs: npt.NDArray[np.float64],
-    alpha_moments_count: np.int64,
-    alpha_moment_mapping: npt.NDArray[np.int64],
-    alpha_index_basic: npt.NDArray[np.int64],
-    alpha_index_times: npt.NDArray[np.int64],
+    alpha_moments_count: np.int32,
+    alpha_moment_mapping: npt.NDArray[np.int32],
+    alpha_index_basic: npt.NDArray[np.int32],
+    alpha_index_times: npt.NDArray[np.int32],
     moment_coeffs: npt.NDArray[np.float64],
-):
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     amc = alpha_moments_count
     moment_values = np.zeros(amc)
     moment_jac_rs = np.zeros((amc, *r_ijs_unit.shape))
@@ -308,11 +306,11 @@ def calc_moments_run(
 
 @nb.njit(
     (
-        nb.int64,
-        nb.int64[:],
+        nb.int32,
+        nb.int32[:],
         nb.float64[:],
         nb.float64[:, :],
-        nb.int64[:, :],
+        nb.int32[:, :],
         nb.float64[:, :],
         nb.float64[:, :],
         nb.float64[:, :, :, :],
@@ -393,7 +391,7 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
                     moment_jac_rc[i_aib, jtype, mu, i_rb, j, k] += der[k]
 
 
-@nb.njit(nb.float64[:, :, :](nb.int64[:], nb.float64[:], nb.float64[:, :, :, :]))
+@nb.njit(nb.float64[:, :, :](nb.int32[:], nb.float64[:], nb.float64[:, :, :, :]))
 def _calc_dedcs(
     alpha_moment_mapping: np.ndarray,
     moment_coeffs: np.ndarray,
@@ -413,9 +411,9 @@ def _calc_dedcs(
 
 @nb.njit(
     nb.types.Tuple((nb.float64[:, :, :], nb.float64[:, :, :, :, :]))(
-        nb.int64,
-        nb.int64[:, :],
-        nb.int64[:],
+        nb.int32,
+        nb.int32[:, :],
+        nb.int32[:],
         nb.float64[:],
         nb.float64[:],
         nb.float64[:, :, :],
@@ -424,7 +422,7 @@ def _calc_dedcs(
     ),
 )
 def _calc_dedcs_and_dgdcs(
-    alpha_index_basic_count: np.int64,
+    alpha_index_basic_count: np.int32,
     alpha_index_times: np.ndarray,
     alpha_moment_mapping: np.ndarray,
     moment_coeffs: np.ndarray,
@@ -509,17 +507,17 @@ def _calc_dedcs_and_dgdcs(
             nb.float64[:, :, :, :, :],
         ),
     )(
-        nb.int64,
-        nb.int64[:],
+        nb.int32,
+        nb.int32[:],
         nb.float64[:],
         nb.float64[:, :],
         nb.float64[:, :],
         nb.float64[:, :],
         nb.float64[:, :, :, :],
-        nb.int64,
-        nb.int64[:],
-        nb.int64[:, :],
-        nb.int64[:, :],
+        nb.int32,
+        nb.int32[:],
+        nb.int32[:, :],
+        nb.int32[:, :],
         nb.float64[:],
     ),
 )
@@ -531,7 +529,7 @@ def calc_moments_train(
     rb_values: np.ndarray,
     rb_derivs: np.ndarray,
     rb_coeffs: np.ndarray,
-    alpha_moments_count: np.int64,
+    alpha_moments_count: np.int32,
     alpha_moment_mapping: np.ndarray,
     alpha_index_basic: np.ndarray,
     alpha_index_times: np.ndarray,
@@ -582,8 +580,8 @@ def calc_moments_train(
 
 @nb.njit
 def store_radial_basis(
-    i: np.int64,
-    itype: np.int64,
+    i: np.int32,
+    itype: np.int32,
     js: np.ndarray,
     jtypes: np.ndarray,
     r_ijs: np.ndarray,

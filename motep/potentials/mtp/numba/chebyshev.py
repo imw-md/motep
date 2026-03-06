@@ -8,14 +8,14 @@ import numpy.typing as npt
 @nb.njit(
     nb.types.Tuple((nb.float64[:], nb.float64[:]))(
         nb.float64,
-        nb.int64,
+        nb.int32,
         nb.float64,
         nb.float64,
     ),
 )
 def _nb_chebyshev(
     r: np.float64,
-    number_of_terms: np.int64,
+    number_of_terms: np.int32,
     min_dist: np.float64,
     max_dist: np.float64,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
@@ -38,7 +38,7 @@ def _nb_chebyshev(
 @nb.njit(
     nb.types.Tuple((nb.float64[:, :], nb.float64[:, :]))(
         nb.float64[:],
-        nb.int64,
+        nb.int32,
         nb.float64,
         nb.float64,
         nb.float64,
@@ -46,7 +46,7 @@ def _nb_chebyshev(
 )
 def calc_radial_basis(
     r_abs: npt.NDArray[np.float64],
-    radial_basis_size: np.int64,
+    radial_basis_size: np.int32,
     scaling: np.float64,
     min_dist: np.float64,
     max_dist: np.float64,
@@ -68,8 +68,8 @@ def calc_radial_basis(
 @nb.njit
 def calc_radial_funcs(
     r_abs: npt.NDArray[np.float64],
-    itype: np.int64,
-    jtypes: npt.NDArray[np.int64],
+    itype: np.int32,
+    jtypes: npt.NDArray[np.int32],
     radial_coeffs: np.ndarray,
     scaling: np.float64,
     min_dist: np.float64,

@@ -26,14 +26,14 @@ class MTPData:
     radial_coeffs: npt.NDArray[np.float64] | None = None
     alpha_moments_count: int = 0
     alpha_index_basic_count: int = 0
-    alpha_index_basic: npt.NDArray[np.int64] | None = None
+    alpha_index_basic: npt.NDArray[np.int32] | None = None
     alpha_index_times_count: int = 0
-    alpha_index_times: npt.NDArray[np.int64] | None = None
+    alpha_index_times: npt.NDArray[np.int32] | None = None
     alpha_scalar_moments: int = 0
-    alpha_moment_mapping: npt.NDArray[np.int64] | None = None
+    alpha_moment_mapping: npt.NDArray[np.int32] | None = None
     species_coeffs: npt.NDArray[np.float64] | None = None
     moment_coeffs: npt.NDArray[np.float64] | None = None
-    species: npt.NDArray[np.int64] | None = None
+    species: npt.NDArray[np.int32] | None = None
     optimized: list[str] = field(
         default_factory=lambda: ["species_coeffs", "moment_coeffs", "radial_coeffs"],
     )
@@ -103,7 +103,7 @@ class MTPData:
 
     @property
     def number_of_parameters_optimized(self) -> int:
-        """Get number of parameters optiized."""
+        """Get number of parameters optimized."""
         species_count = self.species_count
         rfc = self.radial_funcs_count
         rbs = self.radial_basis_size
