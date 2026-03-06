@@ -23,7 +23,7 @@ def make_atoms(engine: str, level: int, data_path: pathlib.Path) -> Atoms:
         pytest.skip()
     atoms = read_cfg(path / "out.cfg", index=-1)
     mtp_data_ref = read_mtp(path / "pot.mtp")
-    atoms.calc = MTP(mtp_data=mtp_data_ref, engine=engine, is_trained=True)
+    atoms.calc = MTP(mtp_data=mtp_data_ref, engine=engine, mode="train")
     return atoms
 
 

@@ -142,7 +142,7 @@ def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
 
 
 def _contract_moments(
-    alpha_index_times: npt.NDArray[np.int64],
+    alpha_index_times: npt.NDArray[np.int32],
     moment_values: npt.NDArray[np.float64],
     moment_jac_rs: npt.NDArray[np.float64],
 ) -> None:
@@ -158,7 +158,7 @@ def _contract_moments(
 
 
 def calc_dedcs_and_dgdcs(
-    alpha_index_basic_count: np.int64,
+    alpha_index_basic_count: np.int32,
     alpha_index_times: np.ndarray,
     alpha_moment_mapping: np.ndarray,
     moment_coeffs: np.ndarray,

@@ -78,7 +78,7 @@ def _init_mapping(pot0: MTPData) -> np.ndarray:
     else:
         m = max(pot0.alpha_index_times[:, -1]) + 1
     # initialize with the max negative value to raise an error whenever not updated
-    return np.full(m, np.iinfo(int).min, dtype=int)
+    return np.full(m, np.iinfo(np.int32).min, dtype=np.int32)
 
 
 def _get_contractions(pot: MTPData) -> dict[str, np.ndarray]:
@@ -95,7 +95,7 @@ def _get_mapping(src: MTPData, dst: MTPData) -> np.ndarray:
     for i0, aib0 in enumerate(src.alpha_index_basic):
         for i1, aib1 in enumerate(dst.alpha_index_basic):
             if np.all(aib0 == aib1):
-                if mapping[i0] != np.iinfo(int).min:
+                if mapping[i0] != np.iinfo(np.int32).min:
                     raise RuntimeError
                 mapping[i0] = i1
                 break
@@ -103,7 +103,7 @@ def _get_mapping(src: MTPData, dst: MTPData) -> np.ndarray:
             raise RuntimeError(aib0)
 
     def _map_contraction(v: np.ndarray) -> np.ndarray:
-        v_mapped = np.full_like(v, np.iinfo(int).min)
+        v_mapped = np.full_like(v, np.iinfo(np.int32).min)
         v_mapped[:, 0] = mapping[v[:, 0]]
         v_mapped[:, 1] = mapping[v[:, 1]]
         v_mapped[:, 2] = v[:, 2]

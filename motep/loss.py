@@ -110,7 +110,7 @@ class LossFunctionForces:
 
     Attributes
     ----------
-    idcs_frc : npt.NDArray[np.int64]
+    idcs_frc : npt.NDArray[np.int32]
         Indices of images that have forces.
 
     """
@@ -201,7 +201,7 @@ class LossFunctionStress:
 
     Attributes
     ----------
-    idcs_str : npt.NDArray[np.int64]
+    idcs_str : npt.NDArray[np.int32]
         Indices of images that have 3D cells.
 
     """
@@ -532,7 +532,7 @@ class LossFunction(LossFunctionBase):
         self.engine = engine
         for atoms in self.images:
             targets = atoms.calc.results
-            atoms.calc = MTP(self.mtp_data, engine=self.engine, is_trained=True)
+            atoms.calc = MTP(self.mtp_data, engine=self.engine, mode="train")
             atoms.calc.targets = targets
 
     def __call__(self, parameters: list[float]) -> float:

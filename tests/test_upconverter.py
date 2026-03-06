@@ -20,8 +20,8 @@ def test_upconvert(src_level: int, dst_level: int, data_path: Path) -> None:
     src_dat = read_mtp(src_path / "pot.mtp")
     dst_dat = read_mtp(dst_path / "pot.mtp")
     upconvert(src_dat, dst_dat)
-    src_mtp = NumbaMTPEngine(src_dat, is_trained=False)
-    dst_mtp = NumbaMTPEngine(dst_dat, is_trained=False)
+    src_mtp = NumbaMTPEngine(src_dat, mode="run")
+    dst_mtp = NumbaMTPEngine(dst_dat, mode="run")
     atoms = read_cfg(src_path / "out.cfg")
     src_energy = src_mtp.calculate(atoms)["energy"]
     dst_energy = dst_mtp.calculate(atoms)["energy"]

@@ -8,6 +8,7 @@ import pytest
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
+from motep.potentials.mtp.cext.engine import CExtMTPEngine
 from motep.potentials.mtp.jax.engine import JaxMTPEngine
 from motep.potentials.mtp.numba.engine import NumbaMTPEngine
 from motep.potentials.mtp.numpy.engine import NumpyMTPEngine
@@ -35,12 +36,14 @@ def get_scale(component: str, d: float) -> np.ndarray:
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
-@pytest.mark.parametrize("is_trained", [False, True])
-@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine])
+@pytest.mark.parametrize("mode", ["run", "train"])
+@pytest.mark.parametrize(
+    "engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine, CExtMTPEngine]
+)
 # @pytest.mark.parametrize("molecule", [762])
 def test_molecules(
     engine: Any,
-    is_trained: bool,
+    mode: str,
     molecule: int,
     level: int,
     data_path: pathlib.Path,
@@ -48,12 +51,10 @@ def test_molecules(
     """Test PyMTP."""
     path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (path / "pot.mtp").exists():
-        pytest.skip()
-    parameters = read_mtp(path / "pot.mtp")
-    # parameters["species"] = species
-    mtp = engine(parameters, is_trained=is_trained)
+        pytest.skip("Test data not available")
+    mtp_data = read_mtp(path / "pot.mtp")
+    mtp = engine(mtp_data, mode=mode)
     images = [read_cfg(path / "out.cfg", index=0)]
-    mtp._initiate_neighbor_list(images[0])
 
     results_all = [mtp.calculate(atoms) for atoms in images]
 
@@ -71,12 +72,12 @@ def test_molecules(
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 # @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("crystal", ["size", "multi"])
-@pytest.mark.parametrize("is_trained", [False, True])
+@pytest.mark.parametrize("mode", ["run", "train"])
 # @pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
-@pytest.mark.parametrize("engine", [NumbaMTPEngine, JaxMTPEngine])
+@pytest.mark.parametrize("engine", [NumbaMTPEngine, JaxMTPEngine, CExtMTPEngine])
 def test_crystals(
     engine: Any,
-    is_trained: bool,
+    mode: str,
     crystal: int,
     level: int,
     data_path: pathlib.Path,
@@ -84,12 +85,10 @@ def test_crystals(
     """Test PyMTP."""
     path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (path / "pot.mtp").exists():
-        pytest.skip()
-    parameters = read_mtp(path / "pot.mtp")
-    # parameters["species"] = species
-    mtp = engine(parameters, is_trained=is_trained)
+        pytest.skip("Test data not available")
+    mtp_data = read_mtp(path / "pot.mtp")
+    mtp = engine(mtp_data, mode=mode)
     images = [read_cfg(path / "out.cfg", index=-1)]
-    mtp._initiate_neighbor_list(images[0])
 
     results_all = [mtp.calculate(atoms) for atoms in images]
 
@@ -112,7 +111,9 @@ def test_crystals(
 # @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23028])
-@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine])
+@pytest.mark.parametrize(
+    "engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine, CExtMTPEngine]
+)
 def test_forces(
     engine: Any,
     molecule: int,
@@ -123,11 +124,9 @@ def test_forces(
     path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
-    parameters = read_mtp(path / "pot.mtp")
-    # parameters["species"] = species
-    mtp = engine(parameters)
+    mtp_data = read_mtp(path / "pot.mtp")
+    mtp = engine(mtp_data)
     atoms_ref = read_cfg(path / "out.cfg", index=-1)
-    mtp._initiate_neighbor_list(atoms_ref)
 
     forces_ref = mtp.calculate(atoms_ref)["forces"]
 
@@ -170,11 +169,9 @@ def test_stress(
     path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
-    parameters = read_mtp(path / "pot.mtp")
-    # parameters["species"] = species
-    mtp = engine(parameters)
+    mtp_data = read_mtp(path / "pot.mtp")
+    mtp = engine(mtp_data)
     atoms_ref = read_cfg(path / "out.cfg", index=-1)
-    mtp._initiate_neighbor_list(atoms_ref)
 
     stress_ref = mtp.calculate(atoms_ref)["stress"]
 
@@ -195,3 +192,43 @@ def test_stress(
     print(stress_ref[sindex], s)
 
     assert stress_ref[sindex] == pytest.approx(s, abs=1e-4)
+
+
+@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize("crystal", ["size", "multi"])
+@pytest.mark.parametrize("engine", [NumbaMTPEngine, CExtMTPEngine])
+def test_basis_data(
+    engine: Any,
+    crystal: int,
+    level: int,
+    data_path: pathlib.Path,
+) -> None:
+    """Test PyMTP."""
+    mode = "train"
+    path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
+    if not (path / "pot.mtp").exists():
+        pytest.skip()
+    mtp_data = read_mtp(path / "pot.mtp")
+    # Assume NumpyMTPEngine as reference
+    ref = NumpyMTPEngine(mtp_data, mode=mode)
+    mtp = engine(mtp_data, mode=mode)
+    images = [read_cfg(path / "out.cfg", index=-1)]
+
+    for atoms in images:
+        ref.calculate(atoms)
+        mtp.calculate(atoms)
+
+        mbd = mtp.mbd
+        mbd_ref = ref.mbd
+        np.testing.assert_allclose(mbd.values, mbd_ref.values, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dbdris, mbd_ref.dbdris, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dbdeps, mbd_ref.dbdeps, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dedcs, mbd_ref.dedcs, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dgdcs, mbd_ref.dgdcs, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dsdcs, mbd_ref.dsdcs, rtol=0.0, atol=1e-6)
+
+        rbd = mtp.rbd
+        rbd_ref = ref.rbd
+        np.testing.assert_allclose(rbd.values, rbd_ref.values, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(rbd.dqdris, rbd_ref.dqdris, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(rbd.dqdeps, rbd_ref.dqdeps, rtol=0.0, atol=1e-6)

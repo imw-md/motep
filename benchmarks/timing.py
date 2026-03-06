@@ -21,11 +21,13 @@ fmt = "{:20s}"
 setup_map = {
     "numpy": {"engine": "numpy"},
     "numba": {"engine": "numba"},
-    "numba_train": {"engine": "numba", "is_trained": True},
+    "numba_train": {"engine": "numba", "mode": "train"},
     "jax": {"engine": "jax"},
+    "cext": {"engine": "cext"},
+    "cext_train": {"engine": "cext", "mode": "train"},
 }
 
-all_setups = ["numpy", "numba", "numba_train", "jax"]
+all_setups = ["numpy", "numba", "numba_train", "jax", "cext", "cext_train"]
 
 
 def print_num_threads():
@@ -76,7 +78,7 @@ def _time_mlippy(pot_path: pathlib.Path, images: list[Atoms]) -> np.ndarray:
     calc = _init_mlippy(pot_path, atom_number_list)
     # Make initial calc to not time things like compile time and things that are cachable
     calc.get_potential_energy(images[-1])
-    with Timer(fmt.format("mlippy")):
+    with Timer(fmt.format("mlippy (run)")):
         energies = [calc.get_potential_energy(_) for _ in images]
     return np.array(energies)
 
@@ -86,17 +88,17 @@ def _time_mtp(
     images: list[Atoms],
     *,
     engine: str,
-    is_trained: bool = False,
+    mode: str = "run",
 ) -> np.ndarray:
     mtp_data = read_mtp(pot_path)
     mtp_data.species = []
     for atomic_number in images[0].numbers:
         if atomic_number not in mtp_data.species:
             mtp_data.species.append(atomic_number)
-    calc = MTP(mtp_data, engine=engine, is_trained=is_trained)
+    calc = MTP(mtp_data, engine=engine, mode=mode)
     calc.use_cache = False
 
-    suffix = " (train)" if is_trained else " (run)"
+    suffix = f" ({mode})"
 
     # Make initial calc to not time things like compile time and things that are cachable
     with Timer(fmt.format(engine + suffix + " (0th)")):
@@ -109,21 +111,23 @@ def _time_mtp(
     return np.array(energies)
 
 
-def main(setup_names: list[str], levels: list[int] = None) -> None:
+def main(
+    setup_names: list[str],
+    levels: list[int] | None = None,
+    sizes: list[int] | None = None,
+    nimages: int | None = None,
+) -> None:
     """Run benchmarks."""
     print_num_threads()
     setups = [setup_map[_] for _ in setup_names or all_setups]
     data_path = pathlib.Path(__file__).parent / "../tests/data_path"
     crystal = "cubic"
-    for level in levels or [6, 20]:
-        for size_reps in [1, 3]:
-            path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
-            cfg_path = path / "out.cfg"
-            if not cfg_path.is_file():
-                continue
-            index = slice(0, 10)
-            images = read_cfg(cfg_path, index=index)
-            images = [_.repeat(size_reps) for _ in images]
+    cfg_path = data_path / f"original/crystals/{crystal}/training.cfg"
+    index = slice(0, nimages or 10)
+    orig_images = read_cfg(cfg_path, index=index)
+    for level in levels or [12, 18, 24]:
+        for size_reps in sizes or [1, 3]:
+            images = [_.repeat(size_reps) for _ in orig_images]
             number_of_atoms = len(images[0])
             if comm.rank == 0:
                 print(
@@ -133,27 +137,25 @@ def main(setup_names: list[str], levels: list[int] = None) -> None:
                     f" on {comm.size} ranks:",
                     flush=True,
                 )
+
+            path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
             pot_path = path / "pot.mtp"
 
             try:
-                e_ref = _time_mlippy(pot_path, images) if comm.rank == 0 else None
+                _time_mlippy(pot_path, images) if comm.rank == 0 else None
             except ImportError:
-                e_ref = None
+                if comm.rank == 0:
+                    print("mlippy could not be imported, skipping mlippy ref.")
 
             for setup in setups:
-                if number_of_atoms > 300 and setup != {"engine": "numba"}:
-                    continue
-                e_test = _time_mtp(pot_path, images, **setup)
-                if e_ref is not None:
-                    try:
-                        np.testing.assert_allclose(e_test, e_ref)
-                    except AssertionError as e:
-                        print(setup["engine"], "energy differs from mlip:", e)
+                _time_mtp(pot_path, images, **setup)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("setups", nargs="*", choices=all_setups)
     parser.add_argument("--levels", nargs="+", choices=list(range(2, 27, 2)), type=int)
+    parser.add_argument("--sizes", nargs="+", type=int)
+    parser.add_argument("--nimages", type=int)
     args = parser.parse_args()
-    main(args.setups, args.levels)
+    main(args.setups, args.levels, args.sizes, args.nimages)

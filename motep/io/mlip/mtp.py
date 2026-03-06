@@ -4,6 +4,7 @@ import itertools
 import os
 import pathlib
 from dataclasses import asdict
+from numbers import Integral, Real
 from typing import TextIO
 
 import numpy as np
@@ -38,18 +39,18 @@ def read_mtp(file: os.PathLike) -> MTPData:
             if "=" in line:
                 key, value = (_.strip() for _ in line.strip().split("="))
                 if key in {"scaling", "min_dist", "max_dist"}:
-                    data[key] = float(value)
+                    data[key] = np.float64(value)
                 elif value.isdigit():
-                    data[key] = int(value)
+                    data[key] = np.int32(value)
                 elif key == "alpha_moment_mapping":
                     data[key] = np.fromiter(
                         (_ for _ in value.strip("{}").split(",")),
-                        dtype=int,
+                        dtype=np.int32,
                     )
                 elif key in {"species_coeffs", "moment_coeffs"}:
                     data[key] = np.fromiter(
                         (_ for _ in value.strip().strip("{}").split(",")),
-                        dtype=float,
+                        dtype=np.float64,
                     )
                 elif key in {"alpha_index_basic", "alpha_index_times"}:
                     data[key] = [
@@ -57,10 +58,10 @@ def read_mtp(file: os.PathLike) -> MTPData:
                         for _ in value.strip("{}").split("}, {")
                         if _ != ""
                     ]
-                    data[key] = np.array(data[key])
+                    data[key] = np.array(data[key], dtype=np.int32)
                     # force to be two-dimensional even if empty (for Level 2)
                     if data[key].size == 0:
-                        data[key] = np.zeros((0, 4), dtype=int)
+                        data[key] = np.zeros((0, 4), dtype=np.int32)
                 else:
                     data[key] = value.strip()
             elif line.strip() == "radial_coeffs":
@@ -71,10 +72,10 @@ def read_mtp(file: os.PathLike) -> MTPData:
 
 
 def _format_value(value: float | int | list | str) -> str:
-    if isinstance(value, float):
-        return f"{value:21.15e}"
-    if isinstance(value, int):
+    if isinstance(value, Integral):
         return f"{value:d}"
+    if isinstance(value, Real):
+        return f"{value:21.15e}"
     if isinstance(value, list):
         return _format_list(value)
     if isinstance(value, np.ndarray):

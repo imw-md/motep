@@ -8,14 +8,14 @@ import numpy.typing as npt
 @nb.njit(
     nb.types.Tuple((nb.float64[:], nb.float64[:]))(
         nb.float64,
-        nb.int64,
+        nb.int32,
         nb.float64,
         nb.float64,
     ),
 )
 def _nb_chebyshev(
     r: np.float64,
-    number_of_terms: np.int64,
+    number_of_terms: np.int32,
     min_dist: np.float64,
     max_dist: np.float64,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
@@ -38,7 +38,7 @@ def _nb_chebyshev(
 @nb.njit(
     nb.types.Tuple((nb.float64[:, :], nb.float64[:, :]))(
         nb.float64[:],
-        nb.int64,
+        nb.int32,
         nb.float64,
         nb.float64,
         nb.float64,
@@ -46,7 +46,7 @@ def _nb_chebyshev(
 )
 def calc_radial_basis(
     r_abs: npt.NDArray[np.float64],
-    radial_basis_size: np.int64,
+    radial_basis_size: np.int32,
     scaling: np.float64,
     min_dist: np.float64,
     max_dist: np.float64,
@@ -65,37 +65,27 @@ def calc_radial_basis(
     return values, derivs
 
 
-@nb.njit
-def calc_radial_funcs(
-    r_abs: npt.NDArray[np.float64],
-    itype: np.int64,
-    jtypes: npt.NDArray[np.int64],
-    radial_coeffs: np.ndarray,
-    scaling: np.float64,
-    min_dist: np.float64,
-    max_dist: np.float64,
+@nb.njit(
+    nb.float64[:, :](
+        nb.int32,
+        nb.int32[:],
+        nb.float64[:, :],
+        nb.float64[:, :, :, :],
+    ),
+)
+def sum_radial_terms(
+    itype: np.int32,
+    jtypes: npt.NDArray[np.int32],
+    basis: npt.NDArray[np.float64],
+    coeffs: np.ndarray,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    """Calculate radial parts.
-
-    Returns
-    -------
-    Tuple of radial values and derivatives.
-
-    """
-    _, _, radial_funcs_count, radial_basis_size = radial_coeffs.shape
-    values, derivs = calc_radial_basis(
-        r_abs,
-        radial_basis_size,
-        scaling,
-        min_dist,
-        max_dist,
-    )
-    radial_part_vs = np.zeros((radial_funcs_count, r_abs.size))
-    radial_part_ds = np.zeros((radial_funcs_count, r_abs.size))
-    for j in range(r_abs.size):
-        for mu in range(radial_funcs_count):
-            for i_rb in range(radial_basis_size):
-                c = radial_coeffs[itype, jtypes[j], mu, i_rb]
-                radial_part_vs[mu, j] += c * values[i_rb, j]
-                radial_part_ds[mu, j] += c * derivs[i_rb, j]
-    return radial_part_vs, radial_part_ds
+    """Sum radial terms."""
+    njs = basis.shape[1]
+    _, _, rfc, rbs = coeffs.shape
+    sum_ = np.zeros((rfc, njs))
+    for j in range(njs):
+        for mu in range(rfc):
+            for i_rb in range(rbs):
+                c = coeffs[itype, jtypes[j], mu, i_rb]
+                sum_[mu, j] += c * basis[i_rb, j]
+    return sum_

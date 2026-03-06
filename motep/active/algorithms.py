@@ -46,7 +46,7 @@ class AlgorithmBase(ABC):
         """Calculate matrix."""
         # Calculate basis functions of `images_training`
         for atoms in images:
-            atoms.calc = MTP(self.mtp_data, engine=self.engine, is_trained=True)
+            atoms.calc = MTP(self.mtp_data, engine=self.engine, mode="train")
             atoms.get_potential_energy()
 
         # Make the overdetermined matrix

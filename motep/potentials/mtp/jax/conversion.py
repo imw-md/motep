@@ -96,7 +96,7 @@ def _calc_r_unit_pows(r_unit: np.ndarray, max_pow: int) -> np.ndarray:
 
 def _contract_moments(
     moment_values: npt.NDArray[np.float64],
-    alpha_index_times: npt.NDArray[np.int64],
+    alpha_index_times: npt.NDArray[np.int32],
 ) -> None:
     """Compute contractions of moments."""
     for ait in alpha_index_times:
