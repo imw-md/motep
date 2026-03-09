@@ -68,7 +68,7 @@ class AlgorithmBase(ABC):
 
         # Eq. (8) in [Podryabinkin_CMS_2017_Active]_
         matrix_active = self.matrix[self.indices]
-        c = matrix @ np.linalg.inv(matrix_active)
+        c = np.linalg.lstsq(matrix_active.T, matrix.T)[0].T
         maxvol_grades = np.max(c, axis=1)
 
         # evaluate `MV_grade` for each `atoms`
@@ -119,9 +119,9 @@ class MaxVolAlgorithm(ExhaustiveAlgorithm):
         flags[indices] = True
 
         tolerance = 1e-9
-        for _ in range(self.maxiter):  # arbitrary large number for safety
+        for _ in range(self.maxiter):
             submatrix = matrix[flags]
-            c = matrix @ np.linalg.inv(submatrix)
+            c = np.linalg.lstsq(submatrix.T, matrix.T)[0].T
             i, j = np.divmod(np.argmax(np.abs(c)), asm)
             if np.abs(c[i, j]) < 1.0 + tolerance:
                 break
