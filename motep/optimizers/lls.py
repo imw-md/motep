@@ -162,6 +162,11 @@ class LLSOptimizerBase(OptimizerBase):
         stresses = np.array([f(images[i].calc.targets[key]) for i in idcs_str])
         if self.loss.setting.stress_times_volume:
             stresses = (stresses.T * self.loss.loss_stress.volumes[idcs_str]).T
+            if self.loss.setting.energy_per_atom:
+                stresses = (
+                    stresses.T
+                    * self.loss.loss_stress.inverse_numbers_of_atoms[idcs_str]
+                ).T
         if self.loss.setting.stress_per_conf:
             stresses /= sqrt(len(images))
         return stresses.flat
@@ -282,6 +287,10 @@ class LLSOptimizer(LLSOptimizerBase):
         matrix = np.array([images[i].calc.engine.mbd.dbdeps.T for i in idcs_str])
         if self.loss.setting.stress_times_volume:
             matrix = (matrix.T * self.loss.loss_stress.volumes[idcs_str]).T
+            if self.loss.setting.energy_per_atom:
+                matrix = (
+                    matrix.T * self.loss.loss_stress.inverse_numbers_of_atoms[idcs_str]
+                ).T
         if self.loss.setting.stress_per_conf:
             matrix /= sqrt(len(images))
         return matrix.reshape((-1, self.loss.mtp_data.alpha_scalar_moments))
