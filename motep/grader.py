@@ -62,6 +62,7 @@ def grade(filename_setting: str, comm: MPI.Comm) -> None:
         mtp_data,
         setting.engine,
         rng=rng,
+        maxiter=setting.maxiter,
     )
 
     if comm.rank == 0:

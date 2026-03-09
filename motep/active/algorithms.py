@@ -1,5 +1,6 @@
 """Module for algorithms."""
 
+import logging
 from abc import ABC, abstractmethod
 from itertools import combinations
 from math import comb
@@ -9,6 +10,8 @@ from ase import Atoms
 
 from motep.calculator import MTP
 from motep.potentials.mtp.data import MTPData
+
+logger = logging.getLogger(__name__)
 
 
 class AlgorithmBase(ABC):
@@ -27,12 +30,14 @@ class AlgorithmBase(ABC):
         mtp_data: MTPData,
         engine: str,
         rng: np.random.Generator,
+        maxiter: int = 100_000,
     ) -> None:
         """Active-set finder."""
         self.images_training = images_training
         self.mtp_data = mtp_data
         self.engine = engine
         self.rng = rng
+        self.maxiter = maxiter
         self.update()
 
     def update(self) -> None:
@@ -114,7 +119,7 @@ class MaxVolAlgorithm(ExhaustiveAlgorithm):
         flags[indices] = True
 
         tolerance = 1e-9
-        for _ in range(65536):  # arbitrary large number for safety
+        for _ in range(self.maxiter):  # arbitrary large number for safety
             submatrix = matrix[flags]
             c = matrix @ np.linalg.inv(submatrix)
             i, j = np.divmod(np.argmax(np.abs(c)), asm)
@@ -123,6 +128,11 @@ class MaxVolAlgorithm(ExhaustiveAlgorithm):
             k = np.where(flags)[0][j]  # row/column in the original matrix
             flags[[k, i]] = flags[[i, k]]
         else:
-            raise RuntimeError(_)
+            cmax = np.abs(c[i, j])
+            msg = (
+                f"Maxvol algorithm did not converge within {_} iterations. "
+                f"Current c-max: {cmax}"
+            )
+            logger.warning(msg)
 
         self.indices = np.where(flags)[0]
