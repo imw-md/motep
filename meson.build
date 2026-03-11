@@ -1,7 +1,7 @@
 project(
   'motep',
   'c',
-  version: '0.1.0',
+  version: run_command(['python', '-m', 'setuptools_scm'], check: true).stdout().strip(),
 )
 
 add_project_arguments(
