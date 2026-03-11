@@ -132,7 +132,7 @@ class Trainer:
 
                     write_mtp(f"intermediate_{i}.mtp", self.mtp_data)
 
-                    ErrorPrinter(loss).log()
+                    ErrorPrinter(loss.images).log()
         return loss
 
 
