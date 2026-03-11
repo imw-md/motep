@@ -8,7 +8,7 @@ from motep.potentials.mtp import get_types
 from motep.potentials.mtp.base import EngineBase
 
 try:
-    from . import _mtp_cext
+    from motep.potentials.mtp.cext import _mtp_cext
 except ImportError as e:
     raise ImportError(
         "C extension module '_mtp_cext' not found. "
