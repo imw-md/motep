@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "motep"
 dependencies = [
+    "numpy>=1.20",
     "ase",
     "mpi4py",
     "scipy",
@@ -40,9 +41,6 @@ dynamic = ["version"]
 [project.optional-dependencies]
 jax = [
   "jax",
-]
-cext = [
-  "numpy>=1.20",
 ]
 
 [project.scripts]
