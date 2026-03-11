@@ -4,6 +4,13 @@ project(
   version: '0.1.0',
 )
 
+add_project_arguments(
+  '-O3',
+  '-ffast-math',
+  '-march=native',
+  language: 'c',
+)
+
 py = import('python').find_installation(pure: false)
 
 install_subdir(
