@@ -419,46 +419,60 @@ class LossFunctionBase(ABC):
 
 
 class ErrorPrinter:
-    """Printer of errors."""
+    """Printer of errors for energy, forces, and stress."""
 
-    def __init__(self, loss: LossFunctionBase) -> None:
-        """Initialize `ErrorPrinter`."""
-        self.loss = loss
+    def __init__(self, images: list[Atoms]) -> None:
+        """Initialize `ErrorPrinter`.
+
+        Parameters
+        ----------
+        images : list[Atoms]
+            List of ASE Atoms objects with calculated results and targets.
+            Assumes that targets are stored in `atoms.calc.targets`.
+
+        """
+        self.images = images
+
+        # Calculate indices of images with specific properties
+        self.idcs_frc = np.fromiter(
+            (i for i, atoms in enumerate(images) if "forces" in atoms.calc.results),
+            dtype=int,
+        )
+        self.idcs_str = np.fromiter(
+            (i for i, atoms in enumerate(images) if "stress" in atoms.calc.results),
+            dtype=int,
+        )
 
     def _calc_errors_energy(self) -> dict[str, float]:
-        loss = self.loss
         iterable = (
             atoms.calc.results["energy"] - atoms.calc.targets["energy"]
-            for atoms in loss.images
+            for atoms in self.images
         )
         return _calc_errors_from_diff(np.fromiter(iterable, dtype=float))
 
     def _calc_errors_energy_per_atom(self) -> dict[str, float]:
-        loss = self.loss
         iterable = (
             ((atoms.calc.results["energy"] - atoms.calc.targets["energy"]) / len(atoms))
-            for i, atoms in enumerate(loss.images)
+            for atoms in self.images
         )
         return _calc_errors_from_diff(np.fromiter(iterable, dtype=float))
 
     def _calc_errors_forces(self) -> dict[str, float]:
-        loss = self.loss
         iterable = (
-            loss.images[i].calc.results["forces"][j, k]
-            - loss.images[i].calc.targets["forces"][j, k]
-            for i in loss.loss_forces.idcs_frc
-            for j in range(len(loss.images[i]))
+            self.images[i].calc.results["forces"][j, k]
+            - self.images[i].calc.targets["forces"][j, k]
+            for i in self.idcs_frc
+            for j in range(len(self.images[i]))
             for k in range(3)
         )
         return _calc_errors_from_diff(np.fromiter(iterable, dtype=float))
 
     def _calc_errors_stress(self) -> dict[str, float]:
-        loss = self.loss
         f = voigt_6_to_full_3x3_stress
         iterable = (
-            f(loss.images[i].calc.results["stress"])[j, k]
-            - f(loss.images[i].calc.targets["stress"])[j, k]
-            for i in loss.loss_stress.idcs_str
+            f(self.images[i].calc.results["stress"])[j, k]
+            - f(self.images[i].calc.targets["stress"])[j, k]
+            for i in self.idcs_str
             for j in range(3)
             for k in range(3)
         )

@@ -47,7 +47,7 @@ def test_without_forces(*, forces_per_atom: bool, data_path: pathlib.Path) -> No
 
     loss(mtp_data.parameters)
     loss.jac(mtp_data.parameters)
-    ErrorPrinter(loss).log(logger)
+    ErrorPrinter(loss.images).log(logger)
 
 
 @pytest.mark.parametrize(

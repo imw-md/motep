@@ -161,7 +161,7 @@ def test_molecules(
 
     mtp_data.log()
     f_ref = loss(mtp_data.parameters)  # update paramters
-    ErrorPrinter(loss).log()
+    ErrorPrinter(loss.images).log()
 
     parameters_ref = np.array(mtp_data.parameters, copy=True)
 
@@ -174,7 +174,7 @@ def test_molecules(
 
     mtp_data.log()
     f_e00 = loss(mtp_data.parameters)  # update paramters
-    ErrorPrinter(loss).log()
+    ErrorPrinter(loss.images).log()
 
     # Check if `parameters` are updated.
     assert (mtp_data.parameters.size != parameters_ref.size) or (
@@ -266,7 +266,7 @@ def test_crystals(
 
     mtp_data.log()
     loss(mtp_data.parameters)  # update parameters
-    ErrorPrinter(loss).log()
+    ErrorPrinter(loss.images).log()
 
     parameters_ref = np.array(mtp_data.parameters, copy=True)
 
@@ -277,7 +277,7 @@ def test_crystals(
 
     mtp_data.log()
     f0 = loss(mtp_data.parameters)  # update parameters
-    errors0 = ErrorPrinter(loss).log()
+    errors0 = ErrorPrinter(loss.images).log()
 
     # Check if `parameters` are updated.
     parameters = mtp_data.parameters
@@ -292,7 +292,7 @@ def test_crystals(
 
     mtp_data.log()
     f1 = loss(mtp_data.parameters)  # update parameters
-    errors1 = ErrorPrinter(loss).log()
+    errors1 = ErrorPrinter(loss.images).log()
 
     # Check RMSEs
     # When only the RMSE of the energies is minimized, it should be smaller than
@@ -307,7 +307,7 @@ def test_crystals(
 
     mtp_data.log()
     f2 = loss(mtp_data.parameters)  # update parameters
-    errors2 = ErrorPrinter(loss).log()
+    errors2 = ErrorPrinter(loss.images).log()
 
     # Check RMSEs
     assert errors1["stress"]["RMS"] > errors2["stress"]["RMS"]

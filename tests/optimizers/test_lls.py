@@ -123,7 +123,7 @@ def test_molecules(
 
     parameters_ref = np.array(mtp_data.parameters, copy=True)
     loss(parameters_ref)  # update paramters
-    ErrorPrinter(loss).log()
+    ErrorPrinter(loss.images).log()
 
     minimized = ["energy"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
@@ -132,7 +132,7 @@ def test_molecules(
 
     mtp_data.log()
     f0 = loss(mtp_data.parameters)  # update paramters
-    errors0 = ErrorPrinter(loss).log()
+    errors0 = ErrorPrinter(loss.images).log()
 
     # Check if `parameters` are updated.
     assert (mtp_data.parameters.size != parameters_ref.size) or (
@@ -146,7 +146,7 @@ def test_molecules(
 
     mtp_data.log()
     f1 = loss(mtp_data.parameters)  # update parameters
-    errors1 = ErrorPrinter(loss).log()
+    errors1 = ErrorPrinter(loss.images).log()
 
     # Check loss functions
     # The value should be smaller when considering both energies and forces than
@@ -232,7 +232,7 @@ def test_crystals(
     parameters_ref = np.array(mtp_data.parameters, copy=True)
     mtp_data.log()
     loss(parameters_ref)  # update parameters
-    ErrorPrinter(loss).log()
+    ErrorPrinter(loss.images).log()
 
     minimized = ["energy"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
@@ -241,7 +241,7 @@ def test_crystals(
 
     mtp_data.log()
     f0 = loss(mtp_data.parameters)  # update parameters
-    errors0 = ErrorPrinter(loss).log()
+    errors0 = ErrorPrinter(loss.images).log()
 
     # Check if `parameters` are updated.
     assert (mtp_data.parameters.size != parameters_ref.size) or (
@@ -255,7 +255,7 @@ def test_crystals(
 
     mtp_data.log()
     f1 = loss(mtp_data.parameters)  # update parameters
-    errors1 = ErrorPrinter(loss).log()
+    errors1 = ErrorPrinter(loss.images).log()
 
     # Check RMSEs
     # When only the RMSE of the energies is minimized, it should be smaller than
@@ -270,7 +270,7 @@ def test_crystals(
 
     mtp_data.log()
     f2 = loss(mtp_data.parameters)  # update parameters
-    errors2 = ErrorPrinter(loss).log()
+    errors2 = ErrorPrinter(loss.images).log()
 
     # Check RMSEs
     assert errors1["stress"]["RMS"] > errors2["stress"]["RMS"]
