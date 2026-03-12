@@ -11,11 +11,30 @@ dependencies = [
     "numba",
 ]
 requires-python = ">=3.11"  # tomllib
+readme = "README.md"
 authors = [
-    {name = "Pranav Kumar"},  # trainer
     {name = "Axel Forslund"},  # calculator
     {name = "Yuji Ikeda"},  # testing
+    {name = "Pranav Kumar"},  # trainer
 ]
+classifiers = [
+    'Development Status :: 4 - Beta',
+    'Intended Audience :: Science/Research',
+    'Intended Audience :: Developers',
+    'Programming Language :: C',
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3 :: Only',
+    'Programming Language :: Python :: Implementation :: CPython',
+    'Topic :: Software Development',
+    'Topic :: Scientific/Engineering',
+    'Operating System :: POSIX :: Linux',
+    'Operating System :: POSIX',
+    'Operating System :: Unix',
+    'Operating System :: MacOS',
+]
+license = 'MIT'
+license-files = ['LICENSE']
 dynamic = ["version"]
 
 [project.optional-dependencies]
