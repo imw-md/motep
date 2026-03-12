@@ -33,8 +33,10 @@ jobs:
           python -m build --sdist --wheel --outdir dist/ .
       - name: Test installation from wheel
         run: |
+          pushd dist
           python -m pip install *.whl
           python -c "from motep.potentials.mtp.cext import _mtp_cext"
+          popd
       - name: Upload the built wheels as artifacts
         uses: actions/upload-artifact@v4
         with:
