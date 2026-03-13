@@ -1,18 +1,10 @@
 # MOTEP
 
+Python implementation of moment tensor potentials.
+
 ## Installation
 
-```bash
-pip install git+https://github.com/imw-md/motep.git
-```
-
-Optionally [our modified version of `mlippy`](https://gitlab.com/yuzie007/mlip-2/-/tree/mlippy) can be used.
-
-As of 2024-09-20, three "engines" are implemented.
-
-1. Mlippy based on python wrapper around mlip code
-2. Numpy based calculator
-3. Numba based calculator
+See [Installation](docs/installation.md).
 
 ## Usage
 
@@ -95,6 +87,10 @@ algorithm = 'maxvol'  # {'maxvol', 'exaustive'}
 ### [`motep apply`](docs/apply.md)
 
 ### [`motep upconvert`](docs/upconvert.md)
+
+### ASE calculators
+
+See [ASE calculators](docs/calculators.md).
 
 ## Big Question ?
 What This code do

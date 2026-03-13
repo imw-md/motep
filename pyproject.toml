@@ -1,10 +1,15 @@
 [build-system]
-requires = ["setuptools>=80", "setuptools-scm>=8", "numpy>=1.20"]
-build-backend = "setuptools.build_meta"
+build-backend = "mesonpy"
+requires = [
+    "meson-python>=0.18.0",
+    "setuptools-scm>=8",
+    "numpy>=1.20",
+]
 
 [project]
 name = "motep"
 dependencies = [
+    "numpy>=1.20",
     "ase",
     "mpi4py",
     "scipy",
@@ -40,9 +45,6 @@ dynamic = ["version"]
 [project.optional-dependencies]
 jax = [
   "jax",
-]
-cext = [
-  "numpy>=1.20",
 ]
 
 [project.scripts]
