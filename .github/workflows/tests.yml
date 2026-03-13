@@ -1,24 +1,23 @@
 name: Tests
-
 on:
   push:
     branches:
-    - '*'
+      - "*"
   pull_request:
     branches:
-    - '*'
-
+      - "*"
 jobs:
   test:
-
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.11"]
-
+        mpi: [false, true]
     steps:
       - uses: actions/checkout@v4
-      - uses: mpi4py/setup-mpi@v1
+      - name: Set up MPI
+        if: matrix.mpi
+        uses: mpi4py/setup-mpi@v1
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -30,8 +29,11 @@ jobs:
           python -m pip install numba
           python -m pip install jax
           python -m pip install pytest
-          python -m pip install --no-build-isolation -e .
+          if [ "${{ matrix.mpi }}" = "true" ]; then
+            python -m pip install --no-build-isolation -e ".[mpi]"
+          else
+            python -m pip install --no-build-isolation -e .
+          fi
       - name: Run pytest
         run: |
-          # python -m pytest -v
           python -m pytest -v tests/test_loss.py::test_without_forces tests/test_mtp.py
