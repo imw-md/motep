@@ -50,6 +50,7 @@ jobs:
       - name: Build wheels
         env:
           CIBW_BUILD: "cp311-*"
+          CIBW_SKIP: "*-musllinux*"
           CIBW_TEST_COMMAND: >-
             python -c "from motep.potentials.mtp.cext import _mtp_cext"
         run: python -m cibuildwheel --output-dir dist
