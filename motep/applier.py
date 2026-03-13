@@ -5,12 +5,11 @@ import logging
 import pathlib
 from pprint import pformat
 
-from mpi4py import MPI
-
 import motep.io
 from motep.calculator import MTP
 from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
+from motep.parallel import DummyMPIComm, world
 from motep.setting import load_setting_apply
 
 logger = logging.getLogger(__name__)
@@ -21,7 +20,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("setting")
 
 
-def apply(filename_setting: str, comm: MPI.Comm) -> None:
+def apply(filename_setting: str, comm: DummyMPIComm) -> None:
     """Run."""
     setting = load_setting_apply(filename_setting)
     if comm.rank == 0:
@@ -54,5 +53,4 @@ def apply(filename_setting: str, comm: MPI.Comm) -> None:
 
 def run(args: argparse.Namespace) -> None:
     """Run."""
-    comm = MPI.COMM_WORLD
-    apply(args.setting, comm)
+    apply(args.setting, comm=world)

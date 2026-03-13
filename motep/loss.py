@@ -8,10 +8,10 @@ import numpy as np
 import numpy.typing as npt
 from ase import Atoms
 from ase.stress import voigt_6_to_full_3x3_stress
-from mpi4py import MPI
 from scipy.constants import eV
 
 from motep.calculator import MTP
+from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting
 
@@ -39,7 +39,7 @@ class LossFunctionEnergy:
         mtp_data: MTPData,
         energy_per_atom: bool = False,
         energy_per_conf: bool = True,
-        comm: MPI.Comm = MPI.COMM_WORLD,
+        comm: DummyMPIComm = world,
     ) -> None:
         """Initialize."""
         self.images = images
@@ -76,7 +76,7 @@ class LossFunctionEnergy:
             if self.energy_per_atom:
                 c *= self.inverse_numbers_of_atoms[i] ** 2
             loss_cnf += c * (result - target) ** 2
-        loss_all = self.comm.allreduce(loss_cnf, op=MPI.SUM)
+        loss_all = self.comm.allreduce(loss_cnf)
         return loss_all / ncnf if self.energy_per_conf else loss_all
 
     def jac(self) -> npt.NDArray[np.float64]:
@@ -101,7 +101,7 @@ class LossFunctionEnergy:
                 c *= self.inverse_numbers_of_atoms[i] ** 2
             dedp = atoms.calc.engine.jac_energy(atoms).parameters
             jac_cnf += c * 2.0 * (result - target) * dedp
-        self.comm.Allreduce(jac_cnf, jac_all, op=MPI.SUM)
+        self.comm.Allreduce(jac_cnf, jac_all)
         return jac_all / ncnf if self.energy_per_conf else jac_all
 
 
@@ -122,7 +122,7 @@ class LossFunctionForces:
         mtp_data: MTPData,
         forces_per_atom: bool = False,
         forces_per_conf: bool = True,
-        comm: MPI.Comm = MPI.COMM_WORLD,
+        comm: DummyMPIComm = world,
     ) -> None:
         """Initialize."""
         self.images = images
@@ -166,7 +166,7 @@ class LossFunctionForces:
             if self.forces_per_atom:
                 c *= self.inverse_numbers_of_atoms[i]
             loss_cnf += c * np.sum((result - target) ** 2)
-        loss_all = self.comm.allreduce(loss_cnf, op=MPI.SUM)
+        loss_all = self.comm.allreduce(loss_cnf)
         return loss_all / ncnf if self.forces_per_conf else loss_all
 
     def jac(self) -> npt.NDArray[np.float64]:
@@ -192,7 +192,7 @@ class LossFunctionForces:
                 c *= self.inverse_numbers_of_atoms[i]
             dfdp = atoms.calc.engine.jac_forces(atoms).parameters
             jac_cnf += c * 2.0 * np.sum((result - target) * dfdp, axis=(-2, -1))
-        self.comm.Allreduce(jac_cnf, jac_all, op=MPI.SUM)
+        self.comm.Allreduce(jac_cnf, jac_all)
         return jac_all / ncnf if self.forces_per_conf else jac_all
 
 
@@ -214,7 +214,7 @@ class LossFunctionStress:
         stress_times_volume: bool = False,
         stress_per_conf: bool = True,
         energy_per_atom: bool = False,
-        comm: MPI.Comm = MPI.COMM_WORLD,
+        comm: DummyMPIComm = world,
     ) -> None:
         """Initialize."""
         self.images = images
@@ -268,7 +268,7 @@ class LossFunctionStress:
                 if self.energy_per_atom:
                     c *= self.inverse_numbers_of_atoms[i] ** 2
             loss_cnf += c * np.sum((f(target - result)) ** 2)
-        loss_all = self.comm.allreduce(loss_cnf, op=MPI.SUM)
+        loss_all = self.comm.allreduce(loss_cnf)
         return loss_all / ncnf if self.stress_per_conf else loss_all
 
     def jac(self) -> npt.NDArray[np.float64]:
@@ -297,7 +297,7 @@ class LossFunctionStress:
                     c *= self.inverse_numbers_of_atoms[i] ** 2
             dsdp = atoms.calc.engine.jac_stress(atoms).parameters
             jac_cnf += c * 2.0 * np.sum(f(result - target) * dsdp, axis=(-2, -1))
-        self.comm.Allreduce(jac_cnf, jac_all, op=MPI.SUM)
+        self.comm.Allreduce(jac_cnf, jac_all)
         return jac_all / len(self.images) if self.stress_per_conf else jac_all
 
 
@@ -310,7 +310,7 @@ class LossFunctionBase(ABC):
         mtp_data: MTPData,
         setting: LossSetting,
         *,
-        comm: MPI.Comm,
+        comm: DummyMPIComm = world,
     ) -> None:
         """Loss function.
 

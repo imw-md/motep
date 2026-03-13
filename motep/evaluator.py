@@ -6,12 +6,11 @@ import pathlib
 from copy import copy
 from pprint import pformat
 
-from mpi4py import MPI
-
 from motep.calculator import MTP
 from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.loss import ErrorPrinter
+from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
 from motep.setting import load_setting_apply
 from motep.utils import measure_time
@@ -72,7 +71,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("setting")
 
 
-def evaluate_from_setting(filename_setting: str, comm: MPI.Comm) -> None:
+def evaluate_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
     """Evaluate the MTP potential on data from a setting file and print errors.
 
     Parameters
@@ -117,6 +116,5 @@ def evaluate_from_setting(filename_setting: str, comm: MPI.Comm) -> None:
 
 def run(args: argparse.Namespace) -> None:
     """Run."""
-    comm = MPI.COMM_WORLD
-    with measure_time("total", comm):
-        evaluate_from_setting(args.setting, comm)
+    with measure_time("total"):
+        evaluate_from_setting(args.setting, comm=world)

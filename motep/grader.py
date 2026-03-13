@@ -6,12 +6,12 @@ import pathlib
 from pprint import pformat
 
 import numpy as np
-from mpi4py import MPI
 
 import motep.io
 from motep.active import AlgorithmBase, make_algorithm
 from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
+from motep.parallel import DummyMPIComm, world
 from motep.setting import load_setting_grade
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("setting")
 
 
-def grade(filename_setting: str, comm: MPI.Comm) -> None:
+def grade(filename_setting: str, comm: DummyMPIComm) -> None:
     """Grade.
 
     This adds `MV_grade` to `atoms.info`.
@@ -86,5 +86,4 @@ def grade(filename_setting: str, comm: MPI.Comm) -> None:
 
 def run(args: argparse.Namespace) -> None:
     """Run."""
-    comm = MPI.COMM_WORLD
-    grade(args.setting, comm)
+    grade(args.setting, comm=world)

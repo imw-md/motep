@@ -7,12 +7,12 @@ from pprint import pformat
 
 import numpy as np
 from ase import Atoms
-from mpi4py import MPI
 
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
+from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting, load_setting_train
 from motep.utils import measure_time
@@ -37,7 +37,7 @@ class Trainer:
         loss: dict | LossSetting | None = None,
         steps: list[dict] | None = None,
         *,
-        comm: MPI.Comm,
+        comm: DummyMPIComm,
         update_mindist: bool = False,
     ) -> None:
         """Initialize.
@@ -136,7 +136,7 @@ class Trainer:
         return loss
 
 
-def train(filename_setting: str, comm: MPI.Comm) -> None:
+def train(filename_setting: str, comm: DummyMPIComm) -> None:
     """Train."""
     setting = load_setting_train(filename_setting)
     if comm.rank == 0:
@@ -178,6 +178,5 @@ def train(filename_setting: str, comm: MPI.Comm) -> None:
 
 def run(args: argparse.Namespace) -> None:
     """Run."""
-    comm = MPI.COMM_WORLD
     with measure_time("total"):
-        train(args.setting, comm)
+        train(args.setting, comm=world)

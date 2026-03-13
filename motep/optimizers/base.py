@@ -3,9 +3,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from mpi4py import MPI
-
 from motep.loss import LossFunctionBase
+from motep.parallel import DummyMPIComm, world
 
 
 class OptimizerBase(ABC):
@@ -22,7 +21,7 @@ class OptimizerBase(ABC):
         self,
         loss: LossFunctionBase,
         *,
-        comm: MPI.Comm = MPI.COMM_WORLD,
+        comm: DummyMPIComm = world,
         **kwargs: dict[str, Any],
     ) -> None:
         """Initialize the `Optimizer` class.
