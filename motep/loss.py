@@ -419,7 +419,16 @@ class LossFunctionBase(ABC):
 
 
 class ErrorPrinter:
-    """Printer of errors for energy, forces, and stress."""
+    """Printer of errors for energy, forces, and stress.
+
+    Attributes
+    ----------
+    idcs_frc : npt.NDArray[np.int32]
+        Indices of images that have target forces.
+    idcs_str : npt.NDArray[np.int32]
+        Indices of images that have target stress.
+
+    """
 
     def __init__(self, images: list[Atoms]) -> None:
         """Initialize `ErrorPrinter`.
@@ -435,11 +444,11 @@ class ErrorPrinter:
 
         # Calculate indices of images with specific properties
         self.idcs_frc = np.fromiter(
-            (i for i, atoms in enumerate(images) if "forces" in atoms.calc.results),
+            (i for i, atoms in enumerate(images) if "forces" in atoms.calc.targets),
             dtype=int,
         )
         self.idcs_str = np.fromiter(
-            (i for i, atoms in enumerate(images) if "stress" in atoms.calc.results),
+            (i for i, atoms in enumerate(images) if "stress" in atoms.calc.targets),
             dtype=int,
         )
 
