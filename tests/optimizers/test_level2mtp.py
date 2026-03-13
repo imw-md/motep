@@ -6,13 +6,13 @@ import pathlib
 import numpy as np
 import pytest
 from ase import Atoms
-from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers.ideal import NoInteractionOptimizer
 from motep.optimizers.level2mtp import Level2MTPOptimizer
+from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting
 
@@ -71,7 +71,7 @@ def test_without_forces(data_path: pathlib.Path) -> None:
         images,
         mtp_data=mtp_data,
         setting=setting,
-        comm=MPI.COMM_WORLD,
+        comm=world,
         engine=engine,
     )
 
@@ -106,7 +106,7 @@ def test_local_minimum(data_path: pathlib.Path) -> None:
         images,
         mtp_data=mtp_data,
         setting=setting,
-        comm=MPI.COMM_WORLD,
+        comm=world,
         engine=engine,
     )
 
@@ -148,7 +148,7 @@ def test_molecules(
         images,
         mtp_data=mtp_data,
         setting=setting,
-        comm=MPI.COMM_WORLD,
+        comm=world,
         engine=engine,
     )
 
@@ -253,7 +253,7 @@ def test_crystals(
         images,
         mtp_data=mtp_data,
         setting=setting,
-        comm=MPI.COMM_WORLD,
+        comm=world,
         engine=engine,
     )
 
@@ -350,7 +350,7 @@ def test_species_coeffs(
         images,
         mtp_data=mtp_data,
         setting=setting,
-        comm=MPI.COMM_WORLD,
+        comm=world,
         engine="numpy",
     )
 

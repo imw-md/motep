@@ -5,7 +5,6 @@ import pathlib
 import shutil
 from time import perf_counter
 
-import mpi4py
 import numba as nb
 import numpy as np
 from ase import Atoms
@@ -13,8 +12,9 @@ from ase import Atoms
 from motep.calculator import MTP
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
+from motep.parallel import world
 
-comm = mpi4py.MPI.COMM_WORLD
+comm = world
 
 fmt = "{:20s}"
 

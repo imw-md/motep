@@ -5,12 +5,12 @@ import pathlib
 import numpy as np
 import pytest
 from ase import Atoms
-from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss import LossFunction
 from motep.optimizers.scipy import ScipyMinimizeOptimizer
+from motep.parallel import world
 from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting
 
@@ -44,7 +44,7 @@ def test_without_bounds(data_path: pathlib.Path) -> None:
         images,
         mtp_data=mtp_data,
         setting=setting,
-        comm=MPI.COMM_WORLD,
+        comm=world,
         engine=engine,
     )
 
@@ -73,7 +73,7 @@ def test_scaling_vs_jac(data_path: pathlib.Path) -> None:
         images,
         mtp_data=mtp_data,
         setting=setting,
-        comm=MPI.COMM_WORLD,
+        comm=world,
         engine=engine,
     )
 
