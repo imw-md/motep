@@ -18,7 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class LLSOptimizerBase(OptimizerBase):
-    """Abstract base class for `LLSOptimizer` and `Level2MTPOptimizer`.
+    """Abstract base class for linear optimizers.
+
+    - :class:`LLSOptimizer`
+    - :class:`~motep.optimizers.level2mtp.Level2MTPOptimizer`
 
     Attributes
     ----------
@@ -175,11 +178,12 @@ class LLSOptimizerBase(OptimizerBase):
 class LLSOptimizer(LLSOptimizerBase):
     """Optimizer based on linear least squares (LLS).
 
-    Attributes
-    ----------
-    optimized : list[str]
-        Coefficients to be optimized.
-        The elements must be some of `species_coeffs` and `moment_coeffs`.
+    The elements of the ``optimized`` attribute must be:
+
+    - ``species_coeffs``
+    - ``moment_coeffs``
+
+    ``radial_coeffs`` cannot be optimized with this optimizer.
 
     """
 

@@ -16,11 +16,12 @@ logger = logging.getLogger(__name__)
 class Level2MTPOptimizer(LLSOptimizerBase):
     """Optimizer for Level 2 MTP.
 
-    Attributes
-    ----------
-    optimized : list[str]
-        Coefficients to be optimized.
-        The elements must be some of `species_coeffs` and `radial_coeffs`.
+    The elements of the ``optimized`` attribute must be:
+
+    - ``species_coeffs``
+    - ``radial_coeffs``
+
+    ``moment_coeffs`` cannot be optimized with this optimizer.
 
     """
 
