@@ -6,7 +6,7 @@ import pathlib
 import time
 import typing
 
-from mpi4py import MPI
+from motep.parallel import DummyMPIComm, world
 
 
 @contextlib.contextmanager
@@ -28,14 +28,14 @@ def cd(path: str | pathlib.Path) -> typing.Generator:
 
 
 @contextlib.contextmanager
-def measure_time(name: str, comm: MPI.Comm = MPI.COMM_WORLD) -> typing.Generator:
+def measure_time(name: str, *, comm: DummyMPIComm = world) -> typing.Generator:
     """Measure time.
 
     Parameters
     ----------
     name : str
         Name of the block.
-    comm : MPI
+    comm : MPI.Comm
         MPI communicator.
 
     """

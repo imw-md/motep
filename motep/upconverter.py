@@ -4,9 +4,9 @@ import argparse
 from collections import defaultdict
 
 import numpy as np
-from mpi4py import MPI
 
 from motep.io.mlip.mtp import read_mtp, write_mtp
+from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
 from motep.setting import load_setting_upconvert
 
@@ -139,8 +139,6 @@ def upconvert(src: MTPData, dst: MTPData) -> None:
 
 def run(args: argparse.Namespace) -> None:
     """Run."""
-    comm = MPI.COMM_WORLD
-
     setting = load_setting_upconvert(args.setting)
 
     src = read_mtp(setting.potentials.base)
@@ -148,5 +146,5 @@ def run(args: argparse.Namespace) -> None:
 
     upconvert(src, dst)
 
-    if comm.rank == 0:
+    if world.rank == 0:
         write_mtp(setting.potentials.final, dst)

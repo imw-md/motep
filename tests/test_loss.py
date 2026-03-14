@@ -7,11 +7,11 @@ import numpy as np
 import pytest
 from ase import Atoms
 from ase.calculators.singlepoint import SinglePointCalculator
-from mpi4py import MPI
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss import ErrorPrinter, LossFunction, LossFunctionStress
+from motep.parallel import world
 from motep.setting import LossSetting
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ def test_without_forces(*, forces_per_atom: bool, data_path: pathlib.Path) -> No
         images,
         mtp_data=mtp_data,
         setting=setting,
-        comm=MPI.COMM_WORLD,
+        comm=world,
         engine=engine,
     )
 
@@ -106,7 +106,7 @@ def test_jac(
         images,
         mtp_data=mtp_data,
         setting=setting,
-        comm=MPI.COMM_WORLD,
+        comm=world,
         engine=engine,
     )
     loss(mtp_data.parameters)
@@ -171,7 +171,7 @@ def test_stress_weight_scaling() -> None:
         mtp_data=None,
         stress_times_volume=True,
         energy_per_atom=False,
-        comm=MPI.COMM_WORLD,
+        comm=world,
     )
     val_no_epa = loss_no_epa.calculate()
 
@@ -181,7 +181,7 @@ def test_stress_weight_scaling() -> None:
         mtp_data=None,
         stress_times_volume=True,
         energy_per_atom=True,
-        comm=MPI.COMM_WORLD,
+        comm=world,
     )
     val_with_epa = loss_with_epa.calculate()
 
@@ -192,7 +192,7 @@ def test_stress_weight_scaling() -> None:
         images,
         mtp_data=None,
         stress_times_volume=False,
-        comm=MPI.COMM_WORLD,
+        comm=world,
     )
     val_no_stv = loss_no_stv.calculate()
     volume = a**3

@@ -3,9 +3,9 @@
 import logging
 
 from ase import Atoms
-from mpi4py import MPI
 
 import motep.io
+from motep.parallel import DummyMPIComm, world
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ def get_dummy_species(images: list[Atoms]) -> list[int]:
 def read_images(
     filenames: list[str],
     species: list[int] | None = None,
-    comm: MPI.Comm = MPI.COMM_WORLD,
+    comm: DummyMPIComm = world,
     title: str = "data",
 ) -> list[Atoms]:
     """Read images."""
