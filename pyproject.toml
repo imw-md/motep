@@ -3,13 +3,13 @@ build-backend = "mesonpy"
 requires = [
     "meson-python>=0.18.0",
     "setuptools-scm>=8",
-    "numpy>=1.20",
+    "numpy>=2.0",
 ]
 
 [project]
 name = "motep"
 dependencies = [
-    "numpy>=1.20",
+    "numpy>=1.23",  # This supports python 3.11.
     "ase",
     "scipy",
     "numba",

@@ -60,3 +60,37 @@ jobs:
           name: motep-${{ matrix.os }}
           path: dist/*.whl
           retention-days: 5
+  test_built_wheels:
+    name: Test built wheels on ${{ matrix.os }} / numpy=${{ matrix.numpy }}
+    needs: build_wheels
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        numpy:
+          - "==1.23.5"
+          - ">=2,<3"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tests
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Download built wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: motep-${{ matrix.os }}
+          path: dist
+      - name: Install runtime NumPy and test deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "numpy${{ matrix.numpy }}" ase scipy numba jax pytest
+      - name: Install built wheel
+        run: python -m pip install --no-deps dist/*cp311*.whl
+      - name: Run pytest
+        run: |
+          python -m pytest -v tests/test_mtp.py
