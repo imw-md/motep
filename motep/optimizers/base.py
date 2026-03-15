@@ -14,6 +14,12 @@ class OptimizerBase(ABC):
     ----------
     loss : LossFunction
         :class:`motep.loss.LossFunction` object.
+    optimized : list[str]
+        Parameters to be optimized.
+
+        - ``species_coeffs``
+        - ``moment_coeffs``
+        - ``radial_coeffs``
 
     """
 
