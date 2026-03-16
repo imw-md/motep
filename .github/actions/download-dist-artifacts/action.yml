@@ -1,0 +1,20 @@
+name: Download distribution artifacts
+description: Download sdist and wheel artifacts for publishing
+runs:
+  using: composite
+  steps:
+    - name: Download sdist
+      uses: actions/download-artifact@v8
+      with:
+        name: motep-sdist
+        path: dist
+    - name: Download Ubuntu wheels
+      uses: actions/download-artifact@v8
+      with:
+        name: motep-ubuntu-latest
+        path: dist
+    - name: Download macOS wheels
+      uses: actions/download-artifact@v8
+      with:
+        name: motep-macos-latest
+        path: dist
