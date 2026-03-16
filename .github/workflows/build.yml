@@ -11,11 +11,11 @@ jobs:
     name: Build sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Install pypa/build
@@ -38,11 +38,11 @@ jobs:
           - ubuntu-latest
           - macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Install cibuildwheel
@@ -55,7 +55,7 @@ jobs:
             python -c "from motep.potentials.mtp.cext import _mtp_cext"
         run: python -m cibuildwheel --output-dir dist
       - name: Upload built wheels as artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: motep-${{ matrix.os }}
           path: dist/*.whl
@@ -74,14 +74,14 @@ jobs:
           - "==1.23.5"
           - ">=2,<3"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: tests
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Download built wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: motep-${{ matrix.os }}
           path: dist
