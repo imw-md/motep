@@ -59,6 +59,8 @@ motep = "motep.__init__:main"
 find = {}
 
 [tool.setuptools_scm]
+version_scheme = "no-guess-dev"
+local_scheme = "no-local-version"
 
 [tool.ruff.lint]
 preview = true  # necessary to activate many pycodestyle rules
