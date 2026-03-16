@@ -46,6 +46,11 @@ mpi = ["mpi4py"]
 jax = [
   "jax",
 ]
+doc = [
+  "sphinx",
+  "sphinx_book_theme",
+  "numpydoc",
+]
 
 [project.scripts]
 motep = "motep.__init__:main"
