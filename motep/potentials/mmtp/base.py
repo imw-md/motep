@@ -50,7 +50,7 @@ class MagMomentBasisData(MagModeBase, MomentBasisData):
         """Initialize moment basis properties."""
         spc = mtp_data.species_count
         rfc = mtp_data.radial_funcs_count
-        nrb = mtp_data.radial_basis_size * mtp_data.mag_basis_size**2
+        nrb = mtp_data.radial_basis.size * mtp_data.magnetic_basis.size**2
         asm = mtp_data.alpha_scalar_moments
 
         self.vatoms = np.full((asm, natoms), np.nan)
@@ -87,7 +87,7 @@ class MagRadialBasisData(MagModeBase, RadialBasisData):
     Notes
     -----
     `nrb` is the combined radial basis size, which is the product of
-    `radial_basis_size` and `mag_basis_size**2`.
+    `radial_basis.size` and `magnetic_basis.size**2`.
     """
 
     dqdmis: npt.NDArray[np.float64] | None = None
@@ -95,7 +95,7 @@ class MagRadialBasisData(MagModeBase, RadialBasisData):
     def initialize(self, natoms: int, mtp_data: MagMTPData) -> None:
         """Initialize radial basis properties."""
         spc = mtp_data.species_count
-        nrb = mtp_data.radial_basis_size * mtp_data.mag_basis_size**2
+        nrb = mtp_data.radial_basis.size * mtp_data.magnetic_basis.size**2
 
         if "train" in self.mode:
             self.values = np.full((spc, spc, nrb), np.nan)

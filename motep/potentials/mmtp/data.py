@@ -49,41 +49,10 @@ class MagMTPData(MTPData):
             default = self.__dataclass_fields__["magnetic_basis"].default_factory()
             self.magnetic_basis = replace(default, **self.magnetic_basis)
 
-    # Backward-compatible properties
-    @property
-    def mag_basis_size(self) -> int:
-        """Get magnetic basis size."""
-        return self.magnetic_basis.size
-
-    @mag_basis_size.setter
-    def mag_basis_size(self, value: int) -> None:
-        """Set magnetic basis size."""
-        self.magnetic_basis.size = np.int32(value)
-
-    @property
-    def min_mag(self) -> float:
-        """Get minimum magnetic value."""
-        return float(self.magnetic_basis.min)
-
-    @min_mag.setter
-    def min_mag(self, value: float | np.float64) -> None:
-        """Set minimum magnetic value."""
-        self.magnetic_basis.min = np.float64(value)
-
-    @property
-    def max_mag(self) -> float:
-        """Get maximum magnetic value."""
-        return float(self.magnetic_basis.max)
-
-    @max_mag.setter
-    def max_mag(self, value: float | np.float64) -> None:
-        """Set maximum magnetic value."""
-        self.magnetic_basis.max = np.float64(value)
-
     def initialize(self, rng: np.random.Generator) -> None:
         """Initialize MTP parameters.
 
-        Ensures ``radial_basis_size`` is the combined value ``rbs * mbs²`` and
+        Ensures ``radial_basis.size`` is the combined value ``rbs * mbs²`` and
         creates ``radial_coeffs`` with the correct combined shape.
         """
         if self.species_coeffs is None:
@@ -93,8 +62,8 @@ class MagMTPData(MTPData):
         if self.radial_coeffs is None:
             spc = self.species_count
             rfc = self.radial_funcs_count
-            mbs = self.mag_basis_size
-            rbs_combined = self.radial_basis_size * mbs * mbs
+            mbs = self.magnetic_basis.size
+            rbs_combined = self.radial_basis.size * mbs * mbs
             self.radial_coeffs = rng.uniform(-0.1, +0.1, (spc, spc, rfc, rbs_combined))
 
     @property
@@ -123,7 +92,7 @@ class MagMTPData(MTPData):
         """
         species_count = self.species_count
         rfc = self.radial_funcs_count
-        nrb = self.radial_basis_size * self.mag_basis_size**2
+        nrb = self.radial_basis.size * self.magnetic_basis.size**2
         asm = self.alpha_scalar_moments
 
         n = 0
@@ -146,7 +115,7 @@ class MagMTPData(MTPData):
         """Get number of parameters optimized."""
         species_count = self.species_count
         rfc = self.radial_funcs_count
-        nrb = self.radial_basis_size * self.mag_basis_size**2
+        nrb = self.radial_basis.size * self.magnetic_basis.size**2
         asm = self.alpha_scalar_moments
         n = 0
         if "scaling" in self.optimized:

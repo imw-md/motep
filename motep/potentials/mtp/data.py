@@ -83,47 +83,6 @@ class MTPData:
             default = self.__dataclass_fields__["radial_basis"].default_factory()
             self.radial_basis = replace(default, **self.radial_basis)
 
-    # Backward-compatible properties
-    @property
-    def radial_basis_type(self) -> str:
-        """Get radial basis type."""
-        return self.radial_basis.type
-
-    @radial_basis_type.setter
-    def radial_basis_type(self, value: str) -> None:
-        """Set radial basis type."""
-        self.radial_basis.type = value
-
-    @property
-    def min_dist(self) -> np.float64:
-        """Get minimum distance."""
-        return self.radial_basis.min
-
-    @min_dist.setter
-    def min_dist(self, value: float | np.float64) -> None:
-        """Set minimum distance."""
-        self.radial_basis.min = np.float64(value)
-
-    @property
-    def max_dist(self) -> np.float64:
-        """Get maximum distance."""
-        return self.radial_basis.max
-
-    @max_dist.setter
-    def max_dist(self, value: float | np.float64) -> None:
-        """Set maximum distance."""
-        self.radial_basis.max = np.float64(value)
-
-    @property
-    def radial_basis_size(self) -> np.int32:
-        """Get radial basis size."""
-        return self.radial_basis.size
-
-    @radial_basis_size.setter
-    def radial_basis_size(self, value: int) -> None:
-        """Set radial basis size."""
-        self.radial_basis.size = np.int32(value)
-
     def initialize(self, rng: np.random.Generator) -> None:
         """Initialize MTP parameters.
 
@@ -140,7 +99,7 @@ class MTPData:
         if self.radial_coeffs is None:
             spc = self.species_count
             rfc = self.radial_funcs_count
-            rbs = self.radial_basis_size
+            rbs = self.radial_basis.size
             self.radial_coeffs = rng.uniform(-0.1, +0.1, (spc, spc, rfc, rbs))
 
     @property
@@ -179,7 +138,7 @@ class MTPData:
         """
         species_count = self.species_count
         rfc = self.radial_funcs_count
-        rbs = self.radial_basis_size
+        rbs = self.radial_basis.size
         asm = self.alpha_scalar_moments
 
         n = 0
@@ -202,7 +161,7 @@ class MTPData:
         """Get number of parameters optimized."""
         species_count = self.species_count
         rfc = self.radial_funcs_count
-        rbs = self.radial_basis_size
+        rbs = self.radial_basis.size
         asm = self.alpha_scalar_moments
         n = 0
         if "scaling" in self.optimized:

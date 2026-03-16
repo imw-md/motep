@@ -66,8 +66,17 @@ static PyObject *py_calc_run(PyObject *self, PyObject *args, PyObject *kwargs)
 
     /* Extract parameters from mtp_data object */
     PyObject *scaling_obj = PyObject_GetAttrString(mtp_data_obj, "scaling");
-    PyObject *min_dist_obj = PyObject_GetAttrString(mtp_data_obj, "min_dist");
-    PyObject *max_dist_obj = PyObject_GetAttrString(mtp_data_obj, "max_dist");
+    PyObject *radial_basis_obj = PyObject_GetAttrString(mtp_data_obj, "radial_basis");
+    PyObject *min_dist_obj = NULL;
+    PyObject *max_dist_obj = NULL;
+    
+    if (radial_basis_obj)
+    {
+        min_dist_obj = PyObject_GetAttrString(radial_basis_obj, "min");
+        max_dist_obj = PyObject_GetAttrString(radial_basis_obj, "max");
+        Py_DECREF(radial_basis_obj);
+    }
+    
     PyObject *radial_coeffs_obj = PyObject_GetAttrString(mtp_data_obj, "radial_coeffs");
     PyObject *species_coeffs_obj = PyObject_GetAttrString(mtp_data_obj, "species_coeffs");
     PyObject *species_count_obj = PyObject_GetAttrString(mtp_data_obj, "species_count");
@@ -299,8 +308,17 @@ static PyObject *py_calc_train(PyObject *self, PyObject *args, PyObject *kwargs)
 
     /* Extract parameters from mtp_data (same as calc_run) */
     PyObject *scaling_obj = PyObject_GetAttrString(mtp_data_obj, "scaling");
-    PyObject *min_dist_obj = PyObject_GetAttrString(mtp_data_obj, "min_dist");
-    PyObject *max_dist_obj = PyObject_GetAttrString(mtp_data_obj, "max_dist");
+    PyObject *radial_basis_obj = PyObject_GetAttrString(mtp_data_obj, "radial_basis");
+    PyObject *min_dist_obj = NULL;
+    PyObject *max_dist_obj = NULL;
+    
+    if (radial_basis_obj)
+    {
+        min_dist_obj = PyObject_GetAttrString(radial_basis_obj, "min");
+        max_dist_obj = PyObject_GetAttrString(radial_basis_obj, "max");
+        Py_DECREF(radial_basis_obj);
+    }
+    
     PyObject *radial_coeffs_obj = PyObject_GetAttrString(mtp_data_obj, "radial_coeffs");
     PyObject *species_coeffs_obj = PyObject_GetAttrString(mtp_data_obj, "species_coeffs");
     PyObject *species_count_obj = PyObject_GetAttrString(mtp_data_obj, "species_count");

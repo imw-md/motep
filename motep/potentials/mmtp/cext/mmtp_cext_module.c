@@ -64,11 +64,30 @@ static PyObject *py_calc_mag_run(PyObject *self, PyObject *args, PyObject *kwarg
     }
 
     PyObject *scaling_obj = PyObject_GetAttrString(mtp_data_obj, "scaling");
-    PyObject *min_dist_obj = PyObject_GetAttrString(mtp_data_obj, "min_dist");
-    PyObject *max_dist_obj = PyObject_GetAttrString(mtp_data_obj, "max_dist");
-    PyObject *min_mag_obj = PyObject_GetAttrString(mtp_data_obj, "min_mag");
-    PyObject *max_mag_obj = PyObject_GetAttrString(mtp_data_obj, "max_mag");
-    PyObject *mag_basis_size_obj = PyObject_GetAttrString(mtp_data_obj, "mag_basis_size");
+    PyObject *radial_basis_obj = PyObject_GetAttrString(mtp_data_obj, "radial_basis");
+    PyObject *magnetic_basis_obj = PyObject_GetAttrString(mtp_data_obj, "magnetic_basis");
+    PyObject *min_dist_obj = NULL;
+    PyObject *max_dist_obj = NULL;
+    PyObject *min_mag_obj = NULL;
+    PyObject *max_mag_obj = NULL;
+    PyObject *mag_basis_size_obj = NULL;
+    PyObject *radial_basis_size_obj = NULL;
+
+    if (radial_basis_obj)
+    {
+        min_dist_obj = PyObject_GetAttrString(radial_basis_obj, "min");
+        max_dist_obj = PyObject_GetAttrString(radial_basis_obj, "max");
+        radial_basis_size_obj = PyObject_GetAttrString(radial_basis_obj, "size");
+        Py_DECREF(radial_basis_obj);
+    }
+    if (magnetic_basis_obj)
+    {
+        min_mag_obj = PyObject_GetAttrString(magnetic_basis_obj, "min");
+        max_mag_obj = PyObject_GetAttrString(magnetic_basis_obj, "max");
+        mag_basis_size_obj = PyObject_GetAttrString(magnetic_basis_obj, "size");
+        Py_DECREF(magnetic_basis_obj);
+    }
+
     PyObject *radial_coeffs_obj = PyObject_GetAttrString(mtp_data_obj, "radial_coeffs");
     PyObject *species_coeffs_obj = PyObject_GetAttrString(mtp_data_obj, "species_coeffs");
     PyObject *species_count_obj = PyObject_GetAttrString(mtp_data_obj, "species_count");
@@ -82,7 +101,7 @@ static PyObject *py_calc_mag_run(PyObject *self, PyObject *args, PyObject *kwarg
     PyObject *moment_coeffs_obj = PyObject_GetAttrString(mtp_data_obj, "moment_coeffs");
 
     if (!scaling_obj || !min_dist_obj || !max_dist_obj || !min_mag_obj || !max_mag_obj ||
-        !mag_basis_size_obj || !radial_coeffs_obj || !species_coeffs_obj || !species_count_obj ||
+        !mag_basis_size_obj || !radial_basis_size_obj || !radial_coeffs_obj || !species_coeffs_obj || !species_count_obj ||
         !radial_funcs_count_obj || !alpha_moments_count_obj || !alpha_moment_mapping_obj ||
         !alpha_index_basic_obj || !alpha_index_basic_count_obj || !alpha_index_times_obj ||
         !alpha_index_times_count_obj || !moment_coeffs_obj)
@@ -93,6 +112,7 @@ static PyObject *py_calc_mag_run(PyObject *self, PyObject *args, PyObject *kwarg
         Py_XDECREF(min_mag_obj);
         Py_XDECREF(max_mag_obj);
         Py_XDECREF(mag_basis_size_obj);
+        Py_XDECREF(radial_basis_size_obj);
         Py_XDECREF(radial_coeffs_obj);
         Py_XDECREF(species_coeffs_obj);
         Py_XDECREF(species_count_obj);
@@ -141,6 +161,7 @@ static PyObject *py_calc_mag_run(PyObject *self, PyObject *args, PyObject *kwarg
         Py_DECREF(min_mag_obj);
         Py_DECREF(max_mag_obj);
         Py_DECREF(mag_basis_size_obj);
+        Py_XDECREF(radial_basis_size_obj);
         Py_DECREF(radial_coeffs_obj);
         Py_DECREF(species_coeffs_obj);
         Py_DECREF(species_count_obj);
@@ -174,6 +195,7 @@ static PyObject *py_calc_mag_run(PyObject *self, PyObject *args, PyObject *kwarg
         Py_DECREF(min_mag_obj);
         Py_DECREF(max_mag_obj);
         Py_DECREF(mag_basis_size_obj);
+        Py_XDECREF(radial_basis_size_obj);
         Py_DECREF(radial_coeffs_obj);
         Py_DECREF(species_coeffs_obj);
         Py_DECREF(species_count_obj);
@@ -190,11 +212,7 @@ static PyObject *py_calc_mag_run(PyObject *self, PyObject *args, PyObject *kwarg
 
     int n_atoms = (int)PyArray_DIM(rs_arr, 0);
     int n_neighbors = (int)PyArray_DIM(rs_arr, 1);
-    int radial_basis_size = (int)PyArray_DIM(radial_coeffs_arr, 3);
-    if (mag_basis_size > 0)
-    {
-        radial_basis_size = radial_basis_size / (mag_basis_size * mag_basis_size);
-    }
+    int radial_basis_size = (int)PyLong_AsLong(radial_basis_size_obj);
     int n_alpha_scalar = (int)PyArray_DIM(alpha_moment_mapping_arr, 0);
 
     npy_intp dims_energy[1] = {n_atoms};
@@ -233,6 +251,7 @@ static PyObject *py_calc_mag_run(PyObject *self, PyObject *args, PyObject *kwarg
         Py_DECREF(min_mag_obj);
         Py_DECREF(max_mag_obj);
         Py_DECREF(mag_basis_size_obj);
+        Py_XDECREF(radial_basis_size_obj);
         Py_DECREF(radial_coeffs_obj);
         Py_DECREF(species_coeffs_obj);
         Py_DECREF(species_count_obj);
@@ -287,6 +306,7 @@ static PyObject *py_calc_mag_run(PyObject *self, PyObject *args, PyObject *kwarg
     Py_DECREF(min_mag_obj);
     Py_DECREF(max_mag_obj);
     Py_DECREF(mag_basis_size_obj);
+    Py_XDECREF(radial_basis_size_obj);
     Py_DECREF(species_count_obj);
     Py_DECREF(radial_funcs_count_obj);
     Py_DECREF(alpha_moments_count_obj);
@@ -398,11 +418,30 @@ static PyObject *py_calc_mag_train(PyObject *self, PyObject *args, PyObject *kwa
     }
 
     PyObject *scaling_obj = PyObject_GetAttrString(mtp_data_obj, "scaling");
-    PyObject *min_dist_obj = PyObject_GetAttrString(mtp_data_obj, "min_dist");
-    PyObject *max_dist_obj = PyObject_GetAttrString(mtp_data_obj, "max_dist");
-    PyObject *min_mag_obj = PyObject_GetAttrString(mtp_data_obj, "min_mag");
-    PyObject *max_mag_obj = PyObject_GetAttrString(mtp_data_obj, "max_mag");
-    PyObject *mag_basis_size_obj = PyObject_GetAttrString(mtp_data_obj, "mag_basis_size");
+    PyObject *radial_basis_obj = PyObject_GetAttrString(mtp_data_obj, "radial_basis");
+    PyObject *magnetic_basis_obj = PyObject_GetAttrString(mtp_data_obj, "magnetic_basis");
+    PyObject *min_dist_obj = NULL;
+    PyObject *max_dist_obj = NULL;
+    PyObject *min_mag_obj = NULL;
+    PyObject *max_mag_obj = NULL;
+    PyObject *mag_basis_size_obj = NULL;
+    PyObject *radial_basis_size_obj = NULL;
+
+    if (radial_basis_obj)
+    {
+        min_dist_obj = PyObject_GetAttrString(radial_basis_obj, "min");
+        max_dist_obj = PyObject_GetAttrString(radial_basis_obj, "max");
+        radial_basis_size_obj = PyObject_GetAttrString(radial_basis_obj, "size");
+        Py_DECREF(radial_basis_obj);
+    }
+    if (magnetic_basis_obj)
+    {
+        min_mag_obj = PyObject_GetAttrString(magnetic_basis_obj, "min");
+        max_mag_obj = PyObject_GetAttrString(magnetic_basis_obj, "max");
+        mag_basis_size_obj = PyObject_GetAttrString(magnetic_basis_obj, "size");
+        Py_DECREF(magnetic_basis_obj);
+    }
+
     PyObject *radial_coeffs_obj = PyObject_GetAttrString(mtp_data_obj, "radial_coeffs");
     PyObject *species_coeffs_obj = PyObject_GetAttrString(mtp_data_obj, "species_coeffs");
     PyObject *species_count_obj = PyObject_GetAttrString(mtp_data_obj, "species_count");
@@ -416,11 +455,29 @@ static PyObject *py_calc_mag_train(PyObject *self, PyObject *args, PyObject *kwa
     PyObject *moment_coeffs_obj = PyObject_GetAttrString(mtp_data_obj, "moment_coeffs");
 
     if (!scaling_obj || !min_dist_obj || !max_dist_obj || !min_mag_obj || !max_mag_obj ||
-        !mag_basis_size_obj || !radial_coeffs_obj || !species_coeffs_obj || !species_count_obj ||
+        !mag_basis_size_obj || !radial_basis_size_obj || !radial_coeffs_obj || !species_coeffs_obj || !species_count_obj ||
         !radial_funcs_count_obj || !alpha_moments_count_obj || !alpha_moment_mapping_obj ||
         !alpha_index_basic_obj || !alpha_index_basic_count_obj || !alpha_index_times_obj ||
         !alpha_index_times_count_obj || !moment_coeffs_obj)
     {
+        Py_XDECREF(scaling_obj);
+        Py_XDECREF(min_dist_obj);
+        Py_XDECREF(max_dist_obj);
+        Py_XDECREF(min_mag_obj);
+        Py_XDECREF(max_mag_obj);
+        Py_XDECREF(mag_basis_size_obj);
+        Py_XDECREF(radial_basis_size_obj);
+        Py_XDECREF(radial_coeffs_obj);
+        Py_XDECREF(species_coeffs_obj);
+        Py_XDECREF(species_count_obj);
+        Py_XDECREF(radial_funcs_count_obj);
+        Py_XDECREF(alpha_moments_count_obj);
+        Py_XDECREF(alpha_moment_mapping_obj);
+        Py_XDECREF(alpha_index_basic_obj);
+        Py_XDECREF(alpha_index_basic_count_obj);
+        Py_XDECREF(alpha_index_times_obj);
+        Py_XDECREF(alpha_index_times_count_obj);
+        Py_XDECREF(moment_coeffs_obj);
         return NULL;
     }
 
@@ -468,16 +525,13 @@ static PyObject *py_calc_mag_train(PyObject *self, PyObject *args, PyObject *kwa
         Py_DECREF(alpha_index_basic_arr);
         Py_DECREF(alpha_index_times_arr);
         Py_DECREF(moment_coeffs_arr);
+        Py_XDECREF(radial_basis_size_obj);
         return NULL;
     }
 
     int n_atoms = (int)PyArray_DIM(rs_arr, 0);
     int n_neighbors = (int)PyArray_DIM(rs_arr, 1);
-    int radial_basis_size = (int)PyArray_DIM(radial_coeffs_arr, 3);
-    if (mag_basis_size > 0)
-    {
-        radial_basis_size = radial_basis_size / (mag_basis_size * mag_basis_size);
-    }
+    int radial_basis_size = (int)PyLong_AsLong(radial_basis_size_obj);
     int n_alpha_scalar = (int)PyArray_DIM(alpha_moment_mapping_arr, 0);
 
     PyObject *rbd_values_obj = PyObject_GetAttrString(rbd_obj, "values");
@@ -510,6 +564,7 @@ static PyObject *py_calc_mag_train(PyObject *self, PyObject *args, PyObject *kwa
         Py_DECREF(alpha_index_basic_arr);
         Py_DECREF(alpha_index_times_arr);
         Py_DECREF(moment_coeffs_arr);
+        Py_XDECREF(radial_basis_size_obj);
         Py_XDECREF(rbd_values_arr);
         Py_XDECREF(rbd_dqdris_arr);
         Py_XDECREF(rbd_dqdeps_arr);
@@ -547,6 +602,7 @@ static PyObject *py_calc_mag_train(PyObject *self, PyObject *args, PyObject *kwa
         Py_DECREF(mbd_dedcs_arr);
         Py_DECREF(mbd_dgdcs_arr);
         Py_DECREF(mbd_dsdcs_arr);
+        Py_XDECREF(radial_basis_size_obj);
         return NULL;
     }
 
@@ -645,6 +701,9 @@ static PyObject *py_calc_mag_train(PyObject *self, PyObject *args, PyObject *kwa
     Py_DECREF(mbd_dedcs_obj);
     Py_DECREF(mbd_dgdcs_obj);
     Py_DECREF(mbd_dsdcs_obj);
+    Py_DECREF(radial_coeffs_obj);
+    Py_DECREF(species_coeffs_obj);
+    Py_XDECREF(radial_basis_size_obj);
 
     return (PyObject *)energies_arr;
 }
@@ -675,11 +734,30 @@ static PyObject *py_calc_mag_train_mgrad(PyObject *self, PyObject *args, PyObjec
     }
 
     PyObject *scaling_obj = PyObject_GetAttrString(mtp_data_obj, "scaling");
-    PyObject *min_dist_obj = PyObject_GetAttrString(mtp_data_obj, "min_dist");
-    PyObject *max_dist_obj = PyObject_GetAttrString(mtp_data_obj, "max_dist");
-    PyObject *min_mag_obj = PyObject_GetAttrString(mtp_data_obj, "min_mag");
-    PyObject *max_mag_obj = PyObject_GetAttrString(mtp_data_obj, "max_mag");
-    PyObject *mag_basis_size_obj = PyObject_GetAttrString(mtp_data_obj, "mag_basis_size");
+    PyObject *radial_basis_obj = PyObject_GetAttrString(mtp_data_obj, "radial_basis");
+    PyObject *magnetic_basis_obj = PyObject_GetAttrString(mtp_data_obj, "magnetic_basis");
+    PyObject *min_dist_obj = NULL;
+    PyObject *max_dist_obj = NULL;
+    PyObject *min_mag_obj = NULL;
+    PyObject *max_mag_obj = NULL;
+    PyObject *mag_basis_size_obj = NULL;
+    PyObject *radial_basis_size_obj = NULL;
+
+    if (radial_basis_obj)
+    {
+        min_dist_obj = PyObject_GetAttrString(radial_basis_obj, "min");
+        max_dist_obj = PyObject_GetAttrString(radial_basis_obj, "max");
+        radial_basis_size_obj = PyObject_GetAttrString(radial_basis_obj, "size");
+        Py_DECREF(radial_basis_obj);
+    }
+    if (magnetic_basis_obj)
+    {
+        min_mag_obj = PyObject_GetAttrString(magnetic_basis_obj, "min");
+        max_mag_obj = PyObject_GetAttrString(magnetic_basis_obj, "max");
+        mag_basis_size_obj = PyObject_GetAttrString(magnetic_basis_obj, "size");
+        Py_DECREF(magnetic_basis_obj);
+    }
+
     PyObject *radial_coeffs_obj = PyObject_GetAttrString(mtp_data_obj, "radial_coeffs");
     PyObject *species_coeffs_obj = PyObject_GetAttrString(mtp_data_obj, "species_coeffs");
     PyObject *species_count_obj = PyObject_GetAttrString(mtp_data_obj, "species_count");
@@ -698,6 +776,26 @@ static PyObject *py_calc_mag_train_mgrad(PyObject *self, PyObject *args, PyObjec
         !alpha_index_basic_obj || !alpha_index_basic_count_obj || !alpha_index_times_obj ||
         !alpha_index_times_count_obj || !moment_coeffs_obj)
     {
+        Py_XDECREF(scaling_obj);
+        Py_XDECREF(min_dist_obj);
+        Py_XDECREF(max_dist_obj);
+        Py_XDECREF(min_mag_obj);
+        Py_XDECREF(max_mag_obj);
+        Py_XDECREF(mag_basis_size_obj);
+        Py_XDECREF(radial_basis_size_obj);
+        Py_XDECREF(radial_coeffs_obj);
+        Py_XDECREF(species_coeffs_obj);
+        Py_XDECREF(species_count_obj);
+        Py_XDECREF(radial_funcs_count_obj);
+        Py_XDECREF(alpha_moments_count_obj);
+        Py_XDECREF(alpha_moment_mapping_obj);
+        Py_XDECREF(alpha_index_basic_obj);
+        Py_XDECREF(alpha_index_basic_count_obj);
+        Py_XDECREF(alpha_index_times_obj);
+        Py_XDECREF(alpha_index_times_count_obj);
+        Py_XDECREF(moment_coeffs_obj);
+        Py_XDECREF(rbd_obj);
+        Py_XDECREF(mbd_obj);
         return NULL;
     }
 
@@ -745,16 +843,32 @@ static PyObject *py_calc_mag_train_mgrad(PyObject *self, PyObject *args, PyObjec
         Py_DECREF(alpha_index_basic_arr);
         Py_DECREF(alpha_index_times_arr);
         Py_DECREF(moment_coeffs_arr);
+        Py_XDECREF(radial_basis_size_obj);
+        Py_DECREF(scaling_obj);
+        Py_DECREF(min_dist_obj);
+        Py_DECREF(max_dist_obj);
+        Py_DECREF(min_mag_obj);
+        Py_DECREF(max_mag_obj);
+        Py_DECREF(mag_basis_size_obj);
+        Py_DECREF(radial_coeffs_obj);
+        Py_DECREF(species_coeffs_obj);
+        Py_DECREF(species_count_obj);
+        Py_DECREF(radial_funcs_count_obj);
+        Py_DECREF(alpha_moments_count_obj);
+        Py_DECREF(alpha_moment_mapping_obj);
+        Py_DECREF(alpha_index_basic_obj);
+        Py_DECREF(alpha_index_basic_count_obj);
+        Py_DECREF(alpha_index_times_obj);
+        Py_DECREF(alpha_index_times_count_obj);
+        Py_DECREF(moment_coeffs_obj);
+        Py_DECREF(rbd_obj);
+        Py_DECREF(mbd_obj);
         return NULL;
     }
 
     int n_atoms = (int)PyArray_DIM(rs_arr, 0);
     int n_neighbors = (int)PyArray_DIM(rs_arr, 1);
-    int radial_basis_size = (int)PyArray_DIM(radial_coeffs_arr, 3);
-    if (mag_basis_size > 0)
-    {
-        radial_basis_size = radial_basis_size / (mag_basis_size * mag_basis_size);
-    }
+    int radial_basis_size = (int)PyLong_AsLong(radial_basis_size_obj);
     int n_alpha_scalar = (int)PyArray_DIM(alpha_moment_mapping_arr, 0);
 
     PyObject *rbd_values_obj = PyObject_GetAttrString(rbd_obj, "values");
@@ -793,6 +907,7 @@ static PyObject *py_calc_mag_train_mgrad(PyObject *self, PyObject *args, PyObjec
         Py_DECREF(alpha_index_basic_arr);
         Py_DECREF(alpha_index_times_arr);
         Py_DECREF(moment_coeffs_arr);
+        Py_XDECREF(radial_basis_size_obj);
         Py_XDECREF(rbd_values_arr);
         Py_XDECREF(rbd_dqdris_arr);
         Py_XDECREF(rbd_dqdmis_arr);
@@ -839,6 +954,7 @@ static PyObject *py_calc_mag_train_mgrad(PyObject *self, PyObject *args, PyObjec
         Py_DECREF(mbd_dgdcs_arr);
         Py_DECREF(mbd_dgmdcs_arr);
         Py_DECREF(mbd_dsdcs_arr);
+        Py_XDECREF(radial_basis_size_obj);
         return NULL;
     }
 
@@ -949,6 +1065,7 @@ static PyObject *py_calc_mag_train_mgrad(PyObject *self, PyObject *args, PyObjec
     Py_DECREF(mbd_dgdcs_obj);
     Py_DECREF(mbd_dgmdcs_obj);
     Py_DECREF(mbd_dsdcs_obj);
+    Py_XDECREF(radial_basis_size_obj);
 
     return (PyObject *)energies_arr;
 }
