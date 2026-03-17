@@ -50,12 +50,12 @@ class MomentBasisData(ModeBase):
 
     mode: str = field(default="run")
 
-    values: npt.NDArray[np.float64] | None = None
-    dbdris: npt.NDArray[np.float64] | None = None
-    dbdeps: npt.NDArray[np.float64] | None = None
-    dedcs: npt.NDArray[np.float64] | None = None
-    dgdcs: npt.NDArray[np.float64] | None = None
-    dsdcs: npt.NDArray[np.float64] | None = None
+    values: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
+    dbdris: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
+    dbdeps: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
+    dedcs: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
+    dgdcs: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
+    dsdcs: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
 
     def initialize(self, natoms: int, mtp_data: MTPData) -> None:
         """Initialize moment basis properties."""
@@ -98,9 +98,9 @@ class RadialBasisData(ModeBase):
 
     mode: str = field(default="run")
 
-    values: npt.NDArray[np.float64] | None = None
-    dqdris: npt.NDArray[np.float64] | None = None
-    dqdeps: npt.NDArray[np.float64] | None = None
+    values: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
+    dqdris: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
+    dqdeps: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
 
     def initialize(self, natoms: int, mtp_data: MTPData) -> None:
         """Initialize radial basis properties."""
