@@ -550,7 +550,12 @@ class ErrorPrinter:
 class LossFunction(LossFunctionBase):
     """Loss function."""
 
-    def __init__(self, *args: tuple, engine: str, **kwargs: dict) -> None:
+    def __init__(
+        self,
+        *args: tuple,
+        engine: str = "cext",
+        **kwargs: dict,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.engine = engine
         for atoms in self.images:

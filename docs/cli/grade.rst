@@ -22,7 +22,6 @@ Usage
     potential_final = 'final.mtp'
 
     seed = 42  # random seed
-    engine = 'cext'
 
     # grade
     algorithm = 'maxvol'  # {'maxvol', 'exaustive'}

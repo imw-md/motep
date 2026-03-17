@@ -2,7 +2,6 @@ configurations = ['training.cfg']
 potential_initial = 'initial.mtp'
 potential_final = 'pot.mtp'
 seed = 42
-engine = 'numba'
 
 [loss]
 energy_weight = 1.0

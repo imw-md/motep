@@ -7,7 +7,7 @@ from motep.potentials.mtp.base import EngineBase
 from motep.potentials.mtp.data import MTPData
 
 
-def make_mtp_engine(engine: str = "numpy") -> EngineBase:
+def make_mtp_engine(engine: str = "cext") -> EngineBase:
     if engine == "numpy":
         from motep.potentials.mtp.numpy.engine import NumpyMTPEngine
 
@@ -42,7 +42,7 @@ class MTP(Calculator):
         self,
         mtp_data: MTPData,
         *args,
-        engine: str = "numpy",
+        engine: str = "cext",
         mode: str = "run",
         **kwargs,
     ) -> None:

@@ -12,7 +12,7 @@ from motep.io.mlip.mtp import read_mtp
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers.ideal import NoInteractionOptimizer
 from motep.optimizers.level2mtp import Level2MTPOptimizer
-from motep.parallel import DummyMPIComm, world
+from motep.parallel import world
 from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting
 
@@ -90,7 +90,7 @@ def test_local_minimum(data_path: pathlib.Path) -> None:
     """Test if the optimized parameters correspond to the local minimum."""
     crystal = "multi"  # test with multiple species
     level = 2
-    engine = "numba"
+    engine = "cext"
     images, mtp_data = make_crystals(crystal, level, data_path)
     images = images[::100]
 
@@ -126,7 +126,7 @@ def test_local_minimum(data_path: pathlib.Path) -> None:
 
 @pytest.mark.parametrize("level", [2, 4, 6])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
-@pytest.mark.parametrize("engine", ["numpy", "numba"])
+@pytest.mark.parametrize("engine", ["cext", "numba"])
 def test_molecules(
     engine: str,
     molecule: int,
@@ -213,7 +213,7 @@ def test_molecules(
 )
 @pytest.mark.parametrize("level", [2, 4])
 @pytest.mark.parametrize("crystal", ["noncubic", "size"])
-@pytest.mark.parametrize("engine", ["numpy"])
+@pytest.mark.parametrize("engine", ["cext"])
 def test_crystals(
     *,
     engine: str,
@@ -351,7 +351,7 @@ def test_species_coeffs(
         mtp_data=mtp_data,
         setting=setting,
         comm=world,
-        engine="numpy",
+        engine="cext",
     )
 
     optimizer = NoInteractionOptimizer(loss)

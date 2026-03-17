@@ -33,7 +33,7 @@ class Trainer:
         mtp_data: MTPData,
         seed: int | None = None,
         rng: np.random.Generator | None = None,
-        engine: str = "numba",
+        engine: str = "cext",
         loss: dict | LossSetting | None = None,
         steps: list[dict] | None = None,
         *,
