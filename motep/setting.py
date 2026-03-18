@@ -110,6 +110,7 @@ class ApplySetting(Setting):
 class GradeSetting(Setting):
     """Setting for the extrapolation-grade calculations."""
 
+    mode: str = "configuration"
     algorithm: str = "maxvol"
     maxiter: int = 100_000
 
