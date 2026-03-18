@@ -28,7 +28,7 @@ def read_images(
     images = []
     if comm.rank == 0:
         logger.info(f"{'':=^72s}\n")
-        logger.info(f"[{title}]")
+        logger.info("[%s]", title)
         for filename in filenames:
             images_local = motep.io.read(filename, species)
             images.extend(images_local)

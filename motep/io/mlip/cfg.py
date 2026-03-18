@@ -234,20 +234,17 @@ def _write_supercell(file: TextIO, atoms: Atoms) -> None:
     file.write(" Supercell\n")
     for vector in atoms.cell:
         file.write("   ")
-        for _ in vector:
-            file.write(f"{_:14.6f}")
+        file.writelines(f"{_:14.6f}" for _ in vector)
         file.write("\n")
 
 
 def _write_atom_data(file: TextIO, atoms: Atoms, species: list[int]) -> None:
     line = " AtomData:  id type "
     file.write(line)
-    for _ in ["cartes_x", "cartes_y", "cartes_z"]:
-        file.write(f"{_:>14s}")
+    file.writelines(f"{_:>14s}" for _ in ["cartes_x", "cartes_y", "cartes_z"])
     if "forces" in atoms.calc.results:
         file.write(" ")
-        for _ in ["fx", "fy", "fz"]:
-            file.write(f"{_:>12s}")
+        file.writelines(f"{_:>12s}" for _ in ["fx", "fy", "fz"])
     file.write("\n")
     numbers = atoms.get_atomic_numbers()
     positions = atoms.get_positions()
@@ -257,12 +254,10 @@ def _write_atom_data(file: TextIO, atoms: Atoms, species: list[int]) -> None:
         file.write(f"    {i + 1:10d}")
         file.write(f" {species.index(number):4d}")
         file.write(" ")
-        for j in range(3):
-            file.write(f" {positions[i, j]:13.6f}")
+        file.writelines(f" {positions[i, j]:13.6f}" for j in range(3))
         if "forces" in atoms.calc.results:
             file.write(" ")
-            for j in range(3):
-                file.write(f" {forces[i, j]:11.6f}")
+            file.writelines(f" {forces[i, j]:11.6f}" for j in range(3))
         file.write("\n")
 
 

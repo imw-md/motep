@@ -71,7 +71,7 @@ def read_mtp(file: os.PathLike) -> MTPData:
     return MTPData(**data)
 
 
-def _format_value(value: float | int | list | str) -> str:
+def _format_value(value: float | list | str) -> str:
     if isinstance(value, Integral):
         return f"{value:d}"
     if isinstance(value, Real):
@@ -133,8 +133,7 @@ def write_mtp(file: os.PathLike, data: MTPData) -> None:
             for k0, k1 in itertools.product(range(species_count), repeat=2):
                 value = data["radial_coeffs"][k0, k1]
                 fd.write(f"\t\t{k0}-{k1}\n")
-                for _ in range(data["radial_funcs_count"]):
-                    fd.write(f"\t\t\t{_format_list(value[_])}\n")
+                fd.writelines(f"\t\t\t{_format_list(value[_])}\n" for _ in range(data["radial_funcs_count"]))
         for key in keys2:
             if data[key] is not None:
                 fd.write(f"{key} = {_format_value(data[key])}\n")
