@@ -50,7 +50,7 @@ def make_crystals(
 
 def test_without_forces(data_path: pathlib.Path) -> None:
     """Test if `LLSOptimizer` works for the training data without forces."""
-    engine = "numpy"
+    engine = "cext"
     molecule = 762
     level = 2
     images, mtp_data = make_molecules(molecule, level, data_path)
@@ -88,7 +88,7 @@ def test_without_forces(data_path: pathlib.Path) -> None:
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
-@pytest.mark.parametrize("engine", ["numpy", "numba"])
+@pytest.mark.parametrize("engine", ["cext", "numba"])
 def test_molecules(
     engine: str,
     molecule: int,
@@ -185,7 +185,7 @@ def test_molecules(
 )
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
-@pytest.mark.parametrize("engine", ["numpy", "numba"])
+@pytest.mark.parametrize("engine", ["cext", "numba"])
 def test_crystals(
     *,
     engine: str,
@@ -313,7 +313,7 @@ def test_species_coeffs(
         mtp_data=mtp_data,
         setting=setting,
         comm=world,
-        engine="numpy",
+        engine="cext",
     )
 
     optimized = ["moment_coeffs"]

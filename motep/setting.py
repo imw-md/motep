@@ -62,7 +62,7 @@ class Setting(DataclassFromAny):
     potential_initial: str = "initial.mtp"
     potential_final: str = "final.mtp"
     seed: int | None = None
-    engine: str = "numba"
+    engine: str = "cext"
 
 
 def _convert_steps(steps: list[dict]) -> list[dict]:

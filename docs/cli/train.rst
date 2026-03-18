@@ -25,8 +25,6 @@ or
 
     # seed = 10  # random seed for initializing MTP parameters
 
-    engine = 'cext'  # {'cext', 'numpy', 'numba', 'jax', 'mlippy'}
-
     [loss]  # setting for the loss function
     energy_weight = 1.0
     forces_weight = 0.01

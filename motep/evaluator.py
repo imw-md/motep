@@ -24,7 +24,7 @@ class Evaluator:
     def __init__(
         self,
         mtp_data: MTPData,
-        engine: str = "numba",
+        engine: str = "cext",
     ) -> None:
         """Initialize Evaluator.
 

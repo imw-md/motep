@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 @pytest.mark.parametrize("forces_per_atom", [False, True])
 def test_without_forces(*, forces_per_atom: bool, data_path: pathlib.Path) -> None:
     """Test if `LossFunction` works for the training data without forces."""
-    engine = "numpy"
+    engine = "cext"
     level = 2
     path = data_path / f"fitting/crystals/multi/{level:02d}"
     if not (path / "pot.mtp").exists():
@@ -70,7 +70,7 @@ def test_without_forces(*, forces_per_atom: bool, data_path: pathlib.Path) -> No
     ],
 )
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("engine", ["numpy"])
+@pytest.mark.parametrize("engine", ["cext"])
 def test_jac(
     *,
     engine: str,

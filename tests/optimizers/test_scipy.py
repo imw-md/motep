@@ -32,7 +32,6 @@ def make_crystals(
 
 def test_without_bounds(data_path: pathlib.Path) -> None:
     """Test if the methods without bounds work."""
-    engine = "numpy"
     crystal = "multi"
     level = 2
     images, mtp_data = make_crystals(crystal, level, data_path)
@@ -40,13 +39,7 @@ def test_without_bounds(data_path: pathlib.Path) -> None:
 
     setting = LossSetting(energy_weight=1.0, forces_weight=0.01, stress_weight=0.001)
 
-    loss = LossFunction(
-        images,
-        mtp_data=mtp_data,
-        setting=setting,
-        comm=world,
-        engine=engine,
-    )
+    loss = LossFunction(images, mtp_data=mtp_data, setting=setting, comm=world)
 
     mtp_data.initialize(rng=np.random.default_rng(42))
 
@@ -59,7 +52,6 @@ def test_without_bounds(data_path: pathlib.Path) -> None:
 
 def test_scaling_vs_jac(data_path: pathlib.Path) -> None:
     """Test if `jac=True` and `"scaling" in optimized` raises an error."""
-    engine = "numpy"
     crystal = "multi"
     level = 2
     images, mtp_data = make_crystals(crystal, level, data_path)
@@ -69,13 +61,7 @@ def test_scaling_vs_jac(data_path: pathlib.Path) -> None:
 
     optimized = ["scaling"]
 
-    loss = LossFunction(
-        images,
-        mtp_data=mtp_data,
-        setting=setting,
-        comm=world,
-        engine=engine,
-    )
+    loss = LossFunction(images, mtp_data=mtp_data, setting=setting, comm=world)
 
     mtp_data.optimized = optimized
     mtp_data.initialize(rng=np.random.default_rng(42))
