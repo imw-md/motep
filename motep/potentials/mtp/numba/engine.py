@@ -18,7 +18,7 @@ from .moment import (
     update_mbd_dedcs,
     update_mbd_dgdcs,
     update_mbd_dsdcs,
-    update_mbd_values,
+    update_mbd_vatoms,
 )
 
 
@@ -62,7 +62,7 @@ class NumbaMTPEngine(EngineBase):
             mtp_data.radial_coeffs,
             mtp_data.species_coeffs,
             mtp_data.moment_coeffs,
-            self.mbd.values,
+            self.mbd.vatoms,
         )
 
         forces = _calc_forces_from_gradient(gradient, js)
@@ -100,7 +100,7 @@ class NumbaMTPEngine(EngineBase):
             self.rbd.values,
             self.rbd.dqdris,
             self.rbd.dqdeps,
-            self.mbd.values,
+            self.mbd.vatoms,
             self.mbd.dbdris,
             self.mbd.dbdeps,
             self.mbd.dedcs,
@@ -150,7 +150,7 @@ def _calc_r_unit(r_ijs: np.ndarray, r_abs: np.ndarray) -> np.ndarray:
         nb.float64[:, :, :, :],
         nb.float64[:],
         nb.float64[:],
-        nb.float64[:],
+        nb.float64[:, :],  # mbd_vatoms
     ),
     # parallel=True,
 )
@@ -168,7 +168,7 @@ def _calc_run(
     radial_coeffs: npt.NDArray[np.float64],
     species_coeffs: npt.NDArray[np.float64],
     moment_coeffs: npt.NDArray[np.float64],
-    mbd_values: npt.NDArray[np.float64],
+    mbd_vatoms: npt.NDArray[np.float64],
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
 
     energies = species_coeffs[itypes]
@@ -206,7 +206,7 @@ def _calc_run(
                 gradient[i, j, k] = local_gradient[j, k]
 
     for i in range(itypes.size):
-        update_mbd_values(mbd_values, mb_vals[i])
+        update_mbd_vatoms(i, mbd_vatoms, mb_vals[i])
 
     return energies, gradient
 
@@ -230,7 +230,7 @@ def _calc_run(
         nb.float64[:, :, :],
         nb.float64[:, :, :, :, :],
         nb.float64[:, :, :, :, :],
-        nb.float64[:],
+        nb.float64[:, :],  # mbd_vatoms
         nb.float64[:, :, :],
         nb.float64[:, :, :],
         nb.float64[:, :, :, :],
@@ -257,7 +257,7 @@ def _calc_train(
     rbd_values: npt.NDArray[np.float64],
     rbd_dqdris: npt.NDArray[np.float64],
     rbd_dqdeps: npt.NDArray[np.float64],
-    mbd_values: npt.NDArray[np.float64],
+    mbd_vatoms: npt.NDArray[np.float64],
     mbd_dbdris: npt.NDArray[np.float64],
     mbd_dbdeps: npt.NDArray[np.float64],
     mbd_dedcs: npt.NDArray[np.float64],
@@ -330,7 +330,7 @@ def _calc_train(
             rbd_dqdris,
             rbd_dqdeps,
         )
-        update_mbd_values(mbd_values, mb_vals[i])
+        update_mbd_vatoms(i, mbd_vatoms, mb_vals[i])
         update_mbd_dbdris(i, js_i, mbd_dbdris, mb_ders[i])
         update_mbd_dbdeps(js_i, rs_i, mbd_dbdeps, mb_ders[i])
         update_mbd_dedcs(itypes[i], mbd_dedcs, dedcs_l[i])

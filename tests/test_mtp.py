@@ -1,13 +1,13 @@
 """Tests for PyMTP."""
 
 import pathlib
-from typing import Any
 
 import numpy as np
 import pytest
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
+from motep.potentials.mtp.base import EngineBase
 from motep.potentials.mtp.cext.engine import CExtMTPEngine
 from motep.potentials.mtp.jax.engine import JaxMTPEngine
 from motep.potentials.mtp.numba.engine import NumbaMTPEngine
@@ -42,7 +42,7 @@ def get_scale(component: str, d: float) -> np.ndarray:
 )
 # @pytest.mark.parametrize("molecule", [762])
 def test_molecules(
-    engine: Any,
+    engine: type[EngineBase],
     mode: str,
     molecule: int,
     level: int,
@@ -76,7 +76,7 @@ def test_molecules(
 # @pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
 @pytest.mark.parametrize("engine", [NumbaMTPEngine, JaxMTPEngine, CExtMTPEngine])
 def test_crystals(
-    engine: Any,
+    engine: type[EngineBase],
     mode: str,
     crystal: int,
     level: int,
@@ -115,7 +115,7 @@ def test_crystals(
     "engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine, CExtMTPEngine]
 )
 def test_forces(
-    engine: Any,
+    engine: type[EngineBase],
     molecule: int,
     level: int,
     data_path: pathlib.Path,
@@ -152,7 +152,7 @@ def test_forces(
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine])
 def test_stress(
-    engine: Any,
+    engine: type[EngineBase],
     crystal: int,
     level: int,
     component: str,
@@ -198,7 +198,7 @@ def test_stress(
 @pytest.mark.parametrize("crystal", ["size", "multi"])
 @pytest.mark.parametrize("engine", [NumbaMTPEngine, CExtMTPEngine])
 def test_basis_data(
-    engine: Any,
+    engine: type[EngineBase],
     crystal: int,
     level: int,
     data_path: pathlib.Path,
@@ -220,7 +220,7 @@ def test_basis_data(
 
         mbd = mtp.mbd
         mbd_ref = ref.mbd
-        np.testing.assert_allclose(mbd.values, mbd_ref.values, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.vatoms, mbd_ref.vatoms, rtol=0.0, atol=1e-6)
         np.testing.assert_allclose(mbd.dbdris, mbd_ref.dbdris, rtol=0.0, atol=1e-6)
         np.testing.assert_allclose(mbd.dbdeps, mbd_ref.dbdeps, rtol=0.0, atol=1e-6)
         np.testing.assert_allclose(mbd.dedcs, mbd_ref.dedcs, rtol=0.0, atol=1e-6)

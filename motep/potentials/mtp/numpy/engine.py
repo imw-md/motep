@@ -76,7 +76,7 @@ class NumpyMTPEngine(EngineBase):
                 rs_i,
             )
 
-            self.mbd.values += basis_values
+            self.mbd.vatoms[:, i] = basis_values
 
             energies[i] += moment_coeffs @ basis_values
             # Calculate forces

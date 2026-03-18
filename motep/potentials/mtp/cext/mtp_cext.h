@@ -21,7 +21,7 @@ typedef struct
 /* Moment basis data structure */
 typedef struct
 {
-    double *values; /* (alpha_scalar_moments) */
+    double *vatoms; /* (alpha_scalar_moments, n_atoms) */
     double *dbdris; /* (alpha_scalar_moments, n_atoms, 3) */
     double *dbdeps; /* (alpha_scalar_moments, 3, 3) */
     double *dedcs;  /* (species_count, species_count, radial_funcs_count, radial_basis_size) */
@@ -64,7 +64,7 @@ void calc_run(
     /* Output */
     double *energies,    /* (n_atoms) */
     double *gradient,    /* (n_atoms, n_neighbors, 3) */
-    double *mbd_values); /* (n_alpha_scalar) */
+    double *mbd_vatoms); /* (n_alpha_scalar, n_atoms) */
 
 /* Training mode calculation - computes energies and parameter derivatives
  * Takes preallocated RadialBasisData and MomentBasisData structures.

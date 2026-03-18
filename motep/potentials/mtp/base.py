@@ -36,7 +36,10 @@ class MomentBasisData(ModeBase):
     values : np.ndarray (alpha_moments_count)
         Basis values summed over atoms.
         This corresponds to b_j in Eq. (5) in [Podryabinkin_CMS_2017_Active]_.
-    dbdris : np.ndarray (alpha_moments_count, 3, number_of_atoms)
+    vatoms : np.ndarray (alpha_moments_count, number_of_atoms)
+        Basis values per atom.
+        This corresponds to B_j in Eq. (2) in [Podryabinkin_CMS_2017_Active]_.
+    dbdris : np.ndarray (alpha_moments_count, number_of_atoms, 3)
         Derivatives of basis functions with respect to Cartesian coordinates of atoms
         summed over atoms.
         This corresponds to nabla b_j in Eq. (7a) in [Podryabinkin_CMS_2017_Active]_.
@@ -50,12 +53,17 @@ class MomentBasisData(ModeBase):
 
     mode: str = field(default="run")
 
-    values: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
+    vatoms: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
     dbdris: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
     dbdeps: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
     dedcs: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
     dgdcs: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
     dsdcs: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
+
+    @property
+    def values(self) -> np.ndarray:
+        """Basis values summed over atoms."""
+        return self.vatoms.sum(axis=-1)
 
     def initialize(self, natoms: int, mtp_data: MTPData) -> None:
         """Initialize moment basis properties."""
@@ -64,7 +72,7 @@ class MomentBasisData(ModeBase):
         rbs = mtp_data.radial_basis_size
         asm = mtp_data.alpha_scalar_moments
 
-        self.values = np.full((asm), np.nan)
+        self.vatoms = np.full((asm, natoms), np.nan)
         if "train" in self.mode:
             self.dbdris = np.full((asm, natoms, 3), np.nan)
             self.dbdeps = np.full((asm, 3, 3), np.nan)
@@ -74,7 +82,7 @@ class MomentBasisData(ModeBase):
 
     def clean(self) -> None:
         """Clean up moment basis properties."""
-        self.values[...] = 0.0
+        self.vatoms[...] = 0.0
         if "train" in self.mode:
             self.dbdris[...] = 0.0
             self.dbdeps[...] = 0.0
