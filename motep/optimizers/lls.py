@@ -6,18 +6,19 @@ from math import sqrt
 from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 from ase.stress import voigt_6_to_full_3x3_stress
 from scipy.optimize._optimize import OptimizeResult
 
 from motep.loss import LossFunctionBase
-from motep.optimizers.base import OptimizerBase
+from motep.optimizers.base import ParallelOptimizerBase
 from motep.optimizers.scipy import Callback
 from motep.potentials.mtp import get_types
 
 logger = logging.getLogger(__name__)
 
 
-class LLSOptimizerBase(OptimizerBase):
+class LLSOptimizerBase(ParallelOptimizerBase):
     """Abstract base class for linear optimizers.
 
     - :class:`LLSOptimizer`
@@ -195,37 +196,35 @@ class LLSOptimizer(LLSOptimizerBase):
     def optimized_allowed(self) -> list[str]:
         return ["species_coeffs", "moment_coeffs"]
 
-    def optimize(self, **kwargs: dict[str, Any]) -> None:
+    def _optimize(self, **kwargs: dict[str, Any]) -> npt.NDArray[np.float64]:
         parameters = self.loss.mtp_data.parameters
         callback = Callback(self.loss)
 
         # Calculate basis functions of `loss.images`
-        loss_value = self.loss(parameters)
-        self.loss.gather_data()
+        loss_value = self.rank0_loss(parameters)
+        self.rank0_gather_data()
 
         # Print the value of the loss function.
         callback(OptimizeResult(x=parameters, fun=loss_value))
 
         # Prepare and solve the LLS problem
-        if self.comm.rank == 0:
-            logger.debug("Calculate `matrix`")
-            matrix = self._calc_matrix()
-            logger.debug("Calculate `vector`")
-            vector = self._calc_vector()
-            logger.debug("Calculate `coeffs`")
-            coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
-        else:
-            coeffs = None
-        coeffs = self.comm.bcast(coeffs, root=0)
+        logger.debug("Calculate `matrix`")
+        matrix = self._calc_matrix()
+        logger.debug("Calculate `vector`")
+        vector = self._calc_vector()
+        logger.debug("Calculate `coeffs`")
+        coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
 
         # Update `mtp_data` and `parameters`
         parameters = self._update_parameters(coeffs)
 
         # Evaluate loss with the new parameters
-        loss_value = self.loss(parameters)
+        loss_value = self.rank0_loss(parameters)
 
         # Print the value of the loss function.
         callback(OptimizeResult(x=parameters, fun=loss_value))
+
+        return parameters
 
     def _update_parameters(self, coeffs: np.ndarray) -> np.ndarray:
         mtp_data = self.loss.mtp_data

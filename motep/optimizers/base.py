@@ -1,10 +1,16 @@
 """Base class of the `Optimizer` classes."""
 
+import logging
 from abc import ABC, abstractmethod
 from typing import Any
 
+import numpy as np
+import numpy.typing as npt
+
 from motep.loss import LossFunctionBase
 from motep.parallel import DummyMPIComm, world
+
+logger = logging.getLogger(__name__)
 
 
 class OptimizerBase(ABC):
@@ -61,7 +67,7 @@ class OptimizerBase(ABC):
 
     @abstractmethod
     def optimize(self, **kwargs: dict[str, Any]) -> None:
-        """Optimize the parameters of `self.loss.mtp_data`."""
+        """Run the optimizer."""
 
     @property
     @abstractmethod
@@ -72,3 +78,84 @@ class OptimizerBase(ABC):
     @abstractmethod
     def optimized_allowed(self) -> list[str]:
         """Return allowed `optimized`."""
+
+
+class ParallelOptimizerBase(OptimizerBase):
+    """OptimizerBase with master-worker MPI pattern.
+
+    Only rank 0 runs the optimizer logic (in :meth:`_optimize`);
+    other ranks service the collective MPI operations triggered by
+    each loss / jac / gather_data evaluation.
+    """
+
+    _OP_LOSS = 0
+    _OP_JAC = 1
+    _OP_GATHER = 2
+    _OP_STOP = 3
+
+    def rank0_loss(self, parameters: npt.NDArray[np.float64]) -> float:
+        """Evaluate the loss function, signaling workers first."""
+        self.loss.comm.bcast(self._OP_LOSS, root=0)
+        return self.loss(parameters)
+
+    def rank0_jac(
+        self,
+        parameters: npt.NDArray[np.float64],
+    ) -> npt.NDArray[np.float64]:
+        """Evaluate the Jacobian, signaling workers first."""
+        self.loss.comm.bcast(self._OP_JAC, root=0)
+        return self.loss.jac(parameters)
+
+    def rank0_gather_data(self) -> None:
+        """Gather data to rank 0, signaling workers first."""
+        self.loss.comm.bcast(self._OP_GATHER, root=0)
+        self.loss.gather_data()
+
+    def _worker_loop(self) -> None:
+        """Service collective operations from rank 0's optimizer.
+
+        Only rank 0 runs the optimizer; other ranks call this method
+        to participate in the collective MPI operations (bcast, allreduce)
+        triggered by each loss/jac/gather evaluation.
+        """
+        while True:
+            op = self.loss.comm.bcast(None, root=0)
+            if op == self._OP_STOP:
+                break
+            elif op == self._OP_LOSS:
+                self.loss(None)
+            elif op == self._OP_JAC:
+                self.loss.jac(None)
+            elif op == self._OP_GATHER:
+                self.loss.gather_data()
+
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
+        """Run the optimizer with the master-worker pattern.
+
+        Rank 0 runs :meth:`_optimize`; other ranks service collective MPI
+        operations in a loop.  After :meth:`_optimize` returns, the
+        resulting parameters are broadcast to all ranks.
+        """
+        if self.loss.comm.rank == 0:
+            result_x = self._optimize(**kwargs)
+            self.loss.comm.bcast(self._OP_STOP, root=0)
+        else:
+            self._worker_loop()
+            result_x = None
+        result_x = self.loss.comm.bcast(result_x, root=0)
+        self.loss.mtp_data.parameters = result_x
+
+    @abstractmethod
+    def _optimize(self, **kwargs: dict[str, Any]) -> npt.NDArray[np.float64]:
+        """Run the optimizer on rank 0.
+
+        Must use :meth:`rank0_loss`, :meth:`rank0_jac`, and
+        :meth:`rank0_gather_data` instead of calling ``self.loss`` directly,
+        so that worker ranks participate in the collective MPI operations.
+
+        Returns
+        -------
+        parameters : npt.NDArray[np.float64]
+            Optimized parameters.
+
+        """
