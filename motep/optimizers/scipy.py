@@ -33,6 +33,10 @@ class Callback:
 
 
 class ScipyOptimizerBase(OptimizerBase):
+    _OP_LOSS = 0
+    _OP_JAC = 1
+    _OP_STOP = 2
+
     @property
     def optimized_default(self) -> list[str]:
         return ["species_coeffs", "moment_coeffs", "radial_coeffs"]
@@ -40,6 +44,32 @@ class ScipyOptimizerBase(OptimizerBase):
     @property
     def optimized_allowed(self) -> list[str]:
         return ["scaling", "species_coeffs", "moment_coeffs", "radial_coeffs"]
+
+    def _rank0_loss(self, parameters):
+        """Loss wrapper for rank 0 — signals workers before evaluation."""
+        self.loss.comm.bcast(self._OP_LOSS, root=0)
+        return self.loss(parameters)
+
+    def _rank0_jac(self, parameters):
+        """Jac wrapper for rank 0 — signals workers before evaluation."""
+        self.loss.comm.bcast(self._OP_JAC, root=0)
+        return self.loss.jac(parameters)
+
+    def _worker_loop(self):
+        """Service collective loss/jac evaluations from rank 0's optimizer.
+
+        Only rank 0 runs scipy's optimizer; other ranks call this method
+        to participate in the collective MPI operations (bcast, allreduce)
+        triggered by each loss/jac evaluation.
+        """
+        while True:
+            op = self.loss.comm.bcast(None, root=0)
+            if op == self._OP_STOP:
+                break
+            elif op == self._OP_LOSS:
+                self.loss(None)
+            elif op == self._OP_JAC:
+                self.loss.jac(None)
 
     def print_result(self, result: OptimizeResult) -> None:
         """Print `result`."""
@@ -68,15 +98,21 @@ class ScipyDualAnnealingOptimizer(ScipyOptimizerBase):
         super().optimize()
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
-        result = dual_annealing(
-            self.loss,
-            bounds=bounds,
-            callback=self.callback,
-            seed=40,
-            x0=parameters,
-        )
-        self.print_result(result)
-        return result.x
+        if self.loss.comm.rank == 0:
+            result = dual_annealing(
+                self._rank0_loss,
+                bounds=bounds,
+                callback=self.callback,
+                seed=40,
+                x0=parameters,
+            )
+            self.loss.comm.bcast(self._OP_STOP, root=0)
+            self.print_result(result)
+        else:
+            result = OptimizeResult(x=None)
+            self._worker_loop()
+        result.x = self.loss.comm.bcast(result.x, root=0)
+        self.loss.mtp_data.parameters = result.x
 
 
 class ScipyDifferentialEvolutionOptimizer(ScipyOptimizerBase):
@@ -84,15 +120,21 @@ class ScipyDifferentialEvolutionOptimizer(ScipyOptimizerBase):
         super().optimize()
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
-        result = differential_evolution(
-            self.loss,
-            bounds,
-            popsize=30,
-            callback=self.callback,
-            x0=parameters,
-        )
-        self.print_result(result)
-        return result.x
+        if self.loss.comm.rank == 0:
+            result = differential_evolution(
+                self._rank0_loss,
+                bounds,
+                popsize=30,
+                callback=self.callback,
+                x0=parameters,
+            )
+            self.loss.comm.bcast(self._OP_STOP, root=0)
+            self.print_result(result)
+        else:
+            result = OptimizeResult(x=None)
+            self._worker_loop()
+        result.x = self.loss.comm.bcast(result.x, root=0)
+        self.loss.mtp_data.parameters = result.x
 
 
 class ScipyMinimizeOptimizer(ScipyOptimizerBase):
@@ -107,7 +149,7 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
         if kwargs.get("jac"):
             if "scaling" in self.optimized:
                 raise ValueError("`jac` cannot (so far) be used to optimize `scaling`.")
-            kwargs["jac"] = self.loss.jac
+            kwargs["jac"] = self._rank0_jac
         if kwargs.get("method", "").lower() in {
             "cg",
             "bfgs",
@@ -119,12 +161,18 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
         }:
             bounds = None
 
-        result = minimize(
-            self.loss,
-            parameters,
-            bounds=bounds,
-            callback=self.callback,
-            **kwargs,
-        )
-        self.print_result(result)
+        if self.loss.comm.rank == 0:
+            result = minimize(
+                self._rank0_loss,
+                parameters,
+                bounds=bounds,
+                callback=self.callback,
+                **kwargs,
+            )
+            self.loss.comm.bcast(self._OP_STOP, root=0)
+            self.print_result(result)
+        else:
+            result = OptimizeResult(x=None)
+            self._worker_loop()
+        result.x = self.loss.comm.bcast(result.x, root=0)
         self.loss.mtp_data.parameters = result.x
