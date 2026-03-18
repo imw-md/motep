@@ -245,11 +245,17 @@ def _write_atom_data(file: TextIO, atoms: Atoms, species: list[int]) -> None:
     if "forces" in atoms.calc.results:
         file.write(" ")
         file.writelines(f"{_:>12s}" for _ in ["fx", "fy", "fz"])
+    if "nbh_grades" in atoms.calc.results:
+        file.write("       nbh_grades")
     file.write("\n")
+
     numbers = atoms.get_atomic_numbers()
     positions = atoms.get_positions()
     if "forces" in atoms.calc.results:
         forces = atoms.calc.results["forces"]
+    if "nbh_grades" in atoms.calc.results:
+        grades = atoms.calc.results["nbh_grades"]
+
     for i, number in enumerate(numbers):
         file.write(f"    {i + 1:10d}")
         file.write(f" {species.index(number):4d}")
@@ -258,6 +264,8 @@ def _write_atom_data(file: TextIO, atoms: Atoms, species: list[int]) -> None:
         if "forces" in atoms.calc.results:
             file.write(" ")
             file.writelines(f" {forces[i, j]:11.6f}" for j in range(3))
+        if "nbh_grades" in atoms.calc.results:
+            file.write(f"{grades[i]:17.5f}")
         file.write("\n")
 
 
