@@ -105,7 +105,7 @@ class Trainer:
             loss = LossFunction(*loss_args, engine=self.engine, comm=self.comm)
 
         for i, step in enumerate(self.steps):
-            with measure_time(f"step {i}: {step['method']}", self.comm):
+            with measure_time(f"step {i}: {step['method']}", comm=self.comm):
                 if self.comm.rank == 0:
                     logger.info(f"{'':=^72s}\n")
                     logger.info(pformat(step))
