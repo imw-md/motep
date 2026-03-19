@@ -1,7 +1,8 @@
 name: Docs
 on:
   push:
-    branches: [main]
+    branches:
+      - "*"
     paths:
       - "docs/**"
       - ".github/workflows/docs.yml"
@@ -20,7 +21,7 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
-  build:
+  build_docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -39,16 +40,14 @@ jobs:
         run: |
           make -C docs html
       - name: Setup Pages
-        if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v5
       - name: Upload artifact
-        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v4
         with:
           path: docs/_build/html
-  deploy:
-    if: github.event_name != 'pull_request'
-    needs: build
+  deploy_docs:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build_docs
     runs-on: ubuntu-latest
     environment:
       name: github-pages
