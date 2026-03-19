@@ -223,8 +223,9 @@ def _write_image(
 
     if "stress" in atoms.calc.results:
         _write_stress(file, atoms)
-    for key in atoms.info:
-        file.write(f" Feature   {key}\t{atoms.info[key]}\n")
+    for key, value in atoms.info.items():
+        fmt = ".6f" if isinstance(value, float) else ""
+        file.write(f" Feature   {key}\t{value:{fmt}}\n")
     file.write("END_CFG\n")
     file.write("\n")
 
