@@ -56,13 +56,14 @@ def test_read_ase_file(data_path: pathlib.Path, tmp_path: pathlib.Path) -> None:
 
 def test_roundtrip(data_path: pathlib.Path, tmp_path: pathlib.Path) -> None:
     """Test if `write_cfg` works as expected."""
-    molecule = 762
-    path = data_path / f"original/molecules/{molecule}/training.cfg"
+    level = 10
+    path = data_path / f"fitting/crystals/multi/{level:02d}/out.cfg"
     atoms_ref = read_cfg(path)
     atoms_ref.calc.results.pop("free_energy")
     fd = tmp_path / "test.cfg"
     write_cfg(fd, atoms_ref)
     atoms = read_cfg(fd)
     assert atoms == atoms_ref
+    assert atoms.info == atoms_ref.info
     for k, v in atoms_ref.calc.results.items():
         assert np.all(atoms.calc.results[k] == v)

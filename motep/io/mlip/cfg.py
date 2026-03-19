@@ -4,9 +4,8 @@ from typing import TextIO
 
 import numpy as np
 from ase import Atoms
-from ase.calculators.lammps import convert
 from ase.calculators.singlepoint import SinglePointCalculator
-from ase.data import atomic_masses, chemical_symbols
+from ase.data import chemical_symbols
 from ase.utils import reader, string2index, writer
 
 
@@ -53,7 +52,7 @@ def _convert_species(species: list | None) -> list[int] | None:
     return species  # list[int] | None
 
 
-def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
+def _read_image(file: TextIO, species: list[int] | None) -> Atoms:
     keys_c = ["cartes_x", "cartes_y", "cartes_z"]
     keys_d = ["direct_x", "direct_y", "direct_z"]
     cell = None
@@ -133,10 +132,10 @@ def _set_forces(atoms: Atoms, atomdata: dict) -> None:
     atoms.calc.results["forces"] = np.array(forces)
 
 
-def _set_stress(atoms: Atoms, stress: dict[float]) -> None:
+def _set_stress(atoms: Atoms, stress: dict[str, float]) -> None:
     voigt_order = ["xx", "yy", "zz", "yz", "xz", "xy"]
-    stress = np.array([stress[_] for _ in voigt_order])
-    atoms.calc.results["stress"] = -stress / atoms.get_volume()
+    arr = np.array([stress[_] for _ in voigt_order])
+    atoms.calc.results["stress"] = -arr / atoms.get_volume()
 
 
 def _parse_value(value: str) -> int | float | bool:
@@ -223,8 +222,9 @@ def _write_image(
 
     if "stress" in atoms.calc.results:
         _write_stress(file, atoms)
-    for key in atoms.info:
-        file.write(f" Feature   {key}\t{atoms.info[key]}\n")
+    for key, value in atoms.info.items():
+        fmt = ".6f" if isinstance(value, float) else ""
+        file.write(f" Feature   {key}\t{value:{fmt}}\n")
     file.write("END_CFG\n")
     file.write("\n")
 
@@ -233,35 +233,38 @@ def _write_supercell(file: TextIO, atoms: Atoms) -> None:
     file.write(" Supercell\n")
     for vector in atoms.cell:
         file.write("   ")
-        for _ in vector:
-            file.write(f"{_:14.6f}")
+        file.writelines(f"{_:14.6f}" for _ in vector)
         file.write("\n")
 
 
 def _write_atom_data(file: TextIO, atoms: Atoms, species: list[int]) -> None:
     line = " AtomData:  id type "
     file.write(line)
-    for _ in ["cartes_x", "cartes_y", "cartes_z"]:
-        file.write(f"{_:>14s}")
+    file.writelines(f"{_:>14s}" for _ in ["cartes_x", "cartes_y", "cartes_z"])
     if "forces" in atoms.calc.results:
         file.write(" ")
-        for _ in ["fx", "fy", "fz"]:
-            file.write(f"{_:>12s}")
+        file.writelines(f"{_:>12s}" for _ in ["fx", "fy", "fz"])
+    if "nbh_grades" in atoms.calc.results:
+        file.write("       nbh_grades")
     file.write("\n")
+
     numbers = atoms.get_atomic_numbers()
     positions = atoms.get_positions()
     if "forces" in atoms.calc.results:
         forces = atoms.calc.results["forces"]
+    if "nbh_grades" in atoms.calc.results:
+        grades = atoms.calc.results["nbh_grades"]
+
     for i, number in enumerate(numbers):
         file.write(f"    {i + 1:10d}")
         file.write(f" {species.index(number):4d}")
         file.write(" ")
-        for j in range(3):
-            file.write(f" {positions[i, j]:13.6f}")
+        file.writelines(f" {positions[i, j]:13.6f}" for j in range(3))
         if "forces" in atoms.calc.results:
             file.write(" ")
-            for j in range(3):
-                file.write(f" {forces[i, j]:11.6f}")
+            file.writelines(f" {forces[i, j]:11.6f}" for j in range(3))
+        if "nbh_grades" in atoms.calc.results:
+            file.write(f"{grades[i]:17.5f}")
         file.write("\n")
 
 
@@ -274,14 +277,3 @@ def _write_stress(file: TextIO, atoms: Atoms) -> None:
         _ *= -1.0 * atoms.get_volume()
         file.write(f"{_:12.5f}")
     file.write("\n")
-
-
-def _write_parameters(file: TextIO, species: dict[str, int]) -> None:
-    file.write("# Masses\n\n")
-    units = "metal"  # g/mol
-    for s, i in species.items():
-        atomic_number = chemical_symbols.index(s)
-        mass = atomic_masses[atomic_number]
-        mass = convert(mass, "mass", "ASE", units)
-        atom_type = i + 1
-        file.write(f"mass {atom_type:>6} {mass:23.17g} # {s}\n")

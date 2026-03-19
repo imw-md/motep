@@ -36,4 +36,4 @@ jobs:
           fi
       - name: Run pytest
         run: |
-          python -m pytest -v tests/test_loss.py::test_without_forces tests/test_mtp.py
+          python -m pytest -v tests/io tests/test_loss.py::test_without_forces tests/test_mtp.py
