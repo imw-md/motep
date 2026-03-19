@@ -107,15 +107,6 @@ class ApplySetting(Setting):
 
 
 @dataclass
-class GradeSetting(Setting):
-    """Setting for the extrapolation-grade calculations."""
-
-    mode: str = "configuration"
-    algorithm: str = "maxvol"
-    maxiter: int = 100_000
-
-
-@dataclass
 class UpconvertSetting:
     """Setting for the upconversion."""
 
@@ -127,7 +118,7 @@ class UpconvertSetting:
             self.potentials = UpconvertPotentials(**dict(self.potentials))
 
 
-def parse_setting(filename: str) -> dict:
+def parse_setting(filename: str) -> dict[str, Any]:
     """Parse setting file.
 
     Returns
@@ -167,17 +158,6 @@ def load_setting_apply(filename: str) -> ApplySetting:
 
     """
     return ApplySetting(**parse_setting(filename))
-
-
-def load_setting_grade(filename: str) -> GradeSetting:
-    """Load setting for `grade`.
-
-    Returns
-    -------
-    GradeSetting
-
-    """
-    return GradeSetting(**parse_setting(filename))
 
 
 def load_setting_upconvert(filename: str | None) -> UpconvertSetting:
