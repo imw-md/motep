@@ -41,22 +41,24 @@ class NumbaMagMTPEngine(MagEngineBase):
         """Intialize the engine."""
         super().__init__(*args, **kwargs)
 
-    def _calculate(self, atoms: Atoms) -> tuple:
+    def _calculate(self, atoms: Atoms, magmoms: np.ndarray | None = None) -> tuple:
+        if magmoms is None:
+            magmoms = atoms.get_initial_magnetic_moments()
         if self.mode == "run":
-            return self._calc_mag_run(atoms)
+            return self._calc_mag_run(atoms, magmoms)
         if self.mode == "train":
-            return self._calc_mag_train(atoms)
+            return self._calc_mag_train(atoms, magmoms)
         if self.mode == "train_mgrad":
-            return self._calc_mag_train_mgrad(atoms)
+            return self._calc_mag_train_mgrad(atoms, magmoms)
         raise NotImplementedError(self.mode)
 
-    def _calc_mag_run(self, atoms: Atoms) -> tuple:
+    def _calc_mag_run(self, atoms: Atoms, magmoms: np.ndarray) -> tuple:
         mtp_data = self.mtp_data
 
         js = self._neighbors
         rs = self._get_interatomic_vectors(atoms)
 
-        magnetic_moments = atoms.get_initial_magnetic_moments()
+        magnetic_moments = magmoms
 
         itypes = get_types(atoms, mtp_data.species)
         jtypes = itypes[js]
@@ -93,13 +95,13 @@ class NumbaMagMTPEngine(MagEngineBase):
 
         return energies, forces, stress, mgrad
 
-    def _calc_mag_train(self, atoms: Atoms) -> tuple:
+    def _calc_mag_train(self, atoms: Atoms, magmoms: np.ndarray) -> tuple:
         mtp_data = self.mtp_data
 
         js = self._neighbors
         rs = self._get_interatomic_vectors(atoms)
 
-        magnetic_moments = atoms.get_initial_magnetic_moments()
+        magnetic_moments = magmoms
 
         itypes = get_types(atoms, mtp_data.species)
         jtypes = itypes[js]
@@ -171,13 +173,13 @@ class NumbaMagMTPEngine(MagEngineBase):
 
         return energies, forces, stress, mgrad
 
-    def _calc_mag_train_mgrad(self, atoms: Atoms) -> tuple:
+    def _calc_mag_train_mgrad(self, atoms: Atoms, magmoms: np.ndarray) -> tuple:
         mtp_data = self.mtp_data
 
         js = self._neighbors
         rs = self._get_interatomic_vectors(atoms)
 
-        magnetic_moments = atoms.get_initial_magnetic_moments()
+        magnetic_moments = magmoms
 
         itypes = get_types(atoms, mtp_data.species)
         jtypes = itypes[js]

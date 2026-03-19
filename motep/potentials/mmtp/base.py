@@ -4,6 +4,7 @@ from typing import ClassVar
 import numpy as np
 import numpy.typing as npt
 from ase import Atoms
+from scipy.optimize import Bounds, minimize
 
 from motep.potentials.mtp.base import (
     EngineBase,
@@ -149,8 +150,18 @@ class MagEngineBase(MagModeBase, EngineBase):
         if self.mtp_data.species is None:
             self.mtp_data.species = list(range(self.mtp_data.species_count))
 
-    def calculate(self, atoms: Atoms) -> dict:
+    def calculate(
+        self, atoms: Atoms, magmoms: npt.NDArray[np.float64] | None = None
+    ) -> dict:
         """Calculate properties of the given system.
+
+        Parameters
+        ----------
+        atoms : Atoms
+            The atomic structure.
+        magmoms : np.ndarray or None
+            Magnetic moments to use. If None, reads from
+            ``atoms.get_initial_magnetic_moments()``.
 
         Returns
         -------
@@ -161,7 +172,7 @@ class MagEngineBase(MagModeBase, EngineBase):
         if self.update_neighbor_list(atoms):
             self.initialize_basis_data(atoms)
 
-        energies, forces, stress, mgrad = self._calculate(atoms)
+        energies, forces, stress, mgrad = self._calculate(atoms, magmoms=magmoms)
 
         self._symmetrize_stress(atoms, stress)
 
@@ -174,7 +185,7 @@ class MagEngineBase(MagModeBase, EngineBase):
         return self.results
 
     def jac_mgrad(self, atoms: Atoms) -> Jac:
-        """Calculate the Jacobian of the magnetic gradient with respect to the MTP parameters.
+        """Calculate the Jacobian of the magnetic gradient with respect to parameters.
 
         `jac.parameters` have the shape of `(nparams, natoms)`.
 
@@ -190,3 +201,52 @@ class MagEngineBase(MagModeBase, EngineBase):
         )  # placeholder of the Jacobian with respect to the parameters
         jac.optimized = self.mtp_data.optimized
         return jac
+
+    def relax_magnetic_moments(
+        self,
+        atoms: Atoms,
+        magmoms_init: npt.NDArray[np.float64] | None = None,
+    ) -> dict:
+        """Relax magnetic moments to minimize energy.
+
+        Parameters
+        ----------
+        atoms : Atoms
+            The atomic structure with magnetic moments to relax.
+        magmoms_init : np.ndarray or None
+            Initial guess for magnetic moments. If None, reads from
+            ``atoms.get_initial_magnetic_moments()``.
+
+        Returns
+        -------
+        dict
+            Results dictionary including relaxed ``magmoms`` and ``magmom``.
+
+        """
+        if magmoms_init is None:
+            magmoms_init = atoms.get_initial_magnetic_moments()
+        mtp_data = self.mtp_data
+
+        self.check_species(atoms)
+        if self.update_neighbor_list(atoms):
+            self.initialize_basis_data(atoms)
+
+        def objective_and_grad(moms: np.ndarray) -> tuple[float, np.ndarray]:
+            energies, _, _, mgrad = self._calculate(atoms, magmoms=moms)
+            return float(energies.sum()), mgrad
+
+        min_mag = mtp_data.magnetic_basis.min
+        max_mag = mtp_data.magnetic_basis.max
+        bounds = Bounds(np.full((len(atoms)), min_mag), np.full((len(atoms)), max_mag))
+        result = minimize(
+            objective_and_grad,
+            magmoms_init,
+            method="L-BFGS-B",
+            jac=True,
+            bounds=bounds,
+        )
+        relaxed_magmoms = result.x
+        results = self.calculate(atoms, magmoms=relaxed_magmoms)
+        results["magmoms"] = relaxed_magmoms
+        results["magmom"] = relaxed_magmoms.sum()
+        return results
