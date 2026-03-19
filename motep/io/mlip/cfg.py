@@ -4,9 +4,8 @@ from typing import TextIO
 
 import numpy as np
 from ase import Atoms
-from ase.calculators.lammps import convert
 from ase.calculators.singlepoint import SinglePointCalculator
-from ase.data import atomic_masses, chemical_symbols
+from ase.data import chemical_symbols
 from ase.utils import reader, string2index, writer
 
 
@@ -278,14 +277,3 @@ def _write_stress(file: TextIO, atoms: Atoms) -> None:
         _ *= -1.0 * atoms.get_volume()
         file.write(f"{_:12.5f}")
     file.write("\n")
-
-
-def _write_parameters(file: TextIO, species: dict[str, int]) -> None:
-    file.write("# Masses\n\n")
-    units = "metal"  # g/mol
-    for s, i in species.items():
-        atomic_number = chemical_symbols.index(s)
-        mass = atomic_masses[atomic_number]
-        mass = convert(mass, "mass", "ASE", units)
-        atom_type = i + 1
-        file.write(f"mass {atom_type:>6} {mass:23.17g} # {s}\n")
