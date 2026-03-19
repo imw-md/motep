@@ -46,6 +46,10 @@ mpi = ["mpi4py"]
 jax = [
   "jax",
 ]
+test = [
+    "pytest",
+    "pytest-cov",
+]
 doc = [
   "sphinx",
   "sphinx_book_theme",
