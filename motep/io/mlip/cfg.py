@@ -53,7 +53,7 @@ def _convert_species(species: list | None) -> list[int] | None:
     return species  # list[int] | None
 
 
-def _read_image(file: TextIO, species: list[str] | None) -> Atoms:
+def _read_image(file: TextIO, species: list[int] | None) -> Atoms:
     keys_c = ["cartes_x", "cartes_y", "cartes_z"]
     keys_d = ["direct_x", "direct_y", "direct_z"]
     cell = None
@@ -133,10 +133,10 @@ def _set_forces(atoms: Atoms, atomdata: dict) -> None:
     atoms.calc.results["forces"] = np.array(forces)
 
 
-def _set_stress(atoms: Atoms, stress: dict[float]) -> None:
+def _set_stress(atoms: Atoms, stress: dict[str, float]) -> None:
     voigt_order = ["xx", "yy", "zz", "yz", "xz", "xy"]
-    stress = np.array([stress[_] for _ in voigt_order])
-    atoms.calc.results["stress"] = -stress / atoms.get_volume()
+    arr = np.array([stress[_] for _ in voigt_order])
+    atoms.calc.results["stress"] = -arr / atoms.get_volume()
 
 
 def _parse_value(value: str) -> int | float | bool:
