@@ -3,6 +3,7 @@
 import logging
 import pathlib
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pprint import pformat
 
 import numpy as np
@@ -20,11 +21,18 @@ from motep.setting import Setting, parse_setting
 logger = logging.getLogger(__name__)
 
 
+class GradeMode(StrEnum):
+    """Extrapolation grade mode."""
+
+    CONFIGURATION = "configuration"
+    NEIGHBORHOOD = "neighborhood"
+
+
 @dataclass
 class GradeSetting(Setting):
     """Setting for the extrapolation-grade calculations."""
 
-    mode: str = "configuration"
+    mode: GradeMode = GradeMode.CONFIGURATION
     maxvol: MaxVolSetting = field(default_factory=MaxVolSetting)
 
     def __post_init__(self) -> None:
@@ -53,7 +61,7 @@ class Grader:
         rng: np.random.Generator | None = None,
         engine: str = "cext",
         *,
-        mode: str = "configuration",
+        mode: GradeMode = GradeMode.CONFIGURATION,
         maxvol_setting: MaxVolSetting | dict | None = None,
         comm: DummyMPIComm = world,
     ) -> None:
@@ -113,8 +121,10 @@ class Grader:
             atoms.get_potential_energy()
 
         # Make the overdetermined matrix
-        if self.mode == "configuration":
+        if self.mode == GradeMode.CONFIGURATION:
             return np.array([atoms.calc.engine.mbd.values for atoms in images])
+        if self.mode == GradeMode.NEIGHBORHOOD:
+            return np.vstack([atoms.calc.engine.mbd.vatoms.T for atoms in images])
         raise ValueError(self.mode)
 
     def grade(self, images: list[Atoms]) -> None:
@@ -136,10 +146,17 @@ class Grader:
         c = np.linalg.lstsq(self.active_set_matrix.T, matrix.T, rcond=None)[0].T
         grades = np.max(c, axis=1)
 
-        if self.mode == "configuration":
+        if self.mode == GradeMode.CONFIGURATION:
             # evaluate `MV_grade` for each configuration
             for atoms, maxvol_grade in zip(images, grades, strict=True):
                 atoms.info["MV_grade"] = maxvol_grade
+        elif self.mode == GradeMode.NEIGHBORHOOD:
+            i = 0
+            for atoms in images:
+                grades_per_image = grades[i : i + len(atoms)]
+                atoms.calc.results["nbh_grades"] = grades_per_image
+                atoms.info["MV_grade"] = grades_per_image.max()
+                i += len(atoms)
         else:
             raise ValueError(self.mode)
 
