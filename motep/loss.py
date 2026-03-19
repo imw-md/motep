@@ -564,6 +564,7 @@ class LossFunction(LossFunctionBase):
             atoms.calc.targets = targets
 
     def __call__(self, parameters: list[float]) -> float:
+        parameters = self.comm.bcast(parameters, root=0)
         self.mtp_data.parameters = parameters
         for atoms in self.images:
             atoms.calc.update_parameters(self.mtp_data)

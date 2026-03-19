@@ -1,6 +1,6 @@
 """Module for `Optimizer` classes."""
 
-from motep.optimizers.base import OptimizerBase
+from motep.optimizers.base import OptimizerBase, ParallelOptimizerBase
 from motep.optimizers.ga import GeneticAlgorithmOptimizer
 from motep.optimizers.ideal import NoInteractionOptimizer
 from motep.optimizers.level2mtp import Level2MTPOptimizer

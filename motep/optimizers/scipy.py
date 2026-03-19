@@ -3,6 +3,8 @@
 import logging
 from typing import Any
 
+import numpy as np
+import numpy.typing as npt
 from scipy.optimize import (
     OptimizeResult,
     differential_evolution,
@@ -11,7 +13,7 @@ from scipy.optimize import (
 )
 
 from motep.loss import LossFunctionBase
-from motep.optimizers.base import OptimizerBase
+from motep.optimizers.base import ParallelOptimizerBase
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +34,7 @@ class Callback:
         self.iter += 1
 
 
-class ScipyOptimizerBase(OptimizerBase):
+class ScipyOptimizerBase(ParallelOptimizerBase):
     @property
     def optimized_default(self) -> list[str]:
         return ["species_coeffs", "moment_coeffs", "radial_coeffs"]
@@ -43,35 +45,27 @@ class ScipyOptimizerBase(OptimizerBase):
 
     def print_result(self, result: OptimizeResult) -> None:
         """Print `result`."""
-        if self.loss.comm.rank == 0:
-            logger.info("")
-            for handler in logger.handlers:
-                handler.flush()
-            logger.info(f"Optimization result:")
-            logger.info(f"  Message: {result.message}")
-            logger.info(f"  Success: {result.success}")
-            logger.info(f"  Status code: {result.status}")
-            logger.info(f"  Number of function evaluations: {result.nfev}")
-            logger.info(f"  Number of iterations: {result.nit}")
-            # logger.info(f"  Final parameters: {result.x}")
-            # logger.info(f"  Final function value: {result.fun}")
-
-    def optimize(self) -> None:
-        """Optimize with a `scipy.optimize` function."""
-        p = self.loss.mtp_data.parameters
-        self.callback = Callback(self.loss)
-        self.callback(OptimizeResult(x=p, fun=self.loss(p)))
+        logger.info("")
+        for handler in logger.handlers:
+            handler.flush()
+        logger.info(f"Optimization result:")
+        logger.info(f"  Message: {result.message}")
+        logger.info(f"  Success: {result.success}")
+        logger.info(f"  Status code: {result.status}")
+        logger.info(f"  Number of function evaluations: {result.nfev}")
+        logger.info(f"  Number of iterations: {result.nit}")
 
 
 class ScipyDualAnnealingOptimizer(ScipyOptimizerBase):
-    def optimize(self, **kwargs: dict[str, Any]) -> None:
-        super().optimize()
+    def _optimize(self, **kwargs: dict[str, Any]) -> npt.NDArray[np.float64]:
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
+        callback = Callback(self.loss)
+        callback(OptimizeResult(x=parameters, fun=self.rank0_loss(parameters)))
         result = dual_annealing(
-            self.loss,
+            self.rank0_loss,
             bounds=bounds,
-            callback=self.callback,
+            callback=callback,
             seed=40,
             x0=parameters,
         )
@@ -80,15 +74,16 @@ class ScipyDualAnnealingOptimizer(ScipyOptimizerBase):
 
 
 class ScipyDifferentialEvolutionOptimizer(ScipyOptimizerBase):
-    def optimize(self, **kwargs: dict[str, Any]) -> None:
-        super().optimize()
+    def _optimize(self, **kwargs: dict[str, Any]) -> npt.NDArray[np.float64]:
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
+        callback = Callback(self.loss)
+        callback(OptimizeResult(x=parameters, fun=self.rank0_loss(parameters)))
         result = differential_evolution(
-            self.loss,
+            self.rank0_loss,
             bounds,
             popsize=30,
-            callback=self.callback,
+            callback=callback,
             x0=parameters,
         )
         self.print_result(result)
@@ -98,16 +93,17 @@ class ScipyDifferentialEvolutionOptimizer(ScipyOptimizerBase):
 class ScipyMinimizeOptimizer(ScipyOptimizerBase):
     """`Optimizer` class using `scipy.minimize`."""
 
-    def optimize(self, **kwargs: dict[str, Any]) -> None:
+    def _optimize(self, **kwargs: dict[str, Any]) -> npt.NDArray[np.float64]:
         """Optimizer using `scipy.optimize.minimize`."""
-        super().optimize()
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
+        callback = Callback(self.loss)
+        callback(OptimizeResult(x=parameters, fun=self.rank0_loss(parameters)))
 
         if kwargs.get("jac"):
             if "scaling" in self.optimized:
                 raise ValueError("`jac` cannot (so far) be used to optimize `scaling`.")
-            kwargs["jac"] = self.loss.jac
+            kwargs["jac"] = self.rank0_jac
         if kwargs.get("method", "").lower() in {
             "cg",
             "bfgs",
@@ -120,11 +116,11 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
             bounds = None
 
         result = minimize(
-            self.loss,
+            self.rank0_loss,
             parameters,
             bounds=bounds,
-            callback=self.callback,
+            callback=callback,
             **kwargs,
         )
         self.print_result(result)
-        self.loss.mtp_data.parameters = result.x
+        return result.x
