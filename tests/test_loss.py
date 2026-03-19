@@ -212,8 +212,7 @@ def test_stress_weight_scaling() -> None:
     ],
 )
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-# @pytest.mark.parametrize("engine", ["numba_mag", "cext_mag"])
-@pytest.mark.parametrize("engine", ["cext_mag"])
+@pytest.mark.parametrize("engine", ["cext"])
 def test_jac_mag(
     *,
     engine: str,

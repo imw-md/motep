@@ -11,8 +11,9 @@ from ase import Atoms
 from ase.stress import voigt_6_to_full_3x3_stress
 from scipy.constants import eV
 
-from motep.calculator import MTP
+from motep.calculator import make_calculator
 from motep.parallel import DummyMPIComm, world
+from motep.potentials.mmtp.data import MagMTPData
 from motep.potentials.mtp.data import MTPData
 from motep.setting import DataclassFromAny
 
@@ -708,14 +709,21 @@ class LossFunction(LossFunctionBase):
         self,
         *args: tuple,
         engine: str = "cext",
+        relax_magmoms: bool | None = None,
         **kwargs: dict,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.engine = engine
+        is_magnetic = isinstance(self.mtp_data, MagMTPData)
         for atoms in self.images:
             targets = atoms.calc.results
-            mode = "train_mgrad" if "mag" in engine and "mgrad" in targets else "train"
-            atoms.calc = MTP(self.mtp_data, engine=self.engine, mode=mode)
+            mode = "train_mgrad" if is_magnetic and "mgrad" in targets else "train"
+            atoms.calc = make_calculator(
+                self.mtp_data,
+                engine=self.engine,
+                mode=mode,
+                relax_magmoms=relax_magmoms,
+            )
             atoms.calc.targets = targets
             # Special handling of magmoms, since they can be both results and input
             if "magmoms" in targets:

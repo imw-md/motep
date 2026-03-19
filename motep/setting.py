@@ -36,6 +36,7 @@ class CommonSetting(DataclassFromAny):
     species: list[int] = field(default_factory=list)
     seed: int | None = None
     engine: str = "cext"
+    relax_magmoms: bool | None = None
 
 
 @dataclass

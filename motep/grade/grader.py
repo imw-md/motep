@@ -9,7 +9,7 @@ import numpy as np
 from ase import Atoms
 
 import motep.io
-from motep.calculator import MTP
+from motep.calculator import make_calculator
 from motep.grade.maxvol import MaxVol, MaxVolResult, MaxVolSetting
 from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
@@ -85,7 +85,12 @@ class Grader:
         images = [copy(_) for _ in images]
 
         for atoms in images:
-            atoms.calc = MTP(self.mtp_data, engine=self.engine, mode="run")
+            atoms.calc = make_calculator(
+                self.mtp_data,
+                engine=self.engine,
+                mode="run",
+                relax_magmoms=False,
+            )
             atoms.get_potential_energy()
 
         # Make the overdetermined matrix
@@ -122,7 +127,12 @@ class Grader:
         # shallow copies of images
         images = [copy(_) for _ in images]
         for atoms in images:
-            atoms.calc = MTP(self.mtp_data, engine=self.engine, mode="run")
+            atoms.calc = make_calculator(
+                self.mtp_data,
+                engine=self.engine,
+                mode="run",
+                relax_magmoms=False,
+            )
             atoms.get_potential_energy()
 
         # Make the overdetermined matrix

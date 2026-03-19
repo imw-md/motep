@@ -37,6 +37,7 @@ class Trainer:
         steps: list[dict] | None = None,
         *,
         update_mindist: bool = False,
+        relax_magmoms: bool | None = None,
         comm: DummyMPIComm = world,
     ) -> None:
         """Initialize.
@@ -59,6 +60,8 @@ class Trainer:
             MPI.Comm object.
         update_mindist : bool (optional)
             Whether to update min_dist of the MTP potential before training.
+        relax_magmoms : bool or None (optional)
+            Whether to relax magnetic moments.  ``None`` uses mode-based default.
 
         """
         self.mtp_data = mtp_data
@@ -73,6 +76,7 @@ class Trainer:
         self.steps = steps or [{"method": "minimize"}]
         self.comm = comm
         self.should_update_mindist = update_mindist
+        self.relax_magmoms = relax_magmoms
 
     def update_mindist(self, images: list[Atoms]) -> None:
         """Update min_dist of the MTP potential."""
@@ -101,7 +105,12 @@ class Trainer:
 
             loss = MlippyLossFunction(*loss_args, comm=self.comm)
         else:
-            loss = LossFunction(*loss_args, engine=self.engine, comm=self.comm)
+            loss = LossFunction(
+                *loss_args,
+                engine=self.engine,
+                relax_magmoms=self.relax_magmoms,
+                comm=self.comm,
+            )
 
         for i, step in enumerate(self.steps):
             with measure_time(f"step {i}: {step['method']}", comm=self.comm):
@@ -165,8 +174,9 @@ def train_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
         engine=setting.common.engine,
         loss=setting.loss,
         steps=setting.steps,
-        comm=comm,
         update_mindist=setting.update_mindist,
+        relax_magmoms=setting.common.relax_magmoms,
+        comm=comm,
     )
     trainer.train(images)
 

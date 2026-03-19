@@ -23,15 +23,15 @@ setup_map = {
     "numpy": {"engine": "numpy"},
     "numba": {"engine": "numba"},
     "numba_train": {"engine": "numba", "mode": "train"},
-    "numba_mag": {"engine": "numba_mag"},
-    "numba_mag_train": {"engine": "numba_mag", "mode": "train"},
-    "numba_mag_train_mgrad": {"engine": "numba_mag", "mode": "train_mgrad"},
+    "numba_mag": {"engine": "numba", "magnetic": True},
+    "numba_mag_train": {"engine": "numba", "mode": "train", "magnetic": True},
+    "numba_mag_train_mgrad": {"engine": "numba", "mode": "train_mgrad", "magnetic": True},
     "jax": {"engine": "jax"},
     "cext": {"engine": "cext"},
     "cext_train": {"engine": "cext", "mode": "train"},
-    "cext_mag": {"engine": "cext_mag"},
-    "cext_mag_train": {"engine": "cext_mag", "mode": "train"},
-    "cext_mag_train_mgrad": {"engine": "cext_mag", "mode": "train_mgrad"},
+    "cext_mag": {"engine": "cext", "magnetic": True},
+    "cext_mag_train": {"engine": "cext", "mode": "train", "magnetic": True},
+    "cext_mag_train_mgrad": {"engine": "cext", "mode": "train_mgrad", "magnetic": True},
 }
 
 all_setups = [
@@ -109,12 +109,13 @@ def _time_mtp(
     *,
     engine: str,
     mode: str = "run",
+    magnetic: bool = False,
 ) -> np.ndarray:
     mtp_data = read_mtp(pot_path)
     species = []
 
     # Reinitialize radial coefficients if magnetic, since they change size
-    if "mag" in engine:
+    if magnetic:
         mtp_data = MagMTPData.from_base(mtp_data)
         mtp_data.radial_coeffs = None
         mtp_data.initialize(np.random.default_rng(123))
