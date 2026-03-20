@@ -2,6 +2,7 @@
 
 import logging
 import pathlib
+from copy import copy
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pprint import pformat
@@ -91,7 +92,7 @@ class Grader:
             List of ASE Atoms objects used for training.
 
         """
-        matrix = self.calc_matrix(images)
+        matrix = self._calc_moment_basis_matrix(images)
         maxvol = MaxVol(
             algorithm=self.maxvol_setting.algorithm,
             init_method=self.maxvol_setting.init_method,
@@ -104,18 +105,21 @@ class Grader:
         )
         self.active_set_matrix = matrix[self.indices]
 
-    def calc_matrix(self, images: list[Atoms]) -> np.ndarray:
+    def _calc_moment_basis_matrix(self, images: list[Atoms]) -> np.ndarray:
         """Calculate the matrix of moment basis values.
 
         Returns
         -------
-        matrix : np.ndarray
+        moment_basis_matrix : np.ndarray
 
         Raises
         ------
         ValueError
 
         """
+        # shallow copies of images
+        images = [copy(_) for _ in images]
+
         for atoms in images:
             atoms.calc = MTP(self.mtp_data, engine=self.engine, mode="run")
             atoms.get_potential_energy()
@@ -127,21 +131,35 @@ class Grader:
             return np.vstack([atoms.calc.engine.mbd.vatoms.T for atoms in images])
         raise ValueError(self.mode)
 
-    def grade(self, images: list[Atoms]) -> None:
+    def grade(self, images: list[Atoms]) -> list[Atoms]:
         """Grade.
 
         Parameters
         ----------
         images : list[Atoms]
-            List of ASE Atoms objects to evaluate.
+            List of ASE :class:`~ase.Atoms` objects to evaluate.
+
+        Returns
+        -------
+        images : list[Atoms]
+            List of ASE :class:`~ase.Atoms` objects with extrapolation grades.
 
         Raises
         ------
         ValueError
 
+        Notes
+        -----
+        This class creates a lightweight shallow copy of the provided Atoms
+        objects. Atomic positions and arrays are treated as immutable and are
+        shared with the input. Only the calculator is replaced internally.
+
         """
+        # shallow copies of images
+        images = [copy(_) for _ in images]
+
         # Make the overdetermined matrix
-        matrix = self.calc_matrix(images)
+        matrix = self._calc_moment_basis_matrix(images)
         # Eq. (8) or the one after Eq. (11) in [Podryabinkin_CMS_2017_Active]_
         c = np.linalg.lstsq(self.active_set_matrix.T, matrix.T, rcond=None)[0].T
         grades = np.max(c, axis=1)
@@ -150,15 +168,16 @@ class Grader:
             # evaluate `MV_grade` for each configuration
             for atoms, maxvol_grade in zip(images, grades, strict=True):
                 atoms.info["MV_grade"] = maxvol_grade
-        elif self.mode == GradeMode.NEIGHBORHOOD:
+            return images
+        if self.mode == GradeMode.NEIGHBORHOOD:
             i = 0
             for atoms in images:
                 grades_per_image = grades[i : i + len(atoms)]
                 atoms.calc.results["nbh_grades"] = grades_per_image
                 atoms.info["MV_grade"] = grades_per_image.max()
                 i += len(atoms)
-        else:
-            raise ValueError(self.mode)
+            return images
+        raise ValueError(self.mode)
 
 
 def grade(filename_setting: str, comm: DummyMPIComm = world) -> None:
@@ -215,7 +234,7 @@ def grade(filename_setting: str, comm: DummyMPIComm = world) -> None:
         comm=comm,
     )
     grader.update(images_training)
-    grader.grade(images_in)
+    images_out = grader.grade(images_in)
 
     if comm.rank == 0:
         logger.info(f"{'':=^72s}\n")
@@ -223,4 +242,4 @@ def grade(filename_setting: str, comm: DummyMPIComm = world) -> None:
         logger.info(grader.indices)
         for handler in logger.handlers:
             handler.flush()
-        motep.io.write(setting.data_out[0], images_in)
+        motep.io.write(setting.data_out[0], images_out)
