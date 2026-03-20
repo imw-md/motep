@@ -1,7 +1,6 @@
 """MTP Engine using C extension."""
 
 import numpy as np
-import numpy.typing as npt
 from ase import Atoms
 
 from motep.potentials.mtp import get_types

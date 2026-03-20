@@ -3,13 +3,14 @@ import numpy as np
 import numpy.typing as npt
 
 
-@nb.njit((nb.float64[:], nb.float64[:]))
-def update_mbd_values(
-    mbd_values: npt.NDArray[np.float64],
+@nb.njit((nb.int32, nb.float64[:, :], nb.float64[:]))
+def update_mbd_vatoms(
+    i: np.int32,
+    mbd_vatoms: npt.NDArray[np.float64],
     basis_values: npt.NDArray[np.float64],
 ) -> None:
-    for iamc in range(mbd_values.size):
-        mbd_values[iamc] += basis_values[iamc]
+    for iamc in range(mbd_vatoms.shape[0]):
+        mbd_vatoms[iamc, i] += basis_values[iamc]
 
 
 @nb.njit((nb.int32, nb.int32[:], nb.float64[:, :, :], nb.float64[:, :, :]))

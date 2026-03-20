@@ -9,6 +9,14 @@ from ase.data import chemical_symbols
 from ase.utils import reader, string2index, writer
 
 
+def _is_float(s: str) -> bool:
+    try:
+        float(s)
+    except ValueError:
+        return False
+    return True
+
+
 @reader
 def read_cfg(
     fd: TextIO,
@@ -80,10 +88,15 @@ def _read_image(file: TextIO, species: list[int] | None) -> Atoms:
             stress = [float(value) for value in next(file).split()]
             stress = dict(zip(keys, stress, strict=True))
         elif line.split()[0] == "Feature":
-            try:
-                info[str(line.split()[1])] = float(line.split()[2])
-            except ValueError:
-                info[str(line.split()[1])] = line.split()[2]
+            key, value = line.split()[1:3]
+            if key == "MV_grade":
+                results[key] = float(value)
+            elif value.isdigit():
+                info[key] = int(value)
+            elif _is_float(value):
+                info[key] = float(value)
+            else:
+                info[key] = value
 
     if species is None:
         numbers = atomdata["type"]
@@ -223,6 +236,12 @@ def _write_image(
     if "stress" in atoms.calc.results:
         _write_stress(file, atoms)
     for key, value in atoms.info.items():
+        fmt = ".6f" if isinstance(value, float) else ""
+        file.write(f" Feature   {key}\t{value:{fmt}}\n")
+    for key in ["MV_grade"]:
+        value = atoms.calc.results.get(key, None)
+        if value is None:
+            continue
         fmt = ".6f" if isinstance(value, float) else ""
         file.write(f" Feature   {key}\t{value:{fmt}}\n")
     file.write("END_CFG\n")

@@ -22,7 +22,7 @@ void calc_run(
     int n_times,
     const double *moment_coeffs,
     double *energies, double *gradient,
-    double *mbd_values)
+    double *mbd_vatoms)
 {
     int rbs = radial_basis_size;
 
@@ -125,7 +125,13 @@ void calc_run(
             energies[i] += moment_coeffs[i_am] * m[idx];
         }
 
-        accumulate_mbd_values(n_alpha_scalar, alpha_moment_mapping, m, mbd_values);
+        accumulate_mbd_vatoms(
+            i,
+            n_atoms,
+            n_alpha_scalar,
+            alpha_moment_mapping,
+            m,
+            mbd_vatoms);
 
         free(r_abs);
         free(r_unit);
@@ -363,13 +369,15 @@ void calc_train(
         free(dgdmb);
 
         /* ====================================================================
-         * Step 7: Accumulate mapped moments into mbd_values
+         * Step 7: Accumulate mapped moments into mbd_vatoms
          * ==================================================================== */
-        accumulate_mbd_values(
+        accumulate_mbd_vatoms(
+            i,
+            n_atoms,
             n_alpha_scalar,
             alpha_moment_mapping,
             m,
-            mbd->values);
+            mbd->vatoms);
 
         /* ====================================================================
          * Step 8: Accumulate moment basis derivatives

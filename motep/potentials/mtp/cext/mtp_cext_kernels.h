@@ -557,17 +557,19 @@ static inline void accumulate_mbd_dedcs(
 }
 
 /* ==========================================================================
- * Accumulate mapped moments into mbd_values
+ * Accumulate mapped moments into mbd_vatoms
  * ========================================================================== */
-static inline void accumulate_mbd_values(
+static inline void accumulate_mbd_vatoms(
+    int i,
+    int n_atoms,
     int n_alpha_scalar,
     const int *alpha_moment_mapping,
     const double *m,
-    double *mbd_values)
+    double *mbd_vatoms)
 {
     for (int iamc = 0; iamc < n_alpha_scalar; iamc++)
     {
-        mbd_values[iamc] += m[alpha_moment_mapping[iamc]];
+        mbd_vatoms[iamc * n_atoms + i] += m[alpha_moment_mapping[iamc]];
     }
 }
 
