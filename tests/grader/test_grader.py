@@ -17,12 +17,12 @@ def test_grader(mode: GradeMode, data_path: Path) -> None:
     images_training = read_cfg(path / "out.cfg", index=":")
     mtp_data = read_mtp(path / "pot.mtp")
 
-    grades_ref = [atoms.info["MV_grade"] for atoms in images_training]
+    grades_ref = [atoms.calc.results["MV_grade"] for atoms in images_training]
 
     grader = Grader(mtp_data, mode=mode)
     grader.update(images_training)
     images_out = grader.grade(images_training)
 
-    grades = [atoms.info["MV_grade"] for atoms in images_out]
+    grades = [atoms.calc.results["MV_grade"] for atoms in images_out]
 
     # np.testing.assert_allclose(grades, grades_ref)  # TODO
