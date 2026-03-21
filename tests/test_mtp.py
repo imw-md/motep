@@ -150,7 +150,10 @@ def test_forces(
 @pytest.mark.parametrize("component", ["xx", "yy", "zz", "yz", "zx", "xy"])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
-@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine])
+@pytest.mark.parametrize(
+    "engine",
+    [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine, CExtMTPEngine],
+)
 def test_stress(
     engine: type[EngineBase],
     crystal: int,
