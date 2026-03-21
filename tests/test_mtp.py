@@ -14,26 +14,6 @@ from motep.potentials.mtp.numba.engine import NumbaMTPEngine
 from motep.potentials.mtp.numpy.engine import NumpyMTPEngine
 
 
-def get_scale(component: str, d: float) -> np.ndarray:
-    """Get the scaling matrix for the corresponding stress component."""
-    voigt_index = ["xx", "yy", "zz", "yz", "zx", "xy"].index(component)
-    if component == "xx":
-        scale = np.diag((1.0 + d, 1.0, 1.0))
-    elif component == "yy":
-        scale = np.diag((1.0, 1.0 + d, 1.0))
-    elif component == "zz":
-        scale = np.diag((1.0, 1.0, 1.0 + d))
-    elif component == "yz":
-        scale = np.array(((1.0, 0.0, 0.0), (0.0, 1.0, 0.5 * d), (0.0, 0.5 * d, 1.0)))
-    elif component == "zx":
-        scale = np.array(((1.0, 0.0, 0.5 * d), (0.0, 1.0, 0.0), (0.5 * d, 0.0, 1.0)))
-    elif component == "xy":
-        scale = np.array(((1.0, 0.5 * d, 0.0), (0.5 * d, 1.0, 0.0), (0.0, 0.0, 1.0)))
-    else:
-        raise ValueError(component)
-    return voigt_index, scale
-
-
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
 @pytest.mark.parametrize("mode", ["run", "train"])
@@ -147,15 +127,16 @@ def test_forces(
     assert forces_ref[0, 0] == pytest.approx(f, abs=1e-4)
 
 
-@pytest.mark.parametrize("component", ["xx", "yy", "zz", "yz", "zx", "xy"])
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
-@pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine])
+@pytest.mark.parametrize(
+    "engine",
+    [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine, CExtMTPEngine],
+)
 def test_stress(
     engine: type[EngineBase],
     crystal: int,
     level: int,
-    component: str,
     data_path: pathlib.Path,
 ) -> None:
     """Test if stresses are consistent with finite-difference values.
@@ -172,26 +153,42 @@ def test_stress(
     mtp_data = read_mtp(path / "pot.mtp")
     mtp = engine(mtp_data)
     atoms_ref = read_cfg(path / "out.cfg", index=-1)
-
     stress_ref = mtp.calculate(atoms_ref)["stress"]
 
-    dx = 1e-6
+    stress = np.zeros((3, 3), dtype=float)
+    eps = 1e-6
+    cell = atoms_ref.cell.copy()
+    volume = atoms_ref.get_volume()
+    for i in range(3):
+        x = np.eye(3)
+        x[i, i] = 1.0 + eps
+        atoms = atoms_ref.copy()
+        atoms.set_cell(cell @ x, scale_atoms=True)
+        eplus = mtp.calculate(atoms)["energy"]
 
-    atoms = atoms_ref.copy()
-    sindex, scale = get_scale(component, +1.0 * dx)
-    atoms.set_cell(atoms.get_cell() @ scale, scale_atoms=True)
-    ep = mtp.calculate(atoms)["energy"]
+        x[i, i] = 1.0 - eps
+        atoms = atoms_ref.copy()
+        atoms.set_cell(cell @ x, scale_atoms=True)
+        eminus = mtp.calculate(atoms)["energy"]
 
-    atoms = atoms_ref.copy()
-    sindex, scale = get_scale(component, -1.0 * dx)
-    atoms.set_cell(atoms.get_cell() @ scale, scale_atoms=True)
-    em = mtp.calculate(atoms)["energy"]
+        stress[i, i] = (eplus - eminus) / (2.0 * eps * volume)
+        x[i, i] = 1.0
 
-    s = (ep - em) / (2.0 * dx) / atoms_ref.get_volume()
+        j = i - 2
+        x[i, j] = x[j, i] = +0.5 * eps
+        atoms = atoms_ref.copy()
+        atoms.set_cell(cell @ x, scale_atoms=True)
+        eplus = mtp.calculate(atoms)["energy"]
 
-    print(stress_ref[sindex], s)
+        x[i, j] = x[j, i] = -0.5 * eps
+        atoms = atoms_ref.copy()
+        atoms.set_cell(cell @ x, scale_atoms=True)
+        eminus = mtp.calculate(atoms)["energy"]
 
-    assert stress_ref[sindex] == pytest.approx(s, abs=1e-4)
+        stress[i, j] = stress[j, i] = (eplus - eminus) / (2 * eps * volume)
+
+    stress = stress.ravel()[[0, 4, 8, 5, 2, 1]]
+    np.testing.assert_allclose(stress, stress_ref, rtol=0.0, atol=1e-4)
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
