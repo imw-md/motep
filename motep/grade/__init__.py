@@ -2,7 +2,7 @@
 
 import argparse
 
-from motep.grader.grader import grade
+from motep.grade.grader import grade
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:

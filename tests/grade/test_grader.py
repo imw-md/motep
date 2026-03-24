@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from motep.grader.grader import GradeMode, Grader
+from motep.grade.grader import GradeMode, Grader
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 

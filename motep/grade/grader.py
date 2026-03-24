@@ -12,7 +12,7 @@ from ase import Atoms
 
 import motep.io
 from motep.calculator import MTP
-from motep.grader.maxvol import MaxVol, MaxVolSetting
+from motep.grade.maxvol import MaxVol, MaxVolSetting
 from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.parallel import DummyMPIComm, world
