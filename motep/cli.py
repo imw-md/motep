@@ -4,7 +4,8 @@ import argparse
 import logging
 import sys
 
-from motep import applier, evaluator, grader, trainer, upconverter
+import motep.train.cli as train_cli
+from motep import applier, evaluator, grader, upconverter
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -20,7 +21,7 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command")
 
     commands = {
-        "train": trainer,
+        "train": train_cli,
         "apply": applier,
         "evaluate": evaluator,
         "grade": grader,
