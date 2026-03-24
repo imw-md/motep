@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from motep.grader.maxvol import MaxVol
+from motep.grade.maxvol import MaxVol
 
 
 def test_maxvol() -> None:

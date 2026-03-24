@@ -6,7 +6,7 @@ import numpy as np
 
 import motep.io
 from motep.io.mlip.cfg import read_cfg, write_cfg
-from motep.trainer import read_images
+from motep.train.trainer import read_images
 
 
 def test_read_path(data_path: pathlib.Path) -> None:

@@ -1,6 +1,5 @@
 """`motep train` command."""
 
-import argparse
 import logging
 import pathlib
 from pprint import pformat
@@ -18,11 +17,6 @@ from motep.setting import LossSetting, load_setting_train
 from motep.utils import measure_time
 
 logger = logging.getLogger(__name__)
-
-
-def add_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add arguments."""
-    parser.add_argument("setting")
 
 
 class Trainer:
@@ -136,7 +130,7 @@ class Trainer:
         return loss
 
 
-def train(filename_setting: str, comm: DummyMPIComm) -> None:
+def train(filename_setting: str, comm: DummyMPIComm = world) -> None:
     """Train."""
     setting = load_setting_train(filename_setting)
     if comm.rank == 0:
@@ -174,9 +168,3 @@ def train(filename_setting: str, comm: DummyMPIComm) -> None:
     if comm.rank == 0:
         logger.info(f"{'':=^72s}\n")
         write_mtp(setting.potential_final, mtp_data)
-
-
-def run(args: argparse.Namespace) -> None:
-    """Run."""
-    with measure_time("total"):
-        train(args.setting, comm=world)
