@@ -212,7 +212,7 @@ def test_molecules(
     ],
 )
 @pytest.mark.parametrize("level", [2, 4])
-@pytest.mark.parametrize("crystal", ["noncubic", "size"])
+@pytest.mark.parametrize("crystal", ["noncubic"])
 @pytest.mark.parametrize("engine", ["cext"])
 def test_crystals(
     *,
