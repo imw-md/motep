@@ -53,7 +53,7 @@ doc = [
 ]
 
 [project.scripts]
-motep = "motep.__init__:main"
+motep = "motep.cli:main"
 
 [tool.setuptools.packages]
 find = {}
