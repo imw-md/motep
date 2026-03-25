@@ -29,12 +29,11 @@ jobs:
           python -m pip install meson-python setuptools_scm
           python -m pip install numpy">=2,<3"  # numpy 2.x.x for build
           python -m pip install numba jax
-          python -m pip install pytest
           if [ "${{ matrix.mpi }}" = "true" ]; then
-            python -m pip install --no-build-isolation -e ".[mpi]"
+            python -m pip install --no-build-isolation -e ".[test,mpi]"
           else
-            python -m pip install --no-build-isolation -e .
+            python -m pip install --no-build-isolation -e ".[test]"
           fi
       - name: Run pytest
         run: |
-          python -m pytest -v --durations=0 --durations-min=0.01
+          python -m pytest -v --durations=0 --durations-min=0.01 -n 4
