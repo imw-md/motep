@@ -1,6 +1,5 @@
-"""`motep run` command."""
+"""`motep run`."""
 
-import argparse
 import logging
 import pathlib
 from pprint import pformat
@@ -9,18 +8,13 @@ import motep.io
 from motep.calculator import MTP
 from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
-from motep.parallel import DummyMPIComm, world
+from motep.parallel import DummyMPIComm
 from motep.setting import load_setting_apply
 
 logger = logging.getLogger(__name__)
 
 
-def add_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add arguments."""
-    parser.add_argument("setting")
-
-
-def apply(filename_setting: str, comm: DummyMPIComm) -> None:
+def run_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
     """Run."""
     setting = load_setting_apply(filename_setting)
     if comm.rank == 0:
@@ -49,8 +43,3 @@ def apply(filename_setting: str, comm: DummyMPIComm) -> None:
         atoms.get_potential_energy()
 
     motep.io.write(setting.data_out[0], images_in)
-
-
-def run(args: argparse.Namespace) -> None:
-    """Run."""
-    apply(args.setting, comm=world)

@@ -1,22 +1,21 @@
-"""`motep train`."""
+"""`motep upconvert`."""
 
 import argparse
 
 from motep.parallel import world
+from motep.upconvert.upconverter import upconvert_from_setting
 from motep.utils import measure_time
-
-from .trainer import train_from_setting
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Add arguments."""
-    parser.add_argument("setting")
+    parser.add_argument("setting", nargs="?")
 
 
 def run(args: argparse.Namespace) -> None:
     """Run."""
     with measure_time("total"):
-        train_from_setting(args.setting, comm=world)
+        upconvert_from_setting(args.setting, comm=world)
 
 
 def main() -> None:

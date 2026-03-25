@@ -180,7 +180,7 @@ class Grader:
         raise ValueError(self.mode)
 
 
-def grade(filename_setting: str, comm: DummyMPIComm = world) -> None:
+def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
     """Grade.
 
     This adds `MV_grade` to `atoms.info` or `nbh_grades` to `atoms.arrays`.
