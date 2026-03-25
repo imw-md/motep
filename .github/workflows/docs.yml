@@ -5,11 +5,13 @@ on:
       - "*"
     paths:
       - "docs/**"
+      - "examples/**"
       - ".github/workflows/docs.yml"
       - "pyproject.toml"
   pull_request:
     paths:
       - "docs/**"
+      - "examples/**"
       - ".github/workflows/docs.yml"
       - "pyproject.toml"
   workflow_dispatch:
