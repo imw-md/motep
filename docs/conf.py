@@ -16,13 +16,19 @@ author = "imw-md/motep"
 extensions = [
     "sphinx.ext.autodoc",
     "numpydoc",
+    "sphinx_gallery.gen_gallery",
 ]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
-# The suffix of source filenames.
-source_suffix = ".rst"
+default_role = "code"
+
+sphinx_gallery_conf = {
+    "filename_pattern": r"/*\.py",
+    "examples_dirs": ["../examples"],
+    "gallery_dirs": ["examples"],
+}
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -30,7 +36,7 @@ source_suffix = ".rst"
 
 html_theme = "sphinx_book_theme"
 html_static_path = ["_static"]
-
+html_css_files = ["custom.css"]
 html_theme_options = {
     # https://pydata-sphinx-theme.readthedocs.io/en/stable/user_guide/header-links.html
     "github_url": "https://github.com/imw-md/motep",

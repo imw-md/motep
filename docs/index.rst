@@ -14,6 +14,7 @@ Please cite the paper [2]_ when publishing the results obtained with MOTEP.
     :maxdepth: 1
 
     installation
+    examples/index
     cli/index
     calculators
     optimizers/index
