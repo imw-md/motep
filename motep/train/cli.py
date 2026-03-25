@@ -2,8 +2,10 @@
 
 import argparse
 
-from motep.train.trainer import train
+from motep.parallel import world
 from motep.utils import measure_time
+
+from .trainer import train_from_setting
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -14,7 +16,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 def run(args: argparse.Namespace) -> None:
     """Run."""
     with measure_time("total"):
-        train(args.setting)
+        train_from_setting(args.setting, comm=world)
 
 
 def main() -> None:
