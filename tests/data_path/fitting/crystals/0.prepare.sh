@@ -12,7 +12,7 @@ mlp=$mlip/bin/mlp
 root=$PWD
 original=$(realpath $(dirname $0))/../../original/crystals
 # crystals=(cubic noncubic)
-crystals=(size)
+crystals=(multi)
 
 for crystal in $crystals; do
   species_count=1
