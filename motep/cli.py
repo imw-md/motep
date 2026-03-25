@@ -4,10 +4,11 @@ import argparse
 import logging
 import sys
 
+import motep.evaluate.cli
 import motep.grade.cli
 import motep.train.cli
 import motep.upconvert.cli
-from motep import applier, evaluator
+from motep import applier
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -25,7 +26,7 @@ def main() -> None:
     commands = {
         "train": motep.train.cli,
         "apply": applier,
-        "evaluate": evaluator,
+        "evaluate": motep.evaluate.cli,
         "grade": motep.grade.cli,
         "upconvert": motep.upconvert.cli,
     }

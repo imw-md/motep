@@ -1,6 +1,5 @@
 """`motep evaluate` command."""
 
-import argparse
 import logging
 import pathlib
 from copy import copy
@@ -10,10 +9,9 @@ from motep.calculator import MTP
 from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.loss import ErrorPrinter
-from motep.parallel import DummyMPIComm, world
+from motep.parallel import DummyMPIComm
 from motep.potentials.mtp.data import MTPData
 from motep.setting import load_setting_apply
-from motep.utils import measure_time
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +64,6 @@ class Evaluator:
         return images_eval
 
 
-def add_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add arguments."""
-    parser.add_argument("setting")
-
-
 def evaluate_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
     """Evaluate the MTP potential on data from a setting file and print errors.
 
@@ -112,9 +105,3 @@ def evaluate_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
     if comm.rank == 0:
         logger.info(f"{'':=^72s}\n")
         ErrorPrinter(images_eval).log()
-
-
-def run(args: argparse.Namespace) -> None:
-    """Run."""
-    with measure_time("total"):
-        evaluate_from_setting(args.setting, comm=world)
