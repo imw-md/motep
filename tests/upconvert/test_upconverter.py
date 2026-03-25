@@ -7,7 +7,7 @@ import pytest
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.potentials.mtp.numba.engine import NumbaMTPEngine
-from motep.upconverter import upconvert
+from motep.upconvert.upconverter import upconvert
 
 _levels = [[i, j] for i in range(2, 22, 2) for j in range(i, 22, 2)]
 

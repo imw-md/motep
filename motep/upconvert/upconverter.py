@@ -1,19 +1,13 @@
-"""`motep upconvert` command."""
+"""`motep upconvert`."""
 
-import argparse
 from collections import defaultdict
 
 import numpy as np
 
 from motep.io.mlip.mtp import read_mtp, write_mtp
-from motep.parallel import DummyMPIComm, world
+from motep.parallel import DummyMPIComm
 from motep.potentials.mtp.data import MTPData
 from motep.setting import load_setting_upconvert
-
-
-def add_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add arguments."""
-    parser.add_argument("setting", nargs="?")
 
 
 def _init(src: MTPData, dst: MTPData) -> None:
@@ -137,14 +131,14 @@ def upconvert(src: MTPData, dst: MTPData) -> None:
     _copy_moment_coeffs(src, dst)
 
 
-def run(args: argparse.Namespace) -> None:
-    """Run."""
-    setting = load_setting_upconvert(args.setting)
+def upconvert_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
+    """Upconvert."""
+    setting = load_setting_upconvert(filename_setting)
 
     src = read_mtp(setting.potentials.base)
     dst = read_mtp(setting.potentials.initial)
 
     upconvert(src, dst)
 
-    if world.rank == 0:
+    if comm.rank == 0:
         write_mtp(setting.potentials.final, dst)
