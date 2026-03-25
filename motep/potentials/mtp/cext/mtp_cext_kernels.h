@@ -70,16 +70,22 @@ static inline void sum_radial_basis(
         for (int irf = 0; irf < rfc; irf++)
         {
             double sum = 0.0;
-
+            double c = 0.0;
             for (int irb = 0; irb < rbs; irb++)
             {
                 /* Access: radial_coeffs[itype, jtype, irf, irb] */
                 int coeff_idx = ((itype * species_count + jtype) * rfc + irf) * rbs + irb;
                 /* Access input_basis[irb, j] via flat index: irb * n_neighbors + j */
-                sum += radial_coeffs[coeff_idx] * input_basis[irb * n_neighbors + j];
+                /* Use the Neumaier summation algorithm to reduce floating-point error */
+                double x = radial_coeffs[coeff_idx] * input_basis[irb * n_neighbors + j];
+                double t = sum + x;
+                if (fabs(sum) >= fabs(x))
+                    c += (sum - t) + x;
+                else
+                    c += (x - t) + sum;
+                sum = t;
             }
-
-            output[irf * n_neighbors + j] = sum;
+            output[irf * n_neighbors + j] = sum + c;
         }
     }
 }
