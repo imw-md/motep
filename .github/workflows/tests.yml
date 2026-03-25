@@ -37,4 +37,4 @@ jobs:
           fi
       - name: Run pytest
         run: |
-          python -m pytest -v --durations=0
+          python -m pytest -v --durations=0 --durations-min=0.01
