@@ -21,7 +21,7 @@ def test_help_main() -> None:
     assert result.returncode == 0
 
 
-@pytest.mark.parametrize("command", ["train", "grade", "upconvert", "evaluate"])
+@pytest.mark.parametrize("command", ["train", "run", "grade", "upconvert", "evaluate"])
 def test_help_sub(command: str) -> None:
     """Test `motep command -h`."""
     motep = shutil.which("motep")
