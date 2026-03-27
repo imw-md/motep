@@ -16,6 +16,7 @@ Please cite the paper [2]_ when publishing the results obtained with MOTEP.
     installation
     examples/index
     cli/index
+    api/index
     calculators
     optimizers/index
     loss
