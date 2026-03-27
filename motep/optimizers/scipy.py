@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 class Callback:
     """Callback after each iteration."""
 
-    def __init__(self, loss: LossFunctionBase):
+    def __init__(self, loss: LossFunctionBase) -> None:
         self.loss = loss
         self.iter = 0
 
-    def __call__(self, intermediate_result: OptimizeResult):
+    def __call__(self, intermediate_result: OptimizeResult) -> None:
         fun = intermediate_result.fun
         if self.loss.comm.rank == 0:
             logger.info("loss %d: %s", self.iter, fun)
@@ -35,6 +35,8 @@ class Callback:
 
 
 class ScipyOptimizerBase(ParallelOptimizerBase):
+    """SciPy Optimizer."""
+
     @property
     def optimized_default(self) -> list[str]:
         return ["species_coeffs", "moment_coeffs", "radial_coeffs"]
@@ -48,12 +50,12 @@ class ScipyOptimizerBase(ParallelOptimizerBase):
         logger.info("")
         for handler in logger.handlers:
             handler.flush()
-        logger.info(f"Optimization result:")
-        logger.info(f"  Message: {result.message}")
-        logger.info(f"  Success: {result.success}")
-        logger.info(f"  Status code: {result.status}")
-        logger.info(f"  Number of function evaluations: {result.nfev}")
-        logger.info(f"  Number of iterations: {result.nit}")
+        logger.info("Optimization result:")
+        logger.info("  Message: %s", result.message)
+        logger.info("  Success: %s", result.success)
+        logger.info("  Status code: %s", result.status)
+        logger.info("  Number of function evaluations: %s", result.nfev)
+        logger.info("  Number of iterations: %s", result.nit)
 
 
 class ScipyDualAnnealingOptimizer(ScipyOptimizerBase):

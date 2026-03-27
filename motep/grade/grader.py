@@ -245,7 +245,7 @@ def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
     images_out = grader.grade(images_in)
 
     if comm.rank == 0:
-        logger.info(f"{'':=^72s}\n")
+        logger.info("%s\n", "=" * 72)
         logger.info("[data_active]")
         logger.info(grader.indices)
         for handler in logger.handlers:

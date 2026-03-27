@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from pprint import pformat
+from typing import TYPE_CHECKING
 
 import numpy as np
 from ase import Atoms
@@ -11,12 +12,15 @@ from scipy.optimize._minimize import MINIMIZE_METHODS  # noqa: PLC2701
 
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.io.utils import get_dummy_species, read_images
-from motep.loss import ErrorPrinter, LossFunction, LossSetting
-from motep.optimizers import OptimizerBase, make_optimizer
+from motep.loss import ErrorPrinter, LossFunction, LossFunctionBase, LossSetting
+from motep.optimizers import make_optimizer
 from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
 from motep.setting import Setting, parse_setting
 from motep.utils import measure_time
+
+if TYPE_CHECKING:
+    from motep.optimizers.base import OptimizerBase
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +128,7 @@ class Trainer:
         """Update min_dist of the MTP potential."""
         self.mtp_data.min_dist = np.min([_.get_all_distances(mic=True) for _ in images])
 
-    def train(self, images: list[Atoms]) -> LossFunction:
+    def train(self, images: list[Atoms]) -> LossFunctionBase:
         """Train.
 
         Parameters
@@ -134,7 +138,7 @@ class Trainer:
 
         Returns
         -------
-        loss : LossFunction
+        loss : LossFunctionBase
             LossFunction object after training.
 
         """
@@ -152,7 +156,7 @@ class Trainer:
         for i, step in enumerate(self.steps):
             with measure_time(f"step {i}: {step['method']}", comm=self.comm):
                 if self.comm.rank == 0:
-                    logger.info(f"{'':=^72s}\n")
+                    logger.info("%s\n", "=" * 72)
                     logger.info(pformat(step))
                     logger.info("")
                     for handler in logger.handlers:
@@ -217,5 +221,5 @@ def train_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
     trainer.train(images)
 
     if comm.rank == 0:
-        logger.info(f"{'':=^72s}\n")
+        logger.info("%s\n", "=" * 72)
         write_mtp(setting.potential_final, mtp_data)

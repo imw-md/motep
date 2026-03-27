@@ -1,6 +1,6 @@
 """Module for `Optimizer` classes."""
 
-from motep.optimizers.base import OptimizerBase, ParallelOptimizerBase
+from motep.optimizers.base import ParallelOptimizerBase
 from motep.optimizers.ga import GeneticAlgorithmOptimizer
 from motep.optimizers.ideal import NoInteractionOptimizer
 from motep.optimizers.level2mtp import Level2MTPOptimizer
@@ -13,8 +13,14 @@ from motep.optimizers.scipy import (
 )
 
 
-def make_optimizer(optimizer: str) -> OptimizerBase:
-    """Make an `Optimizer` class."""
+def make_optimizer(optimizer: str) -> type[ParallelOptimizerBase]:
+    """Make an `Optimizer` class.
+
+    Returns
+    -------
+    type[ParallelOptimizerBase]
+
+    """
     return {
         "GA": GeneticAlgorithmOptimizer,
         "NI": NoInteractionOptimizer,

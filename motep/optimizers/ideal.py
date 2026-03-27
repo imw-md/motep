@@ -20,6 +20,10 @@ class NoInteractionOptimizer(ParallelOptimizerBase):
         Note that, if there are no composition varieties in the training set,
         the values are physically less meaningful.
 
+        Returns
+        -------
+        npt.NDArray[np.float64]
+
         """
         parameters = self.loss.mtp_data.parameters
         callback = Callback(self.loss)
@@ -62,7 +66,13 @@ class NoInteractionOptimizer(ParallelOptimizerBase):
         return ["species_coeffs"]
 
     def _calc_matrix(self) -> np.ndarray:
-        """Calculate the matrix for linear least squares (LLS)."""
+        """Calculate the matrix for linear least squares (LLS).
+
+        Returns
+        -------
+        np.ndarray
+
+        """
         loss = self.loss
         species = loss.mtp_data.species
         images = loss.images
@@ -73,7 +83,13 @@ class NoInteractionOptimizer(ParallelOptimizerBase):
         return counts
 
     def _calc_vector(self) -> np.ndarray:
-        """Calculate the vector for linear least squares (LLS)."""
+        """Calculate the vector for linear least squares (LLS).
+
+        Returns
+        -------
+        np.ndarray
+
+        """
         images = self.loss.images
         return np.fromiter(
             (atoms.calc.targets["energy"] for atoms in images),

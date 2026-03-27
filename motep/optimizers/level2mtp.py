@@ -81,7 +81,13 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         return mtp_data.parameters
 
     def _calc_matrix(self) -> np.ndarray:
-        """Calculate the matrix for linear least squares (LLS)."""
+        """Calculate the matrix for linear least squares (LLS).
+
+        Returns
+        -------
+        np.ndarray
+
+        """
         tmp = []
         tmp.append(self._calc_matrix_radial_coeffs())
         if "species_coeffs" in self.optimized:

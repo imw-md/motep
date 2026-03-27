@@ -123,5 +123,5 @@ def evaluate_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
 
     # Print errors
     if comm.rank == 0:
-        logger.info(f"{'':=^72s}\n")
+        logger.info("%s\n", "=" * 72)
         ErrorPrinter(images_eval).log()

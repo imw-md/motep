@@ -94,7 +94,13 @@ class ParallelOptimizerBase(OptimizerBase):
     _OP_STOP = 3
 
     def rank0_loss(self, parameters: npt.NDArray[np.float64]) -> float:
-        """Evaluate the loss function, signaling workers first."""
+        """Evaluate the loss function, signaling workers first.
+
+        Returns
+        -------
+        float
+
+        """
         self.loss.comm.bcast(self._OP_LOSS, root=0)
         return self.loss(parameters)
 
@@ -102,7 +108,13 @@ class ParallelOptimizerBase(OptimizerBase):
         self,
         parameters: npt.NDArray[np.float64],
     ) -> npt.NDArray[np.float64]:
-        """Evaluate the Jacobian, signaling workers first."""
+        """Evaluate the Jacobian, signaling workers first.
+
+        Returns
+        -------
+        npt.NDArray[np.float64]
+
+        """
         self.loss.comm.bcast(self._OP_JAC, root=0)
         return self.loss.jac(parameters)
 

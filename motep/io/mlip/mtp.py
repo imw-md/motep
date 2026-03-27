@@ -1,10 +1,9 @@
 """Parsers of MLIP .mtp files."""
 
 import itertools
-import os
-import pathlib
 from dataclasses import asdict
 from numbers import Integral, Real
+from pathlib import Path
 from typing import TextIO
 
 import numpy as np
@@ -29,10 +28,16 @@ def _parse_radial_coeffs(file: TextIO, data: dict) -> np.ndarray:
     return np.array(coeffs).reshape(shape)
 
 
-def read_mtp(file: os.PathLike) -> MTPData:
-    """Read an MLIP .mtp file."""
+def read_mtp(file: str | Path) -> MTPData:
+    """Read an MLIP .mtp file.
+
+    Returns
+    -------
+    MTPData
+
+    """
     data = {}
-    with pathlib.Path(file).open("r", encoding="utf-8") as fd:
+    with Path(file).open("r", encoding="utf-8") as fd:
         for line in fd:
             if line.strip() == "MTP":
                 continue
@@ -91,7 +96,7 @@ def _format_list(value: list) -> str:
     return "{" + ", ".join(f"{_format_value(_)}" for _ in value) + "}"
 
 
-def write_mtp(file: os.PathLike, data: MTPData) -> None:
+def write_mtp(file: str | Path, data: MTPData) -> None:
     """Write an MLIP .mtp file."""
     keys0 = [
         "version",
@@ -120,7 +125,7 @@ def write_mtp(file: os.PathLike, data: MTPData) -> None:
     ]
     data = asdict(data)
     species_count = data["species_count"]
-    with pathlib.Path(file).open("w", encoding="utf-8") as fd:
+    with Path(file).open("w", encoding="utf-8") as fd:
         fd.write("MTP\n")
         for key in keys0:
             if data[key] is not None:
