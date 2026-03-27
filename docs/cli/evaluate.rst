@@ -14,8 +14,5 @@ Usage
 ``motep.evaluate.toml``
 -----------------------
 
-.. code-block:: toml
-
-    data_in = 'in.cfg'  # {'.cfg', '.xyz'}
-    data_out = 'out.cfg'  # {'.cfg', '.xyz'}
-    potential_final = 'final.mtp'
+.. literalinclude:: motep.evaluate.toml
+    :language: toml
