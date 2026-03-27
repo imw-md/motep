@@ -28,7 +28,7 @@ class Callback:
     def __call__(self, intermediate_result: OptimizeResult):
         fun = intermediate_result.fun
         if self.loss.comm.rank == 0:
-            logger.info(f"loss {self.iter:4d}: {fun}")
+            logger.info("loss %d: %s", self.iter, fun)
             for handler in logger.handlers:
                 handler.flush()
         self.iter += 1
