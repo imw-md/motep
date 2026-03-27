@@ -6,7 +6,6 @@ import sys
 
 import motep.evaluate.cli
 import motep.grade.cli
-import motep.run.cli
 import motep.train.cli
 import motep.upconvert.cli
 
@@ -25,7 +24,6 @@ def main() -> None:
 
     commands = {
         "train": motep.train.cli,
-        "run": motep.run.cli,
         "evaluate": motep.evaluate.cli,
         "grade": motep.grade.cli,
         "upconvert": motep.upconvert.cli,
