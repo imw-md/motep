@@ -23,4 +23,6 @@ def test_cli_grade(data_path: Path, tmp_path: Path) -> None:
 def test_example_grade(doc_path: Path) -> None:
     """Test if the input file offered in the documentation is parsable."""
     path = doc_path / "cli/motep.grade.toml"
-    load_setting_grade(path)
+    setting = load_setting_grade(path)
+    assert not isinstance(setting.potentials, dict)  # converted to a dataclass?
+    assert isinstance(setting.potentials.final, str)

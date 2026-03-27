@@ -17,7 +17,7 @@ from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
-from motep.setting import Setting, parse_setting
+from motep.setting import DataclassFromAny, Setting, parse_setting
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +30,23 @@ class GradeMode(StrEnum):
 
 
 @dataclass
+class GradePotentials(DataclassFromAny):
+    """Setting of the potentials."""
+
+    final: str = "final.mtp"
+
+
+@dataclass
 class GradeSetting(Setting):
     """Setting for the extrapolation-grade calculations."""
 
+    potentials: GradePotentials = field(default_factory=GradePotentials)
     mode: GradeMode = GradeMode.CONFIGURATION
     maxvol: MaxVolSetting = field(default_factory=MaxVolSetting)
 
     def __post_init__(self) -> None:
         """Postprocess."""
+        self.potentials = GradePotentials.from_any(self.potentials)
         self.maxvol = MaxVolSetting.from_any(self.maxvol)
 
 
@@ -208,7 +217,7 @@ def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
 
     rng = np.random.default_rng(setting.seed)
 
-    mtp_file = str(Path(setting.potential_final).resolve())
+    mtp_file = str(Path(setting.potentials.final).resolve())
 
     species = setting.species or None
     images_training = read_images(

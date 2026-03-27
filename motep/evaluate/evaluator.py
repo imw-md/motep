@@ -2,7 +2,7 @@
 
 import logging
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from pprint import pformat
 
@@ -18,8 +18,17 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class EvaluatePotentials:
+    """Setting of the potentials."""
+
+    final: str = "final.mtp"
+
+
+@dataclass
 class EvaluateSetting(Setting):
     """Setting for the application of the potential."""
+
+    potentials: EvaluatePotentials = field(default_factory=EvaluatePotentials)
 
 
 def load_setting_evaluate(filename: str | Path | None = None) -> EvaluateSetting:
@@ -102,7 +111,7 @@ def evaluate_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
         for handler in logger.handlers:
             handler.flush()
 
-    mtp_file = str(Path(setting.potential_final).resolve())
+    mtp_file = str(Path(setting.potentials.final).resolve())
 
     species = setting.species or None
     images = read_images(

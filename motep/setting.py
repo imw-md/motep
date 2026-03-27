@@ -39,8 +39,6 @@ class Setting(DataclassFromAny):
     data_in: list[str] = field(default_factory=lambda: ["in.cfg"])
     data_out: list[str] = field(default_factory=lambda: ["out.cfg"])
     species: list[int] = field(default_factory=list)
-    potential_initial: str = "initial.mtp"
-    potential_final: str = "final.mtp"
     seed: int | None = None
     engine: str = "cext"
 

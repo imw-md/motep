@@ -24,7 +24,9 @@ def test_cli_train(data_path: Path, tmp_path: Path) -> None:
 def test_example_train(doc_path: Path) -> None:
     """Test if the input file offered in the documentation is parsable."""
     path = doc_path / "cli/motep.train.toml"
-    load_setting_train(path)
+    setting = load_setting_train(path)
+    assert not isinstance(setting.potentials, dict)  # converted to a dataclass?
+    assert isinstance(setting.potentials.final, str)
 
 
 @pytest.mark.parametrize(

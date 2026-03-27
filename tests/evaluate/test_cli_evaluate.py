@@ -22,4 +22,6 @@ def test_cli_evaluate(data_path: Path, tmp_path: Path) -> None:
 def test_example_evaluate(doc_path: Path) -> None:
     """Test if the input file offered in the documentation is parsable."""
     path = doc_path / "cli/motep.evaluate.toml"
-    load_setting_evaluate(path)
+    setting = load_setting_evaluate(path)
+    assert not isinstance(setting.potentials, dict)  # converted to a dataclass?
+    assert isinstance(setting.potentials.final, str)

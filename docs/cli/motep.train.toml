@@ -1,6 +1,8 @@
 data_training = 'training.cfg'
-potential_initial = 'initial.mtp'
-potential_final = 'final.mtp'
+
+[potentials]
+initial = 'initial.mtp'
+final = 'final.mtp'
 
 # seed = 10  # random seed for initializing MTP parameters
 

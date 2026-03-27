@@ -16,7 +16,7 @@ from motep.loss import ErrorPrinter, LossFunction, LossFunctionBase, LossSetting
 from motep.optimizers import make_optimizer
 from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
-from motep.setting import Setting, parse_setting
+from motep.setting import DataclassFromAny, Setting, parse_setting
 from motep.utils import measure_time
 
 if TYPE_CHECKING:
@@ -38,15 +38,20 @@ def _convert_steps(steps: list[dict]) -> list[dict]:
 
 
 @dataclass
+class TrainPotentials(DataclassFromAny):
+    """Setting of the potentials."""
+
+    initial: str = "initial.mtp"
+    final: str = "final.mtp"
+
+
+@dataclass
 class TrainSetting(Setting):
     """Setting of the training."""
 
+    potentials: TrainPotentials = field(default_factory=TrainPotentials)
     loss: LossSetting = field(default_factory=LossSetting)
-    steps: list[dict] = field(
-        default_factory=lambda: [
-            {"method": "minimize"},
-        ],
-    )
+    steps: list[dict] = field(default_factory=lambda: [{"method": "minimize"}])
     update_mindist: bool = False
 
     def __post_init__(self) -> None:
@@ -194,7 +199,7 @@ def train_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
         for handler in logger.handlers:
             handler.flush()
 
-    untrained_mtp = str(Path(setting.potential_initial).resolve())
+    untrained_mtp = str(Path(setting.potentials.initial).resolve())
 
     species = setting.species or None
     images = read_images(
@@ -222,4 +227,4 @@ def train_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
 
     if comm.rank == 0:
         logger.info("%s\n", "=" * 72)
-        write_mtp(setting.potential_final, mtp_data)
+        write_mtp(setting.potentials.final, mtp_data)
