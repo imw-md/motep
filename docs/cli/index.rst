@@ -5,6 +5,6 @@ Command line interface (CLI)
     :maxdepth: 1
 
     train
+    evaluate
     grade
-    apply
     upconvert

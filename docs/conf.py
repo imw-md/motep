@@ -15,7 +15,7 @@ author = "imw-md/motep"
 
 extensions = [
     "sphinx.ext.autodoc",
-    "numpydoc",
+    "sphinx.ext.napoleon",
     "sphinx_gallery.gen_gallery",
 ]
 
@@ -28,6 +28,7 @@ sphinx_gallery_conf = {
     "filename_pattern": r"/*\.py",
     "examples_dirs": ["../examples"],
     "gallery_dirs": ["examples"],
+    "within_subsection_order": "FileNameSortKey",
 }
 
 

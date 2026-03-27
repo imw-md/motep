@@ -1,5 +1,5 @@
-``motep apply``
-===============
+``motep evaluate``
+==================
 
 This command calculates energies, forces, and stresses for the configurations written
 in ``data_in`` using ``potential_final`` and write them in ``data_out``.
@@ -9,10 +9,10 @@ Usage
 
 .. code-block:: bash
 
-    motep apply motep.apply.toml
+    motep evaluate motep.evaluate.toml
 
-``motep.apply.toml``
---------------------
+``motep.evaluate.toml``
+-----------------------
 
 .. code-block:: toml
 

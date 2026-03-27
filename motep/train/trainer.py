@@ -11,7 +11,7 @@ from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.loss import ErrorPrinter, LossFunction
 from motep.optimizers import OptimizerBase, make_optimizer
-from motep.parallel import DummyMPIComm
+from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
 from motep.setting import LossSetting, load_setting_train
 from motep.utils import measure_time
@@ -31,8 +31,8 @@ class Trainer:
         loss: dict | LossSetting | None = None,
         steps: list[dict] | None = None,
         *,
-        comm: DummyMPIComm,
         update_mindist: bool = False,
+        comm: DummyMPIComm = world,
     ) -> None:
         """Initialize.
 

@@ -54,7 +54,6 @@ doc = [
   "sphinx",
   "sphinx_book_theme",
   "sphinx-gallery",
-  "numpydoc",
 ]
 
 [project.scripts]
