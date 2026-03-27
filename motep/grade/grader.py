@@ -169,16 +169,19 @@ class Grader:
 
         if self.mode == GradeMode.CONFIGURATION:
             # evaluate `MV_grade` for each configuration
-            for atoms, maxvol_grade in zip(images, grades, strict=True):
+            for i, (atoms, maxvol_grade) in enumerate(zip(images, grades, strict=True)):
                 atoms.calc.results["MV_grade"] = maxvol_grade
+                logger.info("configuration %d: %s", i, maxvol_grade)
             return images
         if self.mode == GradeMode.NEIGHBORHOOD:
-            i = 0
-            for atoms in images:
-                grades_per_image = grades[i : i + len(atoms)]
+            idx = 0
+            for i, atoms in enumerate(images):
+                grades_per_image = grades[idx : idx + len(atoms)]
+                maxvol_grade = grades_per_image.max()
                 atoms.calc.results["nbh_grades"] = grades_per_image
-                atoms.calc.results["MV_grade"] = grades_per_image.max()
-                i += len(atoms)
+                atoms.calc.results["MV_grade"] = maxvol_grade
+                logger.info("configuration %d: %s", i, maxvol_grade)
+                idx += len(atoms)
             return images
         raise ValueError(self.mode)
 
