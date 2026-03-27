@@ -54,12 +54,13 @@ class Evaluator:
         # Create shallow copies to preserve originals
         images_eval = [copy(_) for _ in images]
 
-        for atoms in images_eval:
+        for i, atoms in enumerate(images_eval):
             # Save targets before replacing calculator
-            targets = atoms.calc.results
+            targets = atoms.calc.results if atoms.calc else {}
             atoms.calc = MTP(self.mtp_data, engine=self.engine, mode="run")
             atoms.calc.targets = targets
-            atoms.get_potential_energy()
+            energy = atoms.get_potential_energy()
+            logger.info("configuration %d: %s", i, energy)
 
         return images_eval
 

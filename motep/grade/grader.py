@@ -157,6 +157,9 @@ class Grader:
         """
         # shallow copies of images
         images = [copy(_) for _ in images]
+        for atoms in images:
+            atoms.calc = MTP(self.mtp_data, engine=self.engine, mode="run")
+            atoms.get_potential_energy()
 
         # Make the overdetermined matrix
         matrix = self._calc_moment_basis_matrix(images)
