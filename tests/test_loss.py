@@ -10,9 +10,8 @@ from ase.calculators.singlepoint import SinglePointCalculator
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.loss import ErrorPrinter, LossFunction, LossFunctionStress
+from motep.loss import ErrorPrinter, LossFunction, LossFunctionStress, LossSetting
 from motep.parallel import world
-from motep.setting import LossSetting
 
 logger = logging.getLogger(__name__)
 

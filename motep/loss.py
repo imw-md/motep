@@ -3,6 +3,7 @@
 import logging
 from abc import ABC, abstractmethod
 from copy import copy
+from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
@@ -13,9 +14,24 @@ from scipy.constants import eV
 from motep.calculator import MTP
 from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
-from motep.setting import LossSetting
+from motep.setting import DataclassFromAny
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class LossSetting(DataclassFromAny):
+    """Setting of the loss function."""
+
+    energy_weight: float = 1.0
+    forces_weight: float = 0.01
+    stress_weight: float = 0.001
+    energy_per_atom: bool = True
+    forces_per_atom: bool = True
+    stress_times_volume: bool = True
+    energy_per_conf: bool = True
+    forces_per_conf: bool = True
+    stress_per_conf: bool = True
 
 
 def _calc_errors_from_diff(diff: np.ndarray) -> dict[str, float]:

@@ -7,9 +7,8 @@ Modified version: Yuji Ikeda
 import numpy as np
 from ase import Atoms
 
-from motep.potentials.mtp import get_types
 from motep.potentials.mtp.base import EngineBase
-from motep.potentials.mtp.data import MTPData
+from motep.potentials.mtp.data import MTPData, get_types
 
 from .chebyshev import ChebyshevArrayRadialBasis
 from .moment import MomentBasis

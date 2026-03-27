@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import pathlib
 import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Self
-
-from scipy.optimize._minimize import MINIMIZE_METHODS  # noqa: PLC2701
 
 
 class DataclassFromAny:
@@ -28,30 +26,6 @@ class DataclassFromAny:
 
 
 @dataclass
-class LossSetting(DataclassFromAny):
-    """Setting of the loss function."""
-
-    energy_weight: float = 1.0
-    forces_weight: float = 0.01
-    stress_weight: float = 0.001
-    energy_per_atom: bool = True
-    forces_per_atom: bool = True
-    stress_times_volume: bool = True
-    energy_per_conf: bool = True
-    forces_per_conf: bool = True
-    stress_per_conf: bool = True
-
-
-@dataclass
-class UpconvertPotentials:
-    """Setting of the potentials."""
-
-    base: str = "base.mtp"
-    initial: str = "initial.mtp"
-    final: str = "final.mtp"
-
-
-@dataclass
 class Setting(DataclassFromAny):
     """Setting of the training."""
 
@@ -65,60 +39,7 @@ class Setting(DataclassFromAny):
     engine: str = "cext"
 
 
-def _convert_steps(steps: list[dict]) -> list[dict]:
-    for i, value in enumerate(steps):
-        if not isinstance(value, dict):
-            steps["steps"][i] = {"method": value}
-        if value["method"].lower() in MINIMIZE_METHODS:
-            if "kwargs" not in value:
-                value["kwargs"] = {}
-            value["kwargs"]["method"] = value["method"]
-            value["method"] = "minimize"
-    return steps
-
-
-@dataclass
-class TrainSetting(Setting):
-    """Setting of the training."""
-
-    loss: LossSetting = field(default_factory=LossSetting)
-    steps: list[dict] = field(
-        default_factory=lambda: [
-            {"method": "minimize"},
-        ],
-    )
-    update_mindist: bool = False
-
-    def __post_init__(self) -> None:
-        """Postprocess attributes."""
-        if isinstance(self.loss, dict):
-            self.loss = LossSetting(**self.loss)
-
-        # Default 'optimized' is defined in each `Optimizer` class.
-
-        # convert the old style "steps" like {'steps`: ['L-BFGS-B']} to the new one
-        # {'steps`: {'method': 'L-BFGS-B'}
-        self.steps = _convert_steps(self.steps)
-
-
-@dataclass
-class ApplySetting(Setting):
-    """Setting for the application of the potential."""
-
-
-@dataclass
-class UpconvertSetting:
-    """Setting for the upconversion."""
-
-    potentials: UpconvertPotentials = field(default_factory=UpconvertPotentials)
-
-    def __post_init__(self) -> None:
-        """Postprocess attributes."""
-        if isinstance(self.potentials, dict):
-            self.potentials = UpconvertPotentials(**dict(self.potentials))
-
-
-def parse_setting(filename: str) -> dict[str, Any]:
+def parse_setting(filename: str | Path) -> dict[str, Any]:
     """Parse setting file.
 
     Returns
@@ -126,7 +47,7 @@ def parse_setting(filename: str) -> dict[str, Any]:
     dict
 
     """
-    with pathlib.Path(filename).open("rb") as f:
+    with Path(filename).open("rb") as f:
         setting_overwritten = tomllib.load(f)
 
     # convert the data files to lists
@@ -136,38 +57,3 @@ def parse_setting(filename: str) -> dict[str, Any]:
             setting_overwritten[key] = [setting_overwritten[key]]
 
     return setting_overwritten
-
-
-def load_setting_train(filename: str) -> TrainSetting:
-    """Load setting for `train`.
-
-    Returns
-    -------
-    TrainSetting
-
-    """
-    return TrainSetting(**parse_setting(filename))
-
-
-def load_setting_apply(filename: str) -> ApplySetting:
-    """Load setting for `grade`.
-
-    Returns
-    -------
-    GradeSetting
-
-    """
-    return ApplySetting(**parse_setting(filename))
-
-
-def load_setting_upconvert(filename: str | None) -> UpconvertSetting:
-    """Load setting for `upconvert`.
-
-    Returns
-    -------
-    UpconvertSetting
-
-    """
-    if filename is None:
-        return UpconvertSetting()
-    return UpconvertSetting(**parse_setting(filename))

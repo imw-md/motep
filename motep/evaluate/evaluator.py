@@ -1,8 +1,9 @@
 """`motep evaluate` command."""
 
 import logging
-import pathlib
 from copy import copy
+from dataclasses import dataclass
+from pathlib import Path
 from pprint import pformat
 
 from motep.calculator import MTP
@@ -11,9 +12,27 @@ from motep.io.utils import get_dummy_species, read_images
 from motep.loss import ErrorPrinter
 from motep.parallel import DummyMPIComm
 from motep.potentials.mtp.data import MTPData
-from motep.setting import load_setting_apply
+from motep.setting import Setting, parse_setting
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class EvaluateSetting(Setting):
+    """Setting for the application of the potential."""
+
+
+def load_setting_evaluate(filename: str | Path | None = None) -> EvaluateSetting:
+    """Load setting for `evaluate`.
+
+    Returns
+    -------
+    EvaluateSetting
+
+    """
+    if filename is None:
+        return EvaluateSetting()
+    return EvaluateSetting(**parse_setting(filename))
 
 
 class Evaluator:
@@ -76,14 +95,14 @@ def evaluate_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
         MPI communicator.
 
     """
-    setting = load_setting_apply(filename_setting)
+    setting = load_setting_evaluate(filename_setting)
     if comm.rank == 0:
         logger.info(pformat(setting))
         logger.info("")
         for handler in logger.handlers:
             handler.flush()
 
-    mtp_file = str(pathlib.Path(setting.potential_final).resolve())
+    mtp_file = str(Path(setting.potential_final).resolve())
 
     species = setting.species or None
     images = read_images(

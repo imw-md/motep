@@ -8,9 +8,8 @@ import numpy as np
 import numpy.typing as npt
 from ase import Atoms
 
-from motep.potentials.mtp import get_types
 from motep.potentials.mtp.base import EngineBase
-from motep.potentials.mtp.data import MTPData
+from motep.potentials.mtp.data import MTPData, get_types
 
 from .conversion import BasisConverter, moments_count_to_level_map
 from .moment import MomentBasis

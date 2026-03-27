@@ -9,19 +9,10 @@ Usage
 
 .. code-block:: bash
 
-    motep grade motep.toml
+    motep grade motep.grade.toml
 
-``motep.toml``
---------------
+``motep.grade.toml``
+--------------------
 
-.. code-block:: toml
-
-    data_training = 'traning.cfg'  # original data for training
-    data_in = 'in.cfg'  # data to be evaluated
-    data_out = 'out.cfg'  # data with `MV_grade`
-    potential_final = 'final.mtp'
-
-    seed = 42  # random seed
-
-    # grade
-    algorithm = 'maxvol'  # {'maxvol', 'exaustive'}
+.. literalinclude:: motep.grade.toml
+    :language: toml

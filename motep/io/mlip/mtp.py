@@ -133,7 +133,10 @@ def write_mtp(file: os.PathLike, data: MTPData) -> None:
             for k0, k1 in itertools.product(range(species_count), repeat=2):
                 value = data["radial_coeffs"][k0, k1]
                 fd.write(f"\t\t{k0}-{k1}\n")
-                fd.writelines(f"\t\t\t{_format_list(value[_])}\n" for _ in range(data["radial_funcs_count"]))
+                fd.writelines(
+                    f"\t\t\t{_format_list(value[_])}\n"
+                    for _ in range(data["radial_funcs_count"])
+                )
         for key in keys2:
             if data[key] is not None:
                 fd.write(f"{key} = {_format_value(data[key])}\n")
