@@ -94,15 +94,28 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
     """`Optimizer` class using `scipy.minimize`."""
 
     def _optimize(self, **kwargs: dict[str, Any]) -> npt.NDArray[np.float64]:
-        """Optimizer using `scipy.optimize.minimize`."""
+        """Optimize using `scipy.optimize.minimize`.
+
+        Returns
+        -------
+        npt.NDArray[np.float64]
+
+        Raises
+        ------
+        ValueError
+            If `jac` and `scaling` is set at the same time.
+
+        """
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
         callback = Callback(self.loss)
         callback(OptimizeResult(x=parameters, fun=self.rank0_loss(parameters)))
 
-        if kwargs.get("jac"):
+        kwargs["jac"] = kwargs.get("jac", True)
+        if kwargs["jac"]:
             if "scaling" in self.optimized:
-                raise ValueError("`jac` cannot (so far) be used to optimize `scaling`.")
+                msg = "`jac` cannot (so far) be used to optimize `scaling`."
+                raise ValueError(msg)
             kwargs["jac"] = self.rank0_jac
         if kwargs.get("method", "").lower() in {
             "cg",
