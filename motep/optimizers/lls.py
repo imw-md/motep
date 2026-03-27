@@ -13,7 +13,7 @@ from scipy.optimize._optimize import OptimizeResult
 from motep.loss import LossFunctionBase
 from motep.optimizers.base import ParallelOptimizerBase
 from motep.optimizers.scipy import Callback
-from motep.potentials.mtp import get_types
+from motep.potentials.mtp.data import get_types
 
 logger = logging.getLogger(__name__)
 

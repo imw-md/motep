@@ -9,12 +9,11 @@ from ase import Atoms
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.loss import ErrorPrinter, LossFunction
+from motep.loss import ErrorPrinter, LossFunction, LossSetting
 from motep.optimizers.ideal import NoInteractionOptimizer
 from motep.optimizers.level2mtp import Level2MTPOptimizer
 from motep.parallel import world
 from motep.potentials.mtp.data import MTPData
-from motep.setting import LossSetting
 
 logger = logging.getLogger(__name__)
 

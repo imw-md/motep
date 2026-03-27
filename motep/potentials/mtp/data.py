@@ -5,8 +5,25 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
+from ase import Atoms
 
 logger = logging.getLogger(__name__)
+
+
+def get_types(atoms: Atoms, species: list[int]) -> npt.NDArray[np.int32]:
+    """Get types.
+
+    Returns
+    -------
+    npt.NDArray[np.int32]
+
+    """
+    species = list(species)
+    return np.fromiter((species.index(_) for _ in atoms.numbers), dtype=np.int32)
+
+
+def _default_factory_optimized() -> list[str]:
+    return ["species_coeffs", "moment_coeffs", "radial_coeffs"]
 
 
 @dataclass
@@ -33,10 +50,8 @@ class MTPData:
     alpha_moment_mapping: npt.NDArray[np.int32] | None = None
     species_coeffs: npt.NDArray[np.float64] | None = None
     moment_coeffs: npt.NDArray[np.float64] | None = None
-    species: npt.NDArray[np.int32] | None = None
-    optimized: list[str] = field(
-        default_factory=lambda: ["species_coeffs", "moment_coeffs", "radial_coeffs"],
-    )
+    _species: npt.NDArray[np.int32] | None = None
+    optimized: list[str] = field(default_factory=_default_factory_optimized)
 
     def initialize(self, rng: np.random.Generator) -> None:
         """Initialize MTP parameters.
@@ -56,6 +71,16 @@ class MTPData:
             rfc = self.radial_funcs_count
             rbs = self.radial_basis_size
             self.radial_coeffs = rng.uniform(-0.1, +0.1, (spc, spc, rfc, rbs))
+
+    @property
+    def species(self) -> npt.NDArray[np.int32] | None:
+        """Species."""
+        return self._species
+
+    @species.setter
+    def species(self, species: npt.NDArray[np.int32]) -> None:
+        self._species = np.array(species, dtype=np.int32)
+        self.species_count = self._species.size
 
     @property
     def parameters(self) -> np.ndarray:
@@ -134,7 +159,7 @@ class MTPData:
 
     def log(self) -> None:
         """Log parameters."""
-        logger.debug(f"scaling: {self.scaling}")
+        logger.debug("scaling: %s", self.scaling)
         logger.debug("moment_coeffs:")
         logger.debug(self.moment_coeffs)
         logger.debug("species_coeffs:")

@@ -8,11 +8,10 @@ from ase import Atoms
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
-from motep.loss import LossFunction
+from motep.loss import LossFunction, LossSetting
 from motep.optimizers.scipy import ScipyMinimizeOptimizer
 from motep.parallel import world
 from motep.potentials.mtp.data import MTPData
-from motep.setting import LossSetting
 
 
 def make_crystals(

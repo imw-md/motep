@@ -1,10 +1,10 @@
 """Grader."""
 
 import logging
-import pathlib
 from copy import copy
 from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
 from pprint import pformat
 
 import numpy as np
@@ -41,7 +41,7 @@ class GradeSetting(Setting):
         self.maxvol = MaxVolSetting.from_any(self.maxvol)
 
 
-def load_setting_grade(filename: str) -> GradeSetting:
+def load_setting_grade(filename: str | Path | None = None) -> GradeSetting:
     """Load setting for `grade`.
 
     Returns
@@ -49,6 +49,8 @@ def load_setting_grade(filename: str) -> GradeSetting:
     GradeSetting
 
     """
+    if filename is None:
+        return GradeSetting()
     return GradeSetting(**parse_setting(filename))
 
 
@@ -206,7 +208,7 @@ def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
 
     rng = np.random.default_rng(setting.seed)
 
-    mtp_file = str(pathlib.Path(setting.potential_final).resolve())
+    mtp_file = str(Path(setting.potential_final).resolve())
 
     species = setting.species or None
     images_training = read_images(
