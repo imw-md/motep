@@ -11,7 +11,13 @@ logger = logging.getLogger(__name__)
 
 
 def get_dummy_species(images: list[Atoms]) -> list[int]:
-    """Get dummy species particularly for images read from `.cfg` files."""
+    """Get dummy species particularly for images read from `.cfg` files.
+
+    Returns
+    -------
+    list[int]
+
+    """
     m = 0
     for atoms in images:
         m = max(m, atoms.numbers.max())
@@ -24,14 +30,20 @@ def read_images(
     comm: DummyMPIComm = world,
     title: str = "data",
 ) -> list[Atoms]:
-    """Read images."""
+    """Read images.
+
+    Returns
+    -------
+    list[Atoms]
+
+    """
     images = []
     if comm.rank == 0:
-        logger.info(f"{'':=^72s}\n")
+        logger.info("%s\n", "=" * 72)
         logger.info("[%s]", title)
         for filename in filenames:
             images_local = motep.io.read(filename, species)
             images.extend(images_local)
-            logger.info(f'"{filename}" = {len(images_local)}')
+            logger.info('"%s" = %s', filename, len(images_local))
         logger.info("")
     return comm.bcast(images, root=0)

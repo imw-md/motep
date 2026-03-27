@@ -84,7 +84,13 @@ class LLSOptimizerBase(ParallelOptimizerBase):
         return counts
 
     def _calc_vector(self) -> np.ndarray:
-        """Calculate the vector for linear least squares (LLS)."""
+        """Calculate the vector for linear least squares (LLS).
+
+        Returns
+        -------
+        np.ndarray
+
+        """
         setting = self.loss.setting
         tmp = []
         if "energy" in self.minimized:
@@ -126,7 +132,13 @@ class LLSOptimizerBase(ParallelOptimizerBase):
         return energies
 
     def _calc_target_energies(self) -> np.ndarray:
-        """Calculate the target energies."""
+        """Calculate the target energies.
+
+        Returns
+        -------
+        np.ndarray
+
+        """
         images = self.loss.images
         return np.fromiter(
             (atoms.calc.targets["energy"] for atoms in images),
@@ -236,7 +248,13 @@ class LLSOptimizer(LLSOptimizerBase):
         return mtp_data.parameters
 
     def _calc_matrix(self) -> np.ndarray:
-        """Calculate the matrix for linear least squares (LLS)."""
+        """Calculate the matrix for linear least squares (LLS).
+
+        Returns
+        -------
+        np.ndarray
+
+        """
         tmp = []
         tmp.append(self._calc_matrix_moment_coeffs())
         if "species_coeffs" in self.optimized:

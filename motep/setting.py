@@ -17,7 +17,13 @@ class DataclassFromAny:
         cls: type[Self],
         value: Self | Mapping[str, Any] | None = None,
     ) -> Self:
-        """Create instance from `value`."""
+        """Create instance from `value`.
+
+        Returns
+        -------
+        Self
+
+        """
         if isinstance(value, cls):
             return value
         if isinstance(value, Mapping):

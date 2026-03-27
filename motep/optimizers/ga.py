@@ -93,7 +93,13 @@ class GeneticAlgorithm:
         elite_individuals: list[np.ndarray],
         steps: int = 20,
     ) -> list[np.ndarray]:
-        """Optimize elites further using `scipy.optimize.minimize`."""
+        """Optimize elites further using `scipy.optimize.minimize`.
+
+        Returns
+        -------
+        list[np.ndarray]
+
+        """
         refined_elites = []
 
         for elite in elite_individuals:
@@ -127,8 +133,7 @@ class GeneticAlgorithm:
             child1 = random.uniform(lower, upper)
             child2 = random.uniform(lower, upper)
             return list(child1), list(child2)
-        else:
-            return parent1, parent2
+        return parent1, parent2
 
     def mutate(self, parameter: np.ndarray) -> np.ndarray:
         """Perform mutation on an individual's parameter with a certain probability.
@@ -152,7 +157,13 @@ class GeneticAlgorithm:
         return np.argsort(fitness_scores)[:elite_count]
 
     def select_elite(self, fitness_scores: list[float]) -> list[np.ndarray]:
-        """Select elite individuals based on their fitness scores."""
+        """Select elite individuals based on their fitness scores.
+
+        Returns
+        -------
+        list[np.ndarray]
+
+        """
         indices = self._get_indices_of_elites(fitness_scores)
         return [self.population[i] for i in indices]
 
@@ -278,12 +289,9 @@ class GeneticAlgorithm:
                 elite = self.supermutation(elite)
             offspring = elite[:]
             while len(offspring) < self.population_size:
-                parent1 = random.choice(
-                    elite
-                )  # Changed to random.choice as random.choices returns a list
-                parent2 = random.choice(
-                    self.population
-                )  # Changed to random.choice as random.choices returns a list
+                # Changed to random.choice as random.choices returns a list
+                parent1 = random.choice(elite)
+                parent2 = random.choice(self.population)
 
                 if random.random() < self.crossover_probability:
                     child1, child2 = self.crossover(parent1, parent2)
@@ -364,7 +372,7 @@ class GeneticAlgorithm:
 
 
 def elite_callback(gen: int, elite: float) -> None:
-    logger.info(f"Generation {gen}: Top Elite - {elite}")
+    logger.info("Generation %s: Top Elite - %s", gen, elite)
 
 
 class GeneticAlgorithmOptimizer(ParallelOptimizerBase):
@@ -380,7 +388,13 @@ class GeneticAlgorithmOptimizer(ParallelOptimizerBase):
     """
 
     def _optimize(self, **kwargs: dict[str, Any]) -> npt.NDArray[np.float64]:
-        """Optimize parameters."""
+        """Optimize parameters.
+
+        Returns
+        -------
+        npt.NDArray[np.float64]
+
+        """
         parameters = self.loss.mtp_data.parameters
         bounds = _limit_bounds(self.loss.mtp_data.get_bounds())
         ga = GeneticAlgorithm(

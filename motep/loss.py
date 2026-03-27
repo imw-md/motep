@@ -416,7 +416,13 @@ class LossFunctionBase(ABC):
                     )
 
     def calc_loss_function(self) -> float:
-        """Calculate the value of the loss function."""
+        """Calculate the value of the loss function.
+
+        Returns
+        -------
+        float
+
+        """
         self._run_calculations()
         return (
             self.setting.energy_weight * self.loss_energy.calculate()
@@ -425,7 +431,13 @@ class LossFunctionBase(ABC):
         )
 
     def jac(self, parameters: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-        """Calculate the Jacobian of the loss function."""
+        """Calculate the Jacobian of the loss function.
+
+        Returns
+        -------
+        npt.NDArray[np.float64]
+
+        """
         jac = self.setting.energy_weight * self.loss_energy.jac()
         if self.loss_forces.idcs_frc.size and self.setting.forces_weight:
             jac += self.setting.forces_weight * self.loss_forces.jac()
@@ -503,14 +515,14 @@ class ErrorPrinter:
         )
         return _calc_errors_from_diff(np.fromiter(iterable, dtype=float))
 
-    def calculate(self) -> dict[str, float]:
+    def calculate(self) -> dict[str, dict[str, float]]:
         """Calculate errors.
 
         The properties should be computed before called.
 
         Returns
         -------
-        dict[str, float]
+        dict[str, dict[str, float]]
             Errors for the properties.
 
         """
@@ -521,12 +533,12 @@ class ErrorPrinter:
         errors["stress"] = self._calc_errors_stress()  # eV/Ang^3
         return errors
 
-    def log(self, logger: logging.Logger = logger) -> dict[str, float]:
+    def log(self, logger: logging.Logger = logger) -> dict[str, dict[str, float]]:
         """Log errors.
 
         Returns
         -------
-        errors : dict[str, float]
+        errors : dict[str, dict[str, float]]
             Errors.
 
         """
@@ -534,30 +546,30 @@ class ErrorPrinter:
 
         key0 = "energy"
         logger.info("Energy (eV):")
-        logger.info(f"    Errors checked for {errors[key0]['N']} configurations")
+        logger.info("    Errors checked for %s configurations", errors[key0]["N"])
         for key1 in ["MAX", "ABS", "RMS"]:
-            logger.info(f"    {key1} error: {errors[key0][key1]}")
+            logger.info("    %s error: %s", key1, errors[key0][key1])
         logger.info("")
 
         key0 = "energy_per_atom"
         logger.info("Energy per atom (eV/atom):")
-        logger.info(f"    Errors checked for {errors[key0]['N']} configurations")
+        logger.info("    Errors checked for %s configurations", errors[key0]["N"])
         for key1 in ["MAX", "ABS", "RMS"]:
-            logger.info(f"    {key1} error: {errors[key0][key1]}")
+            logger.info("    %s error: %s", key1, errors[key0][key1])
         logger.info("")
 
         key0 = "forces"
         logger.info("Forces per component (eV/angstrom):")
-        logger.info(f"    Errors checked for {errors[key0]['N'] // 3} atoms")
+        logger.info("    Errors checked for %s atoms", errors[key0]["N"] // 3)
         for key1 in ["MAX", "ABS", "RMS"]:
-            logger.info(f"    {key1} error: {errors[key0][key1]}")
+            logger.info("    %s error: %s", key1, errors[key0][key1])
         logger.info("")
 
         key0 = "stress"
         logger.info("Stress per component (GPa):")
-        logger.info(f"    Errors checked for {errors[key0]['N'] // 9} configurations")
+        logger.info("    Errors checked for %s configurations", errors[key0]["N"] // 9)
         for key1 in ["MAX", "ABS", "RMS"]:
-            logger.info(f"    {key1} error: {errors[key0][key1] * eV * 1e21}")
+            logger.info("    %s error: %s", key1, errors[key0][key1] * eV * 1e21)
         logger.info("")
 
         return errors

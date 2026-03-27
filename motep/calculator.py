@@ -7,7 +7,18 @@ from motep.potentials.mtp.base import EngineBase
 from motep.potentials.mtp.data import MTPData
 
 
-def make_mtp_engine(engine: str = "cext") -> EngineBase:
+def make_mtp_engine(engine: str = "cext") -> type[EngineBase]:
+    """Make the MTP engine.
+
+    Returns
+    -------
+    type[EngineBase]
+
+    Raises
+    ------
+    ValueError
+
+    """
     if engine == "numpy":
         from motep.potentials.mtp.numpy.engine import NumpyMTPEngine
 
@@ -41,15 +52,16 @@ class MTP(Calculator):
     def __init__(
         self,
         mtp_data: MTPData,
-        *args,
+        *args: tuple,
         engine: str = "cext",
         mode: str = "run",
-        **kwargs,
+        **kwargs: dict,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.engine: EngineBase = make_mtp_engine(engine)(mtp_data, mode=mode)
 
     def update_parameters(self, mtp_data: MTPData) -> None:
+        """Update MTP parameters."""
         self.engine.update(mtp_data)
         self.results = {}  # trigger new calculation
 
@@ -59,6 +71,7 @@ class MTP(Calculator):
         properties: list[str] = ["energy"],
         system_changes: list[str] = all_changes,
     ) -> None:
+        """Calculate."""
         super().calculate(atoms, properties, system_changes)
 
         self.results = self.engine.calculate(self.atoms)

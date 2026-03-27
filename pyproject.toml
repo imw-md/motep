@@ -12,14 +12,12 @@ dependencies = [
     "numpy>=1.23",  # This supports python 3.11.
     "ase",
     "scipy",
-    "numba",
 ]
 requires-python = ">=3.11"  # tomllib
 readme = "README.md"
 authors = [
-    {name = "Axel Forslund"},  # calculator
-    {name = "Yuji Ikeda"},  # testing
-    {name = "Pranav Kumar"},  # trainer
+    {name = "Axel Forslund"},
+    {name = "Yuji Ikeda"},
 ]
 classifiers = [
     'Development Status :: 4 - Beta',
@@ -43,9 +41,8 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 mpi = ["mpi4py"]
-jax = [
-  "jax",
-]
+numba = ["numba"]
+jax = ["jax"]
 test = [
   "pytest",
   "pytest-xdist",
@@ -59,6 +56,13 @@ doc = [
 [project.scripts]
 motep = "motep.cli:main"
 
+[project.urls]
+homepage = "https://imw-md.github.io/motep/"
+documentation = "https://imw-md.github.io/motep/"
+source = "https://github.com/imw-md/motep"
+download = "https://pypi.org/project/motep/#files"
+tracker = "https://github.com/imw-md/motep/issues"
+
 [tool.setuptools.packages]
 find = {}
 
@@ -69,3 +73,4 @@ local_scheme = "no-local-version"
 [tool.ruff.lint]
 preview = true  # necessary to activate many pycodestyle rules
 select = ["ALL"]
+ignore = ["CPY001"]
