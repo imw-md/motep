@@ -15,7 +15,7 @@ class GradeMode(StrEnum):
 
 
 @dataclass
-class GradeConfigurations(DataclassFromAny):
+class _Configurations(DataclassFromAny):
     """Configurations."""
 
     training: list[str] = field(default_factory=lambda: ["training.cfg"])
@@ -24,14 +24,14 @@ class GradeConfigurations(DataclassFromAny):
 
 
 @dataclass
-class GradePotentials(DataclassFromAny):
+class _Potentials(DataclassFromAny):
     """Setting of the potentials."""
 
     final: str = "final.mtp"
 
 
 @dataclass
-class GradeSetting(DataclassFromAny):
+class _GradeSetting(DataclassFromAny):
     """Setting for the extrapolation-grade calculations."""
 
     mode: GradeMode = GradeMode.CONFIGURATION
@@ -43,21 +43,21 @@ class GradeSetting(DataclassFromAny):
 
 
 @dataclass
-class Setting(DataclassFromAny):
+class _Setting(DataclassFromAny):
     """Setting for the extrapolation-grade calculations."""
 
     common: CommonSetting = field(default_factory=CommonSetting)
-    configurations: GradeConfigurations = field(default_factory=GradeConfigurations)
-    potentials: GradePotentials = field(default_factory=GradePotentials)
-    grade: GradeSetting = field(default_factory=GradeSetting)
+    configurations: _Configurations = field(default_factory=_Configurations)
+    potentials: _Potentials = field(default_factory=_Potentials)
+    grade: _GradeSetting = field(default_factory=_GradeSetting)
 
     def __post_init__(self) -> None:
         """Postprocess attributes."""
-        self.configurations = GradeConfigurations.from_any(self.configurations)
-        self.potentials = GradePotentials.from_any(self.potentials)
+        self.configurations = _Configurations.from_any(self.configurations)
+        self.potentials = _Potentials.from_any(self.potentials)
 
 
-def load_setting_grade(filename: str | Path | None = None) -> Setting:
+def load_setting_grade(filename: str | Path | None = None) -> _Setting:
     """Load setting for `grade`.
 
     Returns
@@ -66,5 +66,5 @@ def load_setting_grade(filename: str | Path | None = None) -> Setting:
 
     """
     if filename is None:
-        return Setting()
-    return Setting(**parse_setting(filename))
+        return _Setting()
+    return _Setting(**parse_setting(filename))

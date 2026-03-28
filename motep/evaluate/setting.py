@@ -5,7 +5,7 @@ from motep.setting import CommonSetting, DataclassFromAny, parse_setting
 
 
 @dataclass
-class EvalConfigurations(DataclassFromAny):
+class _Configurations(DataclassFromAny):
     """Configurations."""
 
     initial: list[str] = field(default_factory=lambda: ["initial.cfg"])
@@ -13,27 +13,27 @@ class EvalConfigurations(DataclassFromAny):
 
 
 @dataclass
-class EvalPotentials(DataclassFromAny):
+class _Potentials(DataclassFromAny):
     """Potentials."""
 
     final: str = "final.mtp"
 
 
 @dataclass
-class Setting(DataclassFromAny):
+class _Setting(DataclassFromAny):
     """Setting for the application of the potential."""
 
     common: CommonSetting = field(default_factory=CommonSetting)
-    configurations: EvalConfigurations = field(default_factory=EvalConfigurations)
-    potentials: EvalPotentials = field(default_factory=EvalPotentials)
+    configurations: _Configurations = field(default_factory=_Configurations)
+    potentials: _Potentials = field(default_factory=_Potentials)
 
     def __post_init__(self) -> None:
         """Postprocess attributes."""
-        self.configurations = EvalConfigurations.from_any(self.configurations)
-        self.potentials = EvalPotentials.from_any(self.potentials)
+        self.configurations = _Configurations.from_any(self.configurations)
+        self.potentials = _Potentials.from_any(self.potentials)
 
 
-def load_setting_evaluate(filename: str | Path | None = None) -> Setting:
+def load_setting_evaluate(filename: str | Path | None = None) -> _Setting:
     """Load setting for `evaluate`.
 
     Returns
@@ -42,5 +42,5 @@ def load_setting_evaluate(filename: str | Path | None = None) -> Setting:
 
     """
     if filename is None:
-        return Setting()
-    return Setting(**parse_setting(filename))
+        return _Setting()
+    return _Setting(**parse_setting(filename))

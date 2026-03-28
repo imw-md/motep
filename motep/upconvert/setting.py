@@ -5,26 +5,26 @@ from motep.setting import DataclassFromAny, parse_setting
 
 
 @dataclass
-class UpconvertPotentials(DataclassFromAny):
+class _Potentials(DataclassFromAny):
     """Setting of the potentials."""
 
-    base: str = "base.mtp"
+    training: str = "training.mtp"
     initial: str = "initial.mtp"
     final: str = "final.mtp"
 
 
 @dataclass
-class Setting(DataclassFromAny):
+class _Setting(DataclassFromAny):
     """Setting for the upconversion."""
 
-    potentials: UpconvertPotentials = field(default_factory=UpconvertPotentials)
+    potentials: _Potentials = field(default_factory=_Potentials)
 
     def __post_init__(self) -> None:
         """Postprocess attributes."""
-        self.potentials = UpconvertPotentials.from_any(self.potentials)
+        self.potentials = _Potentials.from_any(self.potentials)
 
 
-def load_setting_upconvert(filename: str | Path | None = None) -> Setting:
+def load_setting_upconvert(filename: str | Path | None = None) -> _Setting:
     """Load setting for `upconvert`.
 
     Returns
@@ -33,5 +33,5 @@ def load_setting_upconvert(filename: str | Path | None = None) -> Setting:
 
     """
     if filename is None:
-        return Setting()
-    return Setting(**parse_setting(filename))
+        return _Setting()
+    return _Setting(**parse_setting(filename))
