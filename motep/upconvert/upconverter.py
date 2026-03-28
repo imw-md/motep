@@ -136,7 +136,7 @@ def upconvert_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
     """Upconvert."""
     setting = load_setting_upconvert(filename_setting)
 
-    src = read_mtp(setting.potentials.training)
+    src = read_mtp(setting.potentials.trained)
     dst = read_mtp(setting.potentials.initial)
 
     upconvert(src, dst)

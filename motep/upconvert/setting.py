@@ -11,7 +11,7 @@ from motep.setting import (
 class _Potentials(DataclassFromAny):
     """Setting of the potentials."""
 
-    training: str = "training.mtp"
+    trained: str = "trained.mtp"
     initial: str = "initial.mtp"
     final: str = "final.mtp"
 
