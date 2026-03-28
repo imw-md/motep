@@ -13,7 +13,7 @@ from motep.io.utils import get_dummy_species, read_images
 from motep.loss import ErrorPrinter
 from motep.parallel import DummyMPIComm
 from motep.potentials.mtp.data import MTPData
-from motep.setting import DataclassFromAny, Setting, parse_setting
+from motep.setting import CommonSetting, DataclassFromAny, parse_setting
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +34,10 @@ class EvalPotentials(DataclassFromAny):
 
 
 @dataclass
-class EvalSetting(Setting):
+class EvalSetting(DataclassFromAny):
     """Setting for the application of the potential."""
 
+    common: CommonSetting = field(default_factory=CommonSetting)
     configurations: EvalConfigurations = field(default_factory=EvalConfigurations)
     potentials: EvalPotentials = field(default_factory=EvalPotentials)
 
@@ -128,21 +129,21 @@ def evaluate_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
 
     mtp_file = str(Path(setting.potentials.final).resolve())
 
-    species = setting.species or None
+    species = setting.common.species or None
     images_initial = read_images(
         setting.configurations.initial,
         species=species,
         comm=comm,
         title="configurations.initial",
     )
-    if not setting.species:
+    if not setting.common.species:
         species = get_dummy_species(images_initial)
 
     mtp_data = read_mtp(mtp_file)
     mtp_data.species = species
 
     # Run evaluation
-    evaluator = Evaluator(mtp_data, engine=setting.engine)
+    evaluator = Evaluator(mtp_data, engine=setting.common.engine)
     images_final = evaluator.evaluate(images_initial)
 
     # Print errors

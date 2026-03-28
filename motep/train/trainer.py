@@ -16,7 +16,7 @@ from motep.loss import ErrorPrinter, LossFunction, LossFunctionBase, LossSetting
 from motep.optimizers import make_optimizer
 from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
-from motep.setting import DataclassFromAny, Setting, parse_setting
+from motep.setting import CommonSetting, DataclassFromAny, parse_setting
 from motep.utils import measure_time
 
 if TYPE_CHECKING:
@@ -53,9 +53,10 @@ class TrainPotentials(DataclassFromAny):
 
 
 @dataclass
-class TrainSetting(Setting):
+class TrainSetting(DataclassFromAny):
     """Setting of the training."""
 
+    common: CommonSetting = field(default_factory=CommonSetting)
     configurations: TrainConfigurations = field(default_factory=TrainConfigurations)
     potentials: TrainPotentials = field(default_factory=TrainPotentials)
     loss: LossSetting = field(default_factory=LossSetting)
@@ -210,14 +211,14 @@ def train_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
 
     untrained_mtp = str(Path(setting.potentials.initial).resolve())
 
-    species = setting.species or None
+    species = setting.common.species or None
     images = read_images(
         setting.configurations.training,
         species=species,
         comm=comm,
         title="configurations.training",
     )
-    if not setting.species:
+    if not setting.common.species:
         species = get_dummy_species(images)
 
     mtp_data = read_mtp(untrained_mtp)
@@ -225,8 +226,8 @@ def train_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
 
     trainer = Trainer(
         mtp_data,
-        seed=setting.seed,
-        engine=setting.engine,
+        seed=setting.common.seed,
+        engine=setting.common.engine,
         loss=setting.loss,
         steps=setting.steps,
         comm=comm,

@@ -1,5 +1,7 @@
-seed = 42  # random seed
 mode = 'neighborhood'
+
+[common]
+seed = 42  # random seed
 
 [configurations]
 training = ['traning.cfg']  # original data for training

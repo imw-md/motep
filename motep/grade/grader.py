@@ -17,7 +17,7 @@ from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
-from motep.setting import DataclassFromAny, Setting, parse_setting
+from motep.setting import CommonSetting, DataclassFromAny, parse_setting
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +46,10 @@ class GradePotentials(DataclassFromAny):
 
 
 @dataclass
-class GradeSetting(Setting):
+class GradeSetting(DataclassFromAny):
     """Setting for the extrapolation-grade calculations."""
 
+    common: CommonSetting = field(default_factory=CommonSetting)
     configurations: GradeConfigurations = field(default_factory=GradeConfigurations)
     potentials: GradePotentials = field(default_factory=GradePotentials)
     mode: GradeMode = GradeMode.CONFIGURATION
@@ -226,18 +227,18 @@ def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
         for handler in logger.handlers:
             handler.flush()
 
-    rng = np.random.default_rng(setting.seed)
+    rng = np.random.default_rng(setting.common.seed)
 
     mtp_file = str(Path(setting.potentials.final).resolve())
 
-    species = setting.species or None
+    species = setting.common.species or None
     images_training = read_images(
         setting.configurations.training,
         species=species,
         comm=comm,
         title="configurations.training",
     )
-    if not setting.species:
+    if not setting.common.species:
         species = get_dummy_species(images_training)
     images_in = read_images(
         setting.configurations.initial,
@@ -249,13 +250,13 @@ def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
     mtp_data = read_mtp(mtp_file)
     mtp_data.species = species
 
-    if setting.engine == "mlippy":
+    if setting.common.engine == "mlippy":
         msg = "`mlippy` engine is not available for `motep grade`"
         raise ValueError(msg)
 
     grader = Grader(
         mtp_data,
-        engine=setting.engine,
+        engine=setting.common.engine,
         rng=rng,
         mode=setting.mode,
         maxvol_setting=MaxVolSetting.from_any(setting.maxvol),

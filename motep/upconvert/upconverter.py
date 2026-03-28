@@ -22,7 +22,7 @@ class UpconvertPotentials(DataclassFromAny):
 
 
 @dataclass
-class UpconvertSetting:
+class UpconvertSetting(DataclassFromAny):
     """Setting for the upconversion."""
 
     potentials: UpconvertPotentials = field(default_factory=UpconvertPotentials)

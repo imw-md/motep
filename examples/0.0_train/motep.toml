@@ -1,7 +1,6 @@
+[common]
 seed = 42  # random seed for initializing MTP parameters
-
-engine = 'numba'  # {'numpy', 'numba', 'mlippy'}
-
+engine = 'cext'  # {'cext', 'numpy', 'numba', 'mlippy'}
 species = [6, 1]  # atomic numbers corresponding to types
 
 [configurations]

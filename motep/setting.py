@@ -1,7 +1,5 @@
 """Functions related to the setting file."""
 
-from __future__ import annotations
-
 import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -32,7 +30,7 @@ class DataclassFromAny:
 
 
 @dataclass
-class Setting(DataclassFromAny):
+class CommonSetting(DataclassFromAny):
     """Setting of the training."""
 
     species: list[int] = field(default_factory=list)
