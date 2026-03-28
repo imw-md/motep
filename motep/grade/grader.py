@@ -186,12 +186,6 @@ def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
     )
     if not setting.common.species:
         species = get_dummy_species(images_training)
-    images_in = read_images(
-        setting.configurations.initial,
-        species=species,
-        comm=comm,
-        title="configurations.initial",
-    )
 
     mtp_data = read_mtp(mtp_file)
     mtp_data.species = species
@@ -209,12 +203,21 @@ def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
         comm=comm,
     )
     grader.update(images_training)
-    images_out = grader.grade(images_in)
 
-    if comm.rank == 0:
-        logger.info("%s\n", "=" * 72)
-        logger.info("[data_active]")
-        logger.info(grader.indices)
-        for handler in logger.handlers:
-            handler.flush()
-        motep.io.write(setting.configurations.final[0], images_out)
+    initial = setting.configurations.initial
+    final = setting.configurations.final
+    for i, (filename_in, filename_out) in enumerate(zip(initial, final, strict=True)):
+        images_in = read_images(
+            [filename_in],
+            species=species,
+            comm=comm,
+            title=f"configurations.initial[{i}]",
+        )
+        images_out = grader.grade(images_in)
+        if comm.rank == 0:
+            logger.info("%s\n", "=" * 72)
+            logger.info("[data_active]")
+            logger.info(grader.indices)
+            for handler in logger.handlers:
+                handler.flush()
+            motep.io.write(filename_out, images_out)
