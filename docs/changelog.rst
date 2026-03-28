@@ -13,3 +13,5 @@ Changed
   This affects how stress residuals are weighted in the loss (stress contributions are
   scaled by the configuration volume), so training results may differ for existing
   configs unless ``stress_times_volume`` is set explicitly.
+- Keys in the CLI setting files are now grouped into ``[common]``, ``[configurations]``,
+  ``[potentials]`` etc.
