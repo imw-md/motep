@@ -6,32 +6,47 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from pprint import pformat
 
+import motep.io
 from motep.calculator import MTP
 from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.loss import ErrorPrinter
 from motep.parallel import DummyMPIComm
 from motep.potentials.mtp.data import MTPData
-from motep.setting import Setting, parse_setting
+from motep.setting import DataclassFromAny, Setting, parse_setting
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class EvaluatePotentials:
-    """Setting of the potentials."""
+class EvalConfigurations(DataclassFromAny):
+    """Configurations."""
+
+    initial: list[str] = field(default_factory=lambda: ["initial.cfg"])
+    final: list[str] = field(default_factory=lambda: ["final.cfg"])
+
+
+@dataclass
+class EvalPotentials(DataclassFromAny):
+    """Potentials."""
 
     final: str = "final.mtp"
 
 
 @dataclass
-class EvaluateSetting(Setting):
+class EvalSetting(Setting):
     """Setting for the application of the potential."""
 
-    potentials: EvaluatePotentials = field(default_factory=EvaluatePotentials)
+    configurations: EvalConfigurations = field(default_factory=EvalConfigurations)
+    potentials: EvalPotentials = field(default_factory=EvalPotentials)
+
+    def __post_init__(self) -> None:
+        """Postprocess attributes."""
+        self.configurations = EvalConfigurations.from_any(self.configurations)
+        self.potentials = EvalPotentials.from_any(self.potentials)
 
 
-def load_setting_evaluate(filename: str | Path | None = None) -> EvaluateSetting:
+def load_setting_evaluate(filename: str | Path | None = None) -> EvalSetting:
     """Load setting for `evaluate`.
 
     Returns
@@ -40,8 +55,8 @@ def load_setting_evaluate(filename: str | Path | None = None) -> EvaluateSetting
 
     """
     if filename is None:
-        return EvaluateSetting()
-    return EvaluateSetting(**parse_setting(filename))
+        return EvalSetting()
+    return EvalSetting(**parse_setting(filename))
 
 
 class Evaluator:
@@ -114,23 +129,24 @@ def evaluate_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
     mtp_file = str(Path(setting.potentials.final).resolve())
 
     species = setting.species or None
-    images = read_images(
-        setting.data_in,
+    images_initial = read_images(
+        setting.configurations.initial,
         species=species,
         comm=comm,
-        title="data_in",
+        title="configurations.initial",
     )
     if not setting.species:
-        species = get_dummy_species(images)
+        species = get_dummy_species(images_initial)
 
     mtp_data = read_mtp(mtp_file)
     mtp_data.species = species
 
     # Run evaluation
     evaluator = Evaluator(mtp_data, engine=setting.engine)
-    images_eval = evaluator.evaluate(images)
+    images_final = evaluator.evaluate(images_initial)
 
     # Print errors
     if comm.rank == 0:
         logger.info("%s\n", "=" * 72)
-        ErrorPrinter(images_eval).log()
+        ErrorPrinter(images_final).log()
+        motep.io.write(setting.configurations.final[0], images_final)

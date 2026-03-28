@@ -1,6 +1,10 @@
 ``motep train``
 ===============
 
+This command trains the potential starting from ``potentials.initial`` based on
+``configurations.training``.
+The trained potential is written in ``potentials.final``.
+
 Usage
 -----
 

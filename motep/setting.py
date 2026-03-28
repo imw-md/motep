@@ -35,9 +35,6 @@ class DataclassFromAny:
 class Setting(DataclassFromAny):
     """Setting of the training."""
 
-    data_training: list[str] = field(default_factory=lambda: ["training.cfg"])
-    data_in: list[str] = field(default_factory=lambda: ["in.cfg"])
-    data_out: list[str] = field(default_factory=lambda: ["out.cfg"])
     species: list[int] = field(default_factory=list)
     seed: int | None = None
     engine: str = "cext"
@@ -52,12 +49,4 @@ def parse_setting(filename: str | Path) -> dict[str, Any]:
 
     """
     with Path(filename).open("rb") as f:
-        setting_overwritten = tomllib.load(f)
-
-    # convert the data files to lists
-    keys = ["data_training", "data_in", "data_out"]
-    for key in keys:
-        if key in setting_overwritten and isinstance(setting_overwritten[key], str):
-            setting_overwritten[key] = [setting_overwritten[key]]
-
-    return setting_overwritten
+        return tomllib.load(f)

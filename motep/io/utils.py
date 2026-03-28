@@ -28,7 +28,7 @@ def read_images(
     filenames: list[str],
     species: list[int] | None = None,
     comm: DummyMPIComm = world,
-    title: str = "data",
+    title: str = "configurations",
 ) -> list[Atoms]:
     """Read images.
 

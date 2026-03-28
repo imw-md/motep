@@ -1,4 +1,5 @@
-data_training = 'training.cfg'
+[configurations]
+training = ['training.cfg']
 
 [potentials]
 initial = 'initial.mtp'

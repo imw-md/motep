@@ -38,8 +38,15 @@ def _convert_steps(steps: list[dict]) -> list[dict]:
 
 
 @dataclass
+class TrainConfigurations(DataclassFromAny):
+    """Configurations."""
+
+    training: list[str] = field(default_factory=lambda: ["training.cfg"])
+
+
+@dataclass
 class TrainPotentials(DataclassFromAny):
-    """Setting of the potentials."""
+    """Potentials."""
 
     initial: str = "initial.mtp"
     final: str = "final.mtp"
@@ -49,6 +56,7 @@ class TrainPotentials(DataclassFromAny):
 class TrainSetting(Setting):
     """Setting of the training."""
 
+    configurations: TrainConfigurations = field(default_factory=TrainConfigurations)
     potentials: TrainPotentials = field(default_factory=TrainPotentials)
     loss: LossSetting = field(default_factory=LossSetting)
     steps: list[dict] = field(default_factory=lambda: [{"method": "minimize"}])
@@ -56,8 +64,9 @@ class TrainSetting(Setting):
 
     def __post_init__(self) -> None:
         """Postprocess attributes."""
-        if isinstance(self.loss, dict):
-            self.loss = LossSetting(**self.loss)
+        self.configurations = TrainConfigurations.from_any(self.configurations)
+        self.potentials = TrainPotentials.from_any(self.potentials)
+        self.loss = LossSetting.from_any(self.loss)
 
         # Default 'optimized' is defined in each `Optimizer` class.
 
@@ -203,10 +212,10 @@ def train_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
 
     species = setting.species or None
     images = read_images(
-        setting.data_training,
+        setting.configurations.training,
         species=species,
         comm=comm,
-        title="data_training",
+        title="configurations.training",
     )
     if not setting.species:
         species = get_dummy_species(images)

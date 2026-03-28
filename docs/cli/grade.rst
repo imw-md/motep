@@ -2,7 +2,8 @@
 ===============
 
 This command calculates the extrapolation grades for the configurations written
-in ``data_in`` using ``potential_final`` and write them in ``data_out``.
+in ``configurations.initial`` using ``potentials.final`` and ``configurations.training``.
+The evaluated extrapolation grades are written in ``configurations.final``.
 
 Usage
 -----

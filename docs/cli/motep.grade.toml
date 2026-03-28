@@ -1,9 +1,10 @@
 seed = 42  # random seed
 mode = 'neighborhood'
 
-data_training = 'traning.cfg'  # original data for training
-data_in = 'in.cfg'  # data to be evaluated
-data_out = 'out.cfg'  # data with `MV_grade`
+[configurations]
+training = ['traning.cfg']  # original data for training
+initial = ['initial.cfg']  # data to be evaluated
+final = ['final.cfg']  # data with `MV_grade`
 
 [potentials]
 final = 'final.mtp'

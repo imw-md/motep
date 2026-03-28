@@ -30,6 +30,15 @@ class GradeMode(StrEnum):
 
 
 @dataclass
+class GradeConfigurations(DataclassFromAny):
+    """Configurations."""
+
+    training: list[str] = field(default_factory=lambda: ["training.cfg"])
+    initial: list[str] = field(default_factory=lambda: ["initial.cfg"])
+    final: list[str] = field(default_factory=lambda: ["final.cfg"])
+
+
+@dataclass
 class GradePotentials(DataclassFromAny):
     """Setting of the potentials."""
 
@@ -40,12 +49,14 @@ class GradePotentials(DataclassFromAny):
 class GradeSetting(Setting):
     """Setting for the extrapolation-grade calculations."""
 
+    configurations: GradeConfigurations = field(default_factory=GradeConfigurations)
     potentials: GradePotentials = field(default_factory=GradePotentials)
     mode: GradeMode = GradeMode.CONFIGURATION
     maxvol: MaxVolSetting = field(default_factory=MaxVolSetting)
 
     def __post_init__(self) -> None:
-        """Postprocess."""
+        """Postprocess attributes."""
+        self.configurations = GradeConfigurations.from_any(self.configurations)
         self.potentials = GradePotentials.from_any(self.potentials)
         self.maxvol = MaxVolSetting.from_any(self.maxvol)
 
@@ -221,18 +232,18 @@ def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
 
     species = setting.species or None
     images_training = read_images(
-        setting.data_training,
+        setting.configurations.training,
         species=species,
         comm=comm,
-        title="data_training",
+        title="configurations.training",
     )
     if not setting.species:
         species = get_dummy_species(images_training)
     images_in = read_images(
-        setting.data_in,
+        setting.configurations.initial,
         species=species,
         comm=comm,
-        title="data_in",
+        title="configurations.initial",
     )
 
     mtp_data = read_mtp(mtp_file)
@@ -259,4 +270,4 @@ def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
         logger.info(grader.indices)
         for handler in logger.handlers:
             handler.flush()
-        motep.io.write(setting.data_out[0], images_out)
+        motep.io.write(setting.configurations.final[0], images_out)

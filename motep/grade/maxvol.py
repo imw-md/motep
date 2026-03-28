@@ -92,8 +92,8 @@ def _exhaust(matrix: np.ndarray) -> np.ndarray:
 
     # Choose rows (configurations)
     # This is preliminarily implemented only in an exhausive manner.
-    # This is therefore valid so far only for a small `data_in`
-    # and for a low level `potential_final`.
+    # This is therefore valid so far only for a small `configurations.initlal`
+    # and for a low level `potentials.final`.
     if comb(nrows, ncols) > 2**24:  # 16777216
         msg = "too large possible combinations of rows"
         raise RuntimeError(msg, comb(nrows, ncols))

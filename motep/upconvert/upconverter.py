@@ -9,11 +9,11 @@ import numpy as np
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.parallel import DummyMPIComm
 from motep.potentials.mtp.data import MTPData
-from motep.setting import parse_setting
+from motep.setting import DataclassFromAny, parse_setting
 
 
 @dataclass
-class UpconvertPotentials:
+class UpconvertPotentials(DataclassFromAny):
     """Setting of the potentials."""
 
     base: str = "base.mtp"
@@ -29,8 +29,7 @@ class UpconvertSetting:
 
     def __post_init__(self) -> None:
         """Postprocess attributes."""
-        if isinstance(self.potentials, dict):
-            self.potentials = UpconvertPotentials(**dict(self.potentials))
+        self.potentials = UpconvertPotentials.from_any(self.potentials)
 
 
 def load_setting_upconvert(filename: str | Path | None = None) -> UpconvertSetting:
