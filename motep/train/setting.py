@@ -1,5 +1,7 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from scipy.optimize._minimize import MINIMIZE_METHODS  # noqa: PLC2701
 
@@ -12,16 +14,17 @@ from motep.setting import (
 )
 
 
-def _convert_steps(steps: list[dict]) -> list[dict]:
-    for i, value in enumerate(steps):
-        if not isinstance(value, dict):
-            steps["steps"][i] = {"method": value}
-        if value["method"].lower() in MINIMIZE_METHODS:
-            if "kwargs" not in value:
-                value["kwargs"] = {}
-            value["kwargs"]["method"] = value["method"]
-            value["method"] = "minimize"
-    return steps
+def _convert_steps(steps: Sequence[str | dict[str, Any]]) -> list[dict[str, Any]]:
+    steps_converted = []
+    for step in steps:
+        tmp: dict[str, Any] = {"method": step} if isinstance(step, str) else step
+        if tmp["method"].lower() in MINIMIZE_METHODS:
+            if "kwargs" not in step:
+                tmp["kwargs"] = {}
+            tmp["kwargs"]["method"] = tmp["method"]
+            tmp["method"] = "minimize"
+        steps_converted.append(tmp)
+    return steps_converted
 
 
 @dataclass

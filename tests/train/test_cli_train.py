@@ -35,6 +35,7 @@ def test_example_train(doc_path: Path) -> None:
 @pytest.mark.parametrize(
     "steps",
     [
+        ["minimize"],
         [{"method": "minimize"}],
         [{"method": "l-bfgs-b"}],
         [{"method": "minimize", "kwargs": {"method": "l-bfgs-b"}}],
