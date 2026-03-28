@@ -1,6 +1,6 @@
 [configurations]
-initial = ['initial.cfg']  # {'.cfg', '.xyz'}
-final = ['final.cfg']  # {'.cfg', '.xyz'}
+initial = 'initial.cfg'  # {'.cfg', '.xyz'}
+final = 'final.cfg'  # {'.cfg', '.xyz'}
 
 [potentials]
 final = 'final.mtp'

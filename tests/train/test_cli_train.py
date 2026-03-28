@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from motep.train.trainer import TrainSetting, load_setting_train
+from motep.train.setting import _Setting
+from motep.train.trainer import load_setting_train
 
 
 def test_cli_train(data_path: Path, tmp_path: Path) -> None:
@@ -41,5 +42,5 @@ def test_example_train(doc_path: Path) -> None:
 )
 def test_train_steps_setting(steps: list) -> None:
     """Test if `steps` in `TrainSetting` is correctly parsed."""
-    setting = TrainSetting(steps=steps)
+    setting = _Setting(steps=steps)
     assert setting.steps[0]["method"] == "minimize"

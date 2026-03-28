@@ -2,7 +2,7 @@
 
 import tomllib
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Self
 
@@ -36,6 +36,18 @@ class CommonSetting(DataclassFromAny):
     species: list[int] = field(default_factory=list)
     seed: int | None = None
     engine: str = "cext"
+
+
+@dataclass
+class ConfigurationsBase(DataclassFromAny):
+    """Base class of the setting for the configurations."""
+
+    def __post_init__(self) -> None:
+        """Postprocess attributes."""
+        # convert the data files to lists
+        for key, value in asdict(self).items():
+            if isinstance(value, str):
+                setattr(self, key, [value])
 
 
 def parse_setting(filename: str | Path) -> dict[str, Any]:

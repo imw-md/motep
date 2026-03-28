@@ -2,9 +2,9 @@
 seed = 42  # random seed
 
 [configurations]
-training = ['traning.cfg']  # original data for training
-initial = ['initial.cfg']  # data to be evaluated
-final = ['final.cfg']  # data with `MV_grade`
+training = 'traning.cfg'  # original data for training
+initial = 'initial.cfg'  # data to be evaluated
+final = 'final.cfg'  # data with `MV_grade`
 
 [potentials]
 final = 'final.mtp'

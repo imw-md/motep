@@ -1,7 +1,10 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from motep.setting import DataclassFromAny, parse_setting
+from motep.setting import (
+    DataclassFromAny,
+    parse_setting,
+)
 
 
 @dataclass

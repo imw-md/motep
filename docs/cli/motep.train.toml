@@ -2,7 +2,7 @@
 seed = 42  # random seed for initializing MTP parameters etc.
 
 [configurations]
-training = ['training.cfg']
+training = 'training.cfg'
 
 [potentials]
 initial = 'initial.mtp'

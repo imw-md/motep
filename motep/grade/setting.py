@@ -2,7 +2,12 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
-from motep.setting import CommonSetting, DataclassFromAny, parse_setting
+from motep.setting import (
+    CommonSetting,
+    ConfigurationsBase,
+    DataclassFromAny,
+    parse_setting,
+)
 
 from .maxvol import MaxVolSetting
 
@@ -15,7 +20,7 @@ class GradeMode(StrEnum):
 
 
 @dataclass
-class _Configurations(DataclassFromAny):
+class _Configurations(ConfigurationsBase):
     """Configurations."""
 
     training: list[str] = field(default_factory=lambda: ["training.cfg"])

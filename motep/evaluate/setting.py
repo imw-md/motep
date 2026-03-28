@@ -1,11 +1,16 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from motep.setting import CommonSetting, DataclassFromAny, parse_setting
+from motep.setting import (
+    CommonSetting,
+    ConfigurationsBase,
+    DataclassFromAny,
+    parse_setting,
+)
 
 
 @dataclass
-class _Configurations(DataclassFromAny):
+class _Configurations(ConfigurationsBase):
     """Configurations."""
 
     initial: list[str] = field(default_factory=lambda: ["initial.cfg"])

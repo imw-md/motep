@@ -4,7 +4,12 @@ from pathlib import Path
 from scipy.optimize._minimize import MINIMIZE_METHODS  # noqa: PLC2701
 
 from motep.loss import LossSetting
-from motep.setting import CommonSetting, DataclassFromAny, parse_setting
+from motep.setting import (
+    CommonSetting,
+    ConfigurationsBase,
+    DataclassFromAny,
+    parse_setting,
+)
 
 
 def _convert_steps(steps: list[dict]) -> list[dict]:
@@ -20,7 +25,7 @@ def _convert_steps(steps: list[dict]) -> list[dict]:
 
 
 @dataclass
-class _Configurations(DataclassFromAny):
+class _Configurations(ConfigurationsBase):
     """Configurations."""
 
     training: list[str] = field(default_factory=lambda: ["training.cfg"])
