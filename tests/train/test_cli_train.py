@@ -26,6 +26,7 @@ def test_example_train(doc_path: Path) -> None:
     """Test if the input file offered in the documentation is parsable."""
     path = doc_path / "cli/motep.train.toml"
     setting = load_setting_train(path)
+    assert not isinstance(setting.common, dict)  # converted to a dataclass?
     assert not isinstance(setting.configurations, dict)  # converted to a dataclass?
     assert isinstance(setting.configurations.training, list)
     assert not isinstance(setting.potentials, dict)  # converted to a dataclass?

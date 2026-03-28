@@ -55,6 +55,7 @@ class _Setting(DataclassFromAny):
 
     def __post_init__(self) -> None:
         """Postprocess attributes."""
+        self.common = CommonSetting.from_any(self.common)
         self.configurations = _Configurations.from_any(self.configurations)
         self.potentials = _Potentials.from_any(self.potentials)
         self.loss = LossSetting.from_any(self.loss)
