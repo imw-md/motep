@@ -2,7 +2,6 @@
 
 import logging
 from copy import copy
-from dataclasses import dataclass, field
 from pathlib import Path
 from pprint import pformat
 
@@ -13,51 +12,10 @@ from motep.io.utils import get_dummy_species, read_images
 from motep.loss import ErrorPrinter
 from motep.parallel import DummyMPIComm
 from motep.potentials.mtp.data import MTPData
-from motep.setting import CommonSetting, DataclassFromAny, parse_setting
+
+from .setting import load_setting_evaluate
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class EvalConfigurations(DataclassFromAny):
-    """Configurations."""
-
-    initial: list[str] = field(default_factory=lambda: ["initial.cfg"])
-    final: list[str] = field(default_factory=lambda: ["final.cfg"])
-
-
-@dataclass
-class EvalPotentials(DataclassFromAny):
-    """Potentials."""
-
-    final: str = "final.mtp"
-
-
-@dataclass
-class EvalSetting(DataclassFromAny):
-    """Setting for the application of the potential."""
-
-    common: CommonSetting = field(default_factory=CommonSetting)
-    configurations: EvalConfigurations = field(default_factory=EvalConfigurations)
-    potentials: EvalPotentials = field(default_factory=EvalPotentials)
-
-    def __post_init__(self) -> None:
-        """Postprocess attributes."""
-        self.configurations = EvalConfigurations.from_any(self.configurations)
-        self.potentials = EvalPotentials.from_any(self.potentials)
-
-
-def load_setting_evaluate(filename: str | Path | None = None) -> EvalSetting:
-    """Load setting for `evaluate`.
-
-    Returns
-    -------
-    EvaluateSetting
-
-    """
-    if filename is None:
-        return EvalSetting()
-    return EvalSetting(**parse_setting(filename))
 
 
 class Evaluator:

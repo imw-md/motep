@@ -1,14 +1,12 @@
 """`motep train`."""
 
 import logging
-from dataclasses import dataclass, field
 from pathlib import Path
 from pprint import pformat
 from typing import TYPE_CHECKING
 
 import numpy as np
 from ase import Atoms
-from scipy.optimize._minimize import MINIMIZE_METHODS  # noqa: PLC2701
 
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.io.utils import get_dummy_species, read_images
@@ -16,77 +14,14 @@ from motep.loss import ErrorPrinter, LossFunction, LossFunctionBase, LossSetting
 from motep.optimizers import make_optimizer
 from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
-from motep.setting import CommonSetting, DataclassFromAny, parse_setting
 from motep.utils import measure_time
+
+from .setting import load_setting_train
 
 if TYPE_CHECKING:
     from motep.optimizers.base import OptimizerBase
 
 logger = logging.getLogger(__name__)
-
-
-def _convert_steps(steps: list[dict]) -> list[dict]:
-    for i, value in enumerate(steps):
-        if not isinstance(value, dict):
-            steps["steps"][i] = {"method": value}
-        if value["method"].lower() in MINIMIZE_METHODS:
-            if "kwargs" not in value:
-                value["kwargs"] = {}
-            value["kwargs"]["method"] = value["method"]
-            value["method"] = "minimize"
-    return steps
-
-
-@dataclass
-class TrainConfigurations(DataclassFromAny):
-    """Configurations."""
-
-    training: list[str] = field(default_factory=lambda: ["training.cfg"])
-
-
-@dataclass
-class TrainPotentials(DataclassFromAny):
-    """Potentials."""
-
-    initial: str = "initial.mtp"
-    final: str = "final.mtp"
-
-
-@dataclass
-class TrainSetting(DataclassFromAny):
-    """Setting of the training."""
-
-    common: CommonSetting = field(default_factory=CommonSetting)
-    configurations: TrainConfigurations = field(default_factory=TrainConfigurations)
-    potentials: TrainPotentials = field(default_factory=TrainPotentials)
-    loss: LossSetting = field(default_factory=LossSetting)
-    steps: list[dict] = field(default_factory=lambda: [{"method": "minimize"}])
-    update_mindist: bool = False
-
-    def __post_init__(self) -> None:
-        """Postprocess attributes."""
-        self.configurations = TrainConfigurations.from_any(self.configurations)
-        self.potentials = TrainPotentials.from_any(self.potentials)
-        self.loss = LossSetting.from_any(self.loss)
-
-        # Default 'optimized' is defined in each `Optimizer` class.
-
-        # convert the old style "steps" like {'steps`: ['L-BFGS-B']} to the new one
-        # {'steps`: {'method': 'L-BFGS-B'}
-        self.steps = _convert_steps(self.steps)
-
-
-def load_setting_train(filename: str | Path | None = None) -> TrainSetting:
-    """Load setting for `train`.
-
-    Returns
-    -------
-    TrainSetting
-
-    """
-    if filename is None:
-        return TrainSetting()
-    return TrainSetting(**parse_setting(filename))
 
 
 class Trainer:

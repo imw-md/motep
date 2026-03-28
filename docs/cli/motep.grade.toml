@@ -1,5 +1,3 @@
-mode = 'neighborhood'
-
 [common]
 seed = 42  # random seed
 
@@ -11,5 +9,8 @@ final = ['final.cfg']  # data with `MV_grade`
 [potentials]
 final = 'final.mtp'
 
-[maxvol]
+[grade]
+mode = 'neighborhood'
+
+[grade.maxvol]
 algorithm = 'maxvol'  # {'maxvol', 'exaustive'}
