@@ -9,10 +9,11 @@ from motep.potentials.mtp.data import get_types
 try:
     from motep.potentials.mtp.cext import _mtp_cext
 except ImportError as e:
-    raise ImportError(
+    msg = (
         "C extension module '_mtp_cext' not found. "
         "Please build the extension with: pip install -e ."
-    ) from e
+    )
+    raise ImportError(msg) from e
 
 
 class CExtMTPEngine(EngineBase):
@@ -26,7 +27,7 @@ class CExtMTPEngine(EngineBase):
         """Initialize the engine."""
         super().__init__(*args, **kwargs)
 
-    def _calculate(self, atoms: Atoms) -> tuple:
+    def _calculate(self, atoms: Atoms) -> tuple[np.ndarray, ...]:
         """Main calculation dispatch."""
         if self.mode == "run":
             return self._calc_run(atoms)
@@ -34,8 +35,14 @@ class CExtMTPEngine(EngineBase):
             return self._calc_train(atoms)
         raise NotImplementedError(self.mode)
 
-    def _calc_run(self, atoms: Atoms) -> tuple:
-        """Calculate energies, forces, and stress for run mode."""
+    def _calc_run(self, atoms: Atoms) -> tuple[np.ndarray, ...]:
+        """Calculate energies, forces, and stress for run mode.
+
+        Returns
+        -------
+        tuple[np.ndarray, ...]
+
+        """
         mtp_data = self.mtp_data
 
         all_js = self._neighbors
@@ -61,8 +68,14 @@ class CExtMTPEngine(EngineBase):
 
         return energies, forces, stress
 
-    def _calc_train(self, atoms: Atoms) -> tuple:
-        """Calculate energies, forces, and stress for training mode."""
+    def _calc_train(self, atoms: Atoms) -> tuple[np.ndarray, ...]:
+        """Calculate energies, forces, and stress for training mode.
+
+        Returns
+        -------
+        tuple[np.ndarray, ...]
+
+        """
         mtp_data = self.mtp_data
 
         js = self._neighbors

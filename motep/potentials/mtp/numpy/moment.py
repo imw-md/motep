@@ -21,7 +21,12 @@ class MomentBasis:
         r_ijs: npt.NDArray[np.float64],  # (neighbors, 3)
         r_abs: npt.NDArray[np.float64],  # (neighbors)
         rb: ChebyshevArrayRadialBasis,
-    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    ) -> tuple[
+        npt.NDArray[np.float64],
+        npt.NDArray[np.float64],
+        npt.NDArray[np.float64],
+        npt.NDArray[np.float64],
+    ]:
         r"""Calculate basis functions and their derivatives.
 
         Parameters
@@ -114,7 +119,7 @@ class MomentBasis:
 
         moment_coeffs = self.mtp_data.moment_coeffs
 
-        dedcs, dgdcs = calc_dedcs_and_dgdcs(
+        dvdcs, dgdcs = _calc_dvdcs_and_dgdcs(
             self.mtp_data.alpha_index_basic_count,
             alpha_index_times,
             alpha_moment_mapping,
@@ -128,7 +133,7 @@ class MomentBasis:
         return (
             moment_values[alpha_moment_mapping],
             moment_jac_rs[alpha_moment_mapping],
-            dedcs,
+            dvdcs,
             dgdcs,
         )
 
@@ -157,7 +162,7 @@ def _contract_moments(
         )
 
 
-def calc_dedcs_and_dgdcs(
+def _calc_dvdcs_and_dgdcs(
     alpha_index_basic_count: np.int32,
     alpha_index_times: np.ndarray,
     alpha_moment_mapping: np.ndarray,
@@ -174,7 +179,7 @@ def calc_dedcs_and_dgdcs(
 
     Returns
     -------
-    dedcs : np.ndarray
+    dvdcs : np.ndarray
         dV/dc.
     dgdcs : np.ndarray
         d(dV/dr)/dc.
@@ -196,9 +201,9 @@ def calc_dedcs_and_dgdcs(
         i1, i2, mult, i3 = ait
         dgdmb[i1] += mult * dgdmb[i3] * moment_values[i2]
         dgdmb[i2] += mult * dgdmb[i3] * moment_values[i1]
-    dedcs = (moment_jac_cs[:aibc].T @ dedmb[:aibc]).T
+    dvdcs = (moment_jac_cs[:aibc].T @ dedmb[:aibc]).T
     dgdcs = (moment_jac_rc[:aibc].T @ dedmb[:aibc]).T
     dgdcs += (
         moment_jac_cs[:aibc, ..., None, None] * dgdmb[:aibc, None, None, None]
     ).sum(axis=0)
-    return dedcs, dgdcs
+    return dvdcs, dgdcs

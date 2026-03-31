@@ -526,17 +526,19 @@ static inline void accumulate_mbd_dgdcs_dsdcs(
 }
 
 /* ==========================================================================
- * Accumulate mbd.dedcs from basic moment jacobians
+ * Accumulate mbd.dvdcs from basic moment jacobians
  * ========================================================================== */
-static inline void accumulate_mbd_dedcs(
+static inline void accumulate_mbd_dvdcs(
+    int i,
     int itype,
+    int n_atoms,
     int n_basic,
     int species_count,
     int radial_funcs_count,
     int radial_basis_size,
     const double *moment_jac_cs,
     const double *dedmb,
-    double *dedcs)
+    double *dvdcs)
 {
     int rbs = radial_basis_size;
     int rfc = radial_funcs_count;
@@ -554,8 +556,8 @@ static inline void accumulate_mbd_dedcs(
                     int mjac_idx = ((iamc * species_count + jtype_idx) * rfc + irf) * rbs + irb;
                     double mjac_val = moment_jac_cs[mjac_idx];
 
-                    int dedcs_idx = ((itype * species_count + jtype_idx) * rfc + irf) * rbs + irb;
-                    dedcs[dedcs_idx] += mjac_val * v1;
+                    int dvdcs_idx = (((itype * species_count + jtype_idx) * rfc + irf) * rbs + irb) * n_atoms + i;
+                    dvdcs[dvdcs_idx] += mjac_val * v1;
                 }
             }
         }

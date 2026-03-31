@@ -45,6 +45,8 @@ class MomentBasisData(ModeBase):
         This corresponds to nabla b_j in Eq. (7a) in [Podryabinkin_CMS_2017_Active]_.
     dbdeps : np.ndarray (alpha_moments_count, 3, 3)
         Derivatives of cumulated basis functions with respect to the strain tensor.
+    dvdcs: np.ndarray
+        Derivatives of local energies with respect to the radial coefficients.
 
     .. [Podryabinkin_CMS_2017_Active]
        E. V. Podryabinkin and A. V. Shapeev, Comput. Mater. Sci. 140, 171 (2017).
@@ -56,7 +58,7 @@ class MomentBasisData(ModeBase):
     vatoms: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
     dbdris: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
     dbdeps: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
-    dedcs: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
+    dvdcs: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
     dgdcs: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
     dsdcs: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
 
@@ -64,6 +66,11 @@ class MomentBasisData(ModeBase):
     def values(self) -> np.ndarray:
         """Basis values summed over atoms."""
         return self.vatoms.sum(axis=-1)
+
+    @property
+    def dedcs(self) -> np.ndarray:
+        """Derivatives of local energies with respect to the radial coefficients."""
+        return self.dvdcs.sum(axis=-1)
 
     def initialize(self, natoms: int, mtp_data: MTPData) -> None:
         """Initialize moment basis properties."""
@@ -76,7 +83,7 @@ class MomentBasisData(ModeBase):
         if "train" in self.mode:
             self.dbdris = np.full((asm, natoms, 3), np.nan)
             self.dbdeps = np.full((asm, 3, 3), np.nan)
-            self.dedcs = np.full((spc, spc, rfc, rbs), np.nan)
+            self.dvdcs = np.full((spc, spc, rfc, rbs, natoms), np.nan)
             self.dgdcs = np.full((spc, spc, rfc, rbs, natoms, 3), np.nan)
             self.dsdcs = np.full((spc, spc, rfc, rbs, 3, 3), np.nan)
 
@@ -86,7 +93,7 @@ class MomentBasisData(ModeBase):
         if "train" in self.mode:
             self.dbdris[...] = 0.0
             self.dbdeps[...] = 0.0
-            self.dedcs[...] = 0.0
+            self.dvdcs[...] = 0.0
             self.dgdcs[...] = 0.0
             self.dsdcs[...] = 0.0
 
@@ -347,7 +354,14 @@ class EngineBase(EngineWithNeighborlist):
                 self.rbd.dqdeps[:, :, :] = np.nan
 
     def jac_energy(self, atoms: Atoms) -> MTPData:
-        """Calculate the Jacobian of the energy with respect to the MTP parameters."""
+        """Calculate the Jacobian of the energy with respect to the MTP parameters.
+
+        Returns
+        -------
+        MTPData
+            Placeholder of the Jacobian of the energy with respect tothe MTP parameters.
+
+        """
         sps = self.mtp_data.species
         nbs = list(atoms.numbers)
 
