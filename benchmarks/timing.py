@@ -91,10 +91,11 @@ def _time_mtp(
     mode: str = "run",
 ) -> np.ndarray:
     mtp_data = read_mtp(pot_path)
-    mtp_data.species = []
+    species = []
     for atomic_number in images[0].numbers:
-        if atomic_number not in mtp_data.species:
-            mtp_data.species.append(atomic_number)
+        if atomic_number not in species:
+            species.append(atomic_number)
+    mtp_data.species = species
     calc = MTP(mtp_data, engine=engine, mode=mode)
     calc.use_cache = False
 
