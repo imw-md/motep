@@ -199,6 +199,66 @@ def _maxvol(
     )
 
 
+def _mlip(
+    matrix: np.ndarray,
+    *,
+    maxiter: int = 100_000,
+) -> MaxVolResult:
+    """Algorithm implemented in MLIP-2/3.
+
+    This algorithm incrementally updates the maximum-volume submatrix starting
+    from the scaled identity matrix.
+    The parameters are hard-coded to mimic the default behavior of MLIP-2/3.
+    Note however that the update can be incomplete, and therefore the canonical
+    MaxVol algorithm is recommended except for cross-checking purposes.
+
+    Returns
+    -------
+    MaxVolResult
+
+    """
+    _validate_matrix(matrix)
+    success = True
+
+    threshold = 1e-3
+    nrows, ncols = matrix.shape
+    selected = np.full(ncols, -1, dtype=int)
+    order = np.arange(nrows, dtype=int)
+
+    init_threshold = 1e-6
+    submatrix = init_threshold * np.eye(ncols)
+    inv_submatrix = (1.0 / init_threshold) * np.eye(ncols)
+
+    c = matrix @ inv_submatrix
+    for nit in range(maxiter):
+        i, j = np.divmod(np.argmax(np.abs(c)), ncols)
+        cmax = np.abs(c[i, j])
+        logger.info("maxvol %d: %s (%s, %s)", nit, cmax, i, j)
+        if cmax - 1.0 < threshold:
+            break
+        if order[i] in selected:
+            break
+        k = order[i]  # index for rows of the original matrix
+        selected[j] = k
+        _update_inv_submatrix(inv_submatrix, c[i], j)
+        _update_c(c, i, j)
+        c[[i, j]] = c[[j, i]]
+        order[[i, j]] = order[[j, i]]
+        submatrix[j] = matrix[k]
+
+    if np.any(selected == -1):
+        logger.warning("Some parameters have not been selected.")
+        logger.warning(np.where(selected == -1)[0])
+        success = False
+
+    return MaxVolResult(
+        indices=selected[selected != -1],
+        submatrix=submatrix,
+        success=success,
+        nit=nit,
+    )
+
+
 def _calc_c(matrix: np.ndarray, selected: np.ndarray) -> np.ndarray:
     """Calculate c explicitly based on c @ matrix = matrix[selected].
 
@@ -221,11 +281,27 @@ def _update_c(c: np.ndarray, i: np.int_, j: np.int_) -> None:
     c -= np.outer(col, row) / c[i, j]
 
 
+def _update_inv_submatrix(
+    inv_submatrix: np.ndarray,
+    tmp: np.ndarray,
+    j: np.int_,
+) -> None:
+    """Update inv(sub(A)) based on the rank-1 update.
+
+    https://en.wikipedia.org/wiki/Sherman%E2%80%93Morrison_formula
+    """
+    row = tmp.copy()
+    row[j] -= 1.0
+    col = inv_submatrix[:, j].copy()
+    inv_submatrix -= np.outer(col, row) / tmp[j]
+
+
 class FindMethod(StrEnum):
     """Finding method for the indices for he MaxVol calculation."""
 
     EXHAUST = "exhaust"
     MAXVOL = "maxvol"
+    MLIP = "mlip"
 
 
 @dataclass
@@ -294,4 +370,6 @@ class MaxVol:
                 threshold=self.threshold,
                 maxiter=self.maxiter,
             )
+        if self.algorithm == FindMethod.MLIP:
+            return _mlip(matrix)
         raise ValueError(self.algorithm)
