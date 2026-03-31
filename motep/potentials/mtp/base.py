@@ -374,6 +374,28 @@ class EngineBase(EngineWithNeighborlist):
         jac.optimized = self.mtp_data.optimized
         return jac
 
+    def jac_energies(self, atoms: Atoms) -> Jacobian:
+        """Calculate the Jacobian of local energies with respect to the MTP parameters.
+
+        Returns
+        -------
+        Jacobian
+            Jacobian whose ``parameters`` have the shape of `(nparams, natoms)`.
+
+        """
+        number_of_atoms = len(atoms)
+        spicies_coeffs = np.full((self.mtp_data.species_count, number_of_atoms), np.nan)
+        for i, s in enumerate(self.mtp_data.species):
+            spicies_coeffs[i] = atoms.numbers == s
+
+        return Jacobian(
+            scaling=np.zeros((1, number_of_atoms)),
+            moment_coeffs=self.mbd.vatoms,
+            species_coeffs=spicies_coeffs,
+            radial_coeffs=self.mbd.dvdcs,
+            optimized=self.mtp_data.optimized,
+        )
+
     def jac_forces(self, atoms: Atoms) -> Jacobian:
         """Calculate the Jacobian of the forces with respect to the MTP parameters.
 

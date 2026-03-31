@@ -16,6 +16,7 @@ def test_grader(mode: GradeMode, data_path: Path) -> None:
     path = data_path / "fitting/crystals/multi/10"
     images_training = read_cfg(path / "out.cfg", index=":")
     mtp_data = read_mtp(path / "pot.mtp")
+    mtp_data.optimized = ["moment_coeffs"]
 
     grades_ref = [atoms.calc.results["MV_grade"] for atoms in images_training]
 

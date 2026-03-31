@@ -124,7 +124,12 @@ class Grader:
             return np.array([fcnf(atoms) for atoms in images])
 
         if self.mode == GradeMode.NEIGHBORHOOD:
-            return np.vstack([atoms.calc.engine.mbd.vatoms.T for atoms in images])
+
+            def fnbh(atoms: Atoms) -> np.ndarray:
+                return atoms.calc.engine.jac_energies(atoms).parameters.T
+
+            return np.vstack([fnbh(atoms) for atoms in images])
+
         raise ValueError(self.mode)
 
     def grade(self, images: list[Atoms]) -> list[Atoms]:
@@ -213,6 +218,7 @@ def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
         species = get_dummy_species(images_training)
 
     mtp_data = read_mtp(mtp_file)
+    mtp_data.optimized = ["moment_coeffs"]
     mtp_data.species = species
 
     if setting.common.engine == "mlippy":
