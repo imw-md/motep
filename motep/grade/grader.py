@@ -10,7 +10,7 @@ from ase import Atoms
 
 import motep.io
 from motep.calculator import MTP
-from motep.grade.maxvol import MaxVol, MaxVolSetting
+from motep.grade.maxvol import MaxVol, MaxVolResult, MaxVolSetting
 from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.parallel import DummyMPIComm, world
@@ -46,11 +46,16 @@ class Grader:
         self.rng = rng or np.random.default_rng(seed)
 
         self.engine = engine
-        self.maxvol_setting = maxvol_setting
+        self.maxvol = MaxVol(
+            algorithm=maxvol_setting.algorithm,
+            init_method=maxvol_setting.init_method,
+            threshold=maxvol_setting.threshold,
+            maxiter=maxvol_setting.maxiter,
+            rng=self.rng,
+        )
+        self.maxvol_result = MaxVolResult()
         self.mode = mode
         self.comm = comm
-        self.indices = np.array(np.iinfo(np.int32).min, dtype=int)
-        self.active_set_matrix = np.array(np.nan)
 
     def update(self, images: list[Atoms]) -> None:
         """Reevaluate the matrix and active set.
@@ -62,17 +67,7 @@ class Grader:
 
         """
         matrix = self._calc_moment_basis_matrix(images)
-        maxvol = MaxVol(
-            algorithm=self.maxvol_setting.algorithm,
-            init_method=self.maxvol_setting.init_method,
-            rng=self.rng,
-        )
-        self.indices = maxvol.run(
-            matrix,
-            threshold=self.maxvol_setting.threshold,
-            maxiter=self.maxvol_setting.maxiter,
-        )
-        self.active_set_matrix = matrix[self.indices]
+        self.maxvol_result = self.maxvol.run(matrix)
 
     def _calc_moment_basis_matrix(self, images: list[Atoms]) -> np.ndarray:
         """Calculate the matrix of moment basis values.
@@ -132,8 +127,11 @@ class Grader:
 
         # Make the overdetermined matrix
         matrix = self._calc_moment_basis_matrix(images)
+
+        active_set_matrix = self.maxvol_result.submatrix
+
         # Eq. (8) or the one after Eq. (11) in [Podryabinkin_CMS_2017_Active]_
-        c = np.linalg.lstsq(self.active_set_matrix.T, matrix.T, rcond=None)[0].T
+        c = np.linalg.lstsq(active_set_matrix.T, matrix.T, rcond=None)[0].T
         grades = np.max(c, axis=1)
 
         if self.mode == GradeMode.CONFIGURATION:
@@ -217,7 +215,7 @@ def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
         if comm.rank == 0:
             logger.info("%s\n", "=" * 72)
             logger.info("[data_active]")
-            logger.info(grader.indices)
+            logger.info(grader.maxvol_result.indices)
             for handler in logger.handlers:
                 handler.flush()
             motep.io.write(filename_out, images_out)

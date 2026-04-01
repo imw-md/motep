@@ -15,6 +15,35 @@ from motep.setting import DataclassFromAny
 logger = logging.getLogger(__name__)
 
 
+@dataclass(kw_only=True)
+class MaxVolResult:
+    """Result container for MaxVol calculations.
+
+    Similar to ``scipy.optimize.OptimizeResult``, this dataclass collects the
+    computed indices and useful convergence metadata.
+
+    Attributes
+    ----------
+    indices : ndarray
+        Indices of the matrix giving the maximum-volume submatrix.
+    submatrix : ndarray
+        Maximum-volume submatrix.
+        This is redundant for the exhaustive and the canonical MaxVol algorithms but not
+        for the MLIP-2/3 algorithm because the construction of the submatrix can be
+        imcomplete.
+    success : bool
+        Whether or not the MaxVol algorithm succeeded.
+    nit : int
+        Number of iterations.
+
+    """
+
+    indices: np.ndarray = field(default_factory=lambda: np.full(0, 0))
+    submatrix: np.ndarray = field(default_factory=lambda: np.full((0, 0), np.nan))
+    success: bool = False
+    nit: int = 0
+
+
 def _init_maxvol_first(matrix: np.ndarray) -> np.ndarray:
     return np.arange(matrix.shape[1])
 
@@ -74,13 +103,12 @@ def _validate_indices(matrix: np.ndarray, indices: np.ndarray) -> None:
         raise ValueError(msg)
 
 
-def _exhaust(matrix: np.ndarray) -> np.ndarray:
+def _exhaust(matrix: np.ndarray) -> MaxVolResult:
     """Find the MaxVol indices exhaustively.
 
     Returns
     -------
-    indices : np.ndarray
-        MaxVol indices.
+    MaxVolResult
 
     Raises
     ------
@@ -109,7 +137,12 @@ def _exhaust(matrix: np.ndarray) -> np.ndarray:
             indices = indices_checked
             slogdet_max = slogdet
 
-    return indices
+    return MaxVolResult(
+        indices=indices,
+        submatrix=matrix[indices],
+        success=True,
+        nit=0,
+    )
 
 
 def _maxvol(
@@ -118,24 +151,25 @@ def _maxvol(
     *,
     threshold: float = 1e-9,
     maxiter: int = 100_100,
-) -> np.ndarray:
+) -> MaxVolResult:
     """Find the MaxVol indices.
 
     Returns
     -------
-    indices : np.ndarray
-        MaxVol indices.
+    MaxVolResult
 
     """
     _validate_matrix(matrix)
     _validate_indices(matrix, indices)
+    success = True
+
     nrows, ncols = matrix.shape
     selected = np.array(indices, dtype=int, copy=True)
     in_selected = np.zeros(nrows, dtype=bool)
     in_selected[selected] = True
 
     c = _calc_c(matrix, selected)
-    for _ in range(maxiter):
+    for nit in range(maxiter):
         i, j = np.divmod(np.argmax(np.abs(c)), ncols)
         cmax = np.abs(c[i, j])
         if cmax - 1.0 < threshold:
@@ -147,14 +181,22 @@ def _maxvol(
         in_selected[i] = True
         selected[j] = i
         _update_c(c, i, j)
+        logger.info("maxvol %d: %s (%s, %s)", nit, cmax, i, j)
     else:
         msg = (
             f"Maxvol algorithm did not converge within {maxiter} iterations. "
             f"Current c-max: {cmax}"
         )
         logger.warning(msg)
+        success = False
 
-    return np.sort(selected)
+    indices = np.sort(selected)
+    return MaxVolResult(
+        indices=indices,
+        submatrix=matrix[indices],
+        success=success,
+        nit=nit,
+    )
 
 
 def _calc_c(matrix: np.ndarray, selected: np.ndarray) -> np.ndarray:
@@ -196,14 +238,16 @@ class MaxVolSetting(DataclassFromAny):
     maxiter: int = 100_000
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MaxVol:
     """MaxVol algorithm."""
 
     algorithm: FindMethod = FindMethod.MAXVOL
     init_method: InitMethod = InitMethod.QR
-    rng: np.random.Generator | None = None
     init_fn: Callable[..., np.ndarray] = field(init=False)
+    threshold: float = float("nan")
+    maxiter: int = 100_000
+    rng: np.random.Generator | None = None
 
     def __post_init__(self) -> None:
         """Set up the initialization method.
@@ -219,18 +263,17 @@ class MaxVol:
             msg = f"Unknown init method: {self.init_method}"
             raise ValueError(msg) from err
 
-    def run(
-        self,
-        matrix: np.ndarray,
-        *,
-        threshold: float = 1e-9,
-        maxiter: int = 100_100,
-    ) -> np.ndarray:
+    def run(self, matrix: np.ndarray) -> MaxVolResult:
         """Find the indices for the MaxVol calculation.
+
+        Parameters
+        ----------
+        matrix : ndarray
+            Matrix to evaluate.
 
         Returns
         -------
-        np.ndarray
+        MaxVolResult
 
         Raises
         ------
@@ -245,5 +288,10 @@ class MaxVol:
                 indices = self.init_fn(matrix, rng=self.rng)
             else:
                 indices = self.init_fn(matrix)
-            return _maxvol(matrix, indices, threshold=threshold, maxiter=maxiter)
+            return _maxvol(
+                matrix,
+                indices,
+                threshold=self.threshold,
+                maxiter=self.maxiter,
+            )
         raise ValueError(self.algorithm)

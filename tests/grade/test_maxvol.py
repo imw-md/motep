@@ -14,7 +14,7 @@ def test_maxvol() -> None:
     """
     rng = np.random.default_rng(42)
     matrix = rng.random((20, 10))
-    indices_ref = MaxVol(algorithm="exhaust").run(matrix)
-    indices = MaxVol(algorithm="maxvol", init_method="random", rng=rng).run(matrix)
+    result_ref = MaxVol(algorithm="exhaust").run(matrix)
+    result = MaxVol(algorithm="maxvol", init_method="random", rng=rng).run(matrix)
 
-    np.testing.assert_array_equal(indices, indices_ref)
+    np.testing.assert_array_equal(result.indices, result_ref.indices)
