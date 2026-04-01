@@ -130,28 +130,53 @@ def _maxvol(
     _validate_matrix(matrix)
     _validate_indices(matrix, indices)
     nrows, ncols = matrix.shape
-    flags = np.zeros(nrows, dtype=bool)
-    flags[indices] = True
+    selected = np.array(indices, dtype=int, copy=True)
+    in_selected = np.zeros(nrows, dtype=bool)
+    in_selected[selected] = True
 
+    c = _calc_c(matrix, selected)
     for _ in range(maxiter):
-        submatrix = matrix[flags]
-        c = np.linalg.lstsq(submatrix.T, matrix.T, rcond=None)[0].T
         i, j = np.divmod(np.argmax(np.abs(c)), ncols)
-        if np.abs(c[i, j]) - 1.0 < threshold:
-            break
-        selected = np.flatnonzero(flags)
-        k = selected[j]
-        flags[k] = False
-        flags[i] = True
-    else:
         cmax = np.abs(c[i, j])
+        if cmax - 1.0 < threshold:
+            break
+        if in_selected[i]:
+            break
+        k = selected[j]
+        in_selected[k] = False
+        in_selected[i] = True
+        selected[j] = i
+        _update_c(c, i, j)
+    else:
         msg = (
             f"Maxvol algorithm did not converge within {maxiter} iterations. "
             f"Current c-max: {cmax}"
         )
         logger.warning(msg)
 
-    return np.flatnonzero(flags)
+    return selected
+
+
+def _calc_c(matrix: np.ndarray, selected: np.ndarray) -> np.ndarray:
+    """Calculate c explicitly based on c @ matrix = matrix[selected].
+
+    Returns
+    -------
+    c: np.ndarray
+
+    """
+    return np.linalg.lstsq(matrix[selected].T, matrix.T, rcond=None)[0].T
+
+
+def _update_c(c: np.ndarray, i: np.int_, j: np.int_) -> None:
+    """Modify c based on the rank-1 update.
+
+    https://en.wikipedia.org/wiki/Sherman%E2%80%93Morrison_formula
+    """
+    row = c[i, :].copy()
+    row[j] -= 1.0
+    col = c[:, j].copy()
+    c -= np.outer(col, row) / c[i, j]
 
 
 class FindMethod(StrEnum):
