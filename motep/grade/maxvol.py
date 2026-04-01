@@ -154,7 +154,7 @@ def _maxvol(
         )
         logger.warning(msg)
 
-    return selected
+    return np.sort(selected)
 
 
 def _calc_c(matrix: np.ndarray, selected: np.ndarray) -> np.ndarray:
