@@ -1,3 +1,6 @@
-data_in = 'in.cfg'  # {'.cfg', '.xyz'}
-data_out = 'out.cfg'  # {'.cfg', '.xyz'}
-potential_final = 'final.mtp'
+[configurations]
+initial = 'initial.cfg'  # {'.cfg', '.xyz'}
+final = 'final.cfg'  # {'.cfg', '.xyz'}
+
+[potentials]
+final = 'final.mtp'

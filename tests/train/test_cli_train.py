@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from motep.train.trainer import TrainSetting, load_setting_train
+from motep.train.setting import _Setting
+from motep.train.trainer import load_setting_train
 
 
 def test_cli_train(data_path: Path, tmp_path: Path) -> None:
@@ -24,12 +25,18 @@ def test_cli_train(data_path: Path, tmp_path: Path) -> None:
 def test_example_train(doc_path: Path) -> None:
     """Test if the input file offered in the documentation is parsable."""
     path = doc_path / "cli/motep.train.toml"
-    load_setting_train(path)
+    setting = load_setting_train(path)
+    assert not isinstance(setting.common, dict)  # converted to a dataclass?
+    assert not isinstance(setting.configurations, dict)  # converted to a dataclass?
+    assert isinstance(setting.configurations.training, list)
+    assert not isinstance(setting.potentials, dict)  # converted to a dataclass?
+    assert isinstance(setting.potentials.final, str)
 
 
 @pytest.mark.parametrize(
     "steps",
     [
+        ["minimize"],
         [{"method": "minimize"}],
         [{"method": "l-bfgs-b"}],
         [{"method": "minimize", "kwargs": {"method": "l-bfgs-b"}}],
@@ -37,5 +44,5 @@ def test_example_train(doc_path: Path) -> None:
 )
 def test_train_steps_setting(steps: list) -> None:
     """Test if `steps` in `TrainSetting` is correctly parsed."""
-    setting = TrainSetting(steps=steps)
+    setting = _Setting(steps=steps)
     assert setting.steps[0]["method"] == "minimize"

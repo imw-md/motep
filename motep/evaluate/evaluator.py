@@ -2,37 +2,20 @@
 
 import logging
 from copy import copy
-from dataclasses import dataclass
 from pathlib import Path
 from pprint import pformat
 
+import motep.io
 from motep.calculator import MTP
 from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.loss import ErrorPrinter
 from motep.parallel import DummyMPIComm
 from motep.potentials.mtp.data import MTPData
-from motep.setting import Setting, parse_setting
+
+from .setting import load_setting_evaluate
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class EvaluateSetting(Setting):
-    """Setting for the application of the potential."""
-
-
-def load_setting_evaluate(filename: str | Path | None = None) -> EvaluateSetting:
-    """Load setting for `evaluate`.
-
-    Returns
-    -------
-    EvaluateSetting
-
-    """
-    if filename is None:
-        return EvaluateSetting()
-    return EvaluateSetting(**parse_setting(filename))
 
 
 class Evaluator:
@@ -102,26 +85,27 @@ def evaluate_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
         for handler in logger.handlers:
             handler.flush()
 
-    mtp_file = str(Path(setting.potential_final).resolve())
+    mtp_file = str(Path(setting.potentials.final).resolve())
 
-    species = setting.species or None
-    images = read_images(
-        setting.data_in,
+    species = setting.common.species or None
+    images_initial = read_images(
+        setting.configurations.initial,
         species=species,
         comm=comm,
-        title="data_in",
+        title="configurations.initial",
     )
-    if not setting.species:
-        species = get_dummy_species(images)
+    if not setting.common.species:
+        species = get_dummy_species(images_initial)
 
     mtp_data = read_mtp(mtp_file)
     mtp_data.species = species
 
     # Run evaluation
-    evaluator = Evaluator(mtp_data, engine=setting.engine)
-    images_eval = evaluator.evaluate(images)
+    evaluator = Evaluator(mtp_data, engine=setting.common.engine)
+    images_final = evaluator.evaluate(images_initial)
 
     # Print errors
     if comm.rank == 0:
         logger.info("%s\n", "=" * 72)
-        ErrorPrinter(images_eval).log()
+        ErrorPrinter(images_final).log()
+        motep.io.write(setting.configurations.final[0], images_final)

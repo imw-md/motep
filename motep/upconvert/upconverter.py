@@ -1,49 +1,14 @@
 """`motep upconvert`."""
 
 from collections import defaultdict
-from dataclasses import dataclass, field
-from pathlib import Path
 
 import numpy as np
 
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.parallel import DummyMPIComm
 from motep.potentials.mtp.data import MTPData
-from motep.setting import parse_setting
 
-
-@dataclass
-class UpconvertPotentials:
-    """Setting of the potentials."""
-
-    base: str = "base.mtp"
-    initial: str = "initial.mtp"
-    final: str = "final.mtp"
-
-
-@dataclass
-class UpconvertSetting:
-    """Setting for the upconversion."""
-
-    potentials: UpconvertPotentials = field(default_factory=UpconvertPotentials)
-
-    def __post_init__(self) -> None:
-        """Postprocess attributes."""
-        if isinstance(self.potentials, dict):
-            self.potentials = UpconvertPotentials(**dict(self.potentials))
-
-
-def load_setting_upconvert(filename: str | Path | None = None) -> UpconvertSetting:
-    """Load setting for `upconvert`.
-
-    Returns
-    -------
-    UpconvertSetting
-
-    """
-    if filename is None:
-        return UpconvertSetting()
-    return UpconvertSetting(**parse_setting(filename))
+from .setting import load_setting_upconvert
 
 
 def _init(src: MTPData, dst: MTPData) -> None:
@@ -171,7 +136,7 @@ def upconvert_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
     """Upconvert."""
     setting = load_setting_upconvert(filename_setting)
 
-    src = read_mtp(setting.potentials.base)
+    src = read_mtp(setting.potentials.trained)
     dst = read_mtp(setting.potentials.initial)
 
     upconvert(src, dst)

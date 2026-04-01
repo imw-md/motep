@@ -1,12 +1,14 @@
-data_training = 'ase.xyz'
-potential_initial = 'initial.mtp'
-potential_final = 'final.mtp'
-
+[common]
 seed = 42  # random seed for initializing MTP parameters
-
-engine = 'numba'  # {'numpy', 'numba', 'mlippy'}
-
+engine = 'cext'  # {'cext', 'numpy', 'numba', 'mlippy'}
 species = [6, 1]  # atomic numbers corresponding to types
+
+[configurations]
+training = 'ase.xyz'
+
+[potentials]
+initial = 'initial.mtp'
+final = 'final.mtp'
 
 [loss]  # setting for the loss function
 energy_weight = 1.0

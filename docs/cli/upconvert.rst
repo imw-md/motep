@@ -16,14 +16,10 @@ or
 
 .. code-block:: bash
 
-    motep upconvert upconvert.toml
+    motep upconvert motep.upconvert.toml
 
-``upconvert.toml``
-------------------
+``motep.upconvert.toml``
+------------------------
 
-.. code-block:: toml
-
-    [potentials]
-    base = 'base.mtp'  # trained potential with, e.g., a lower level
-    initial = 'initial.mtp'  # untrained potential with, e.g., a higher level
-    final = 'final.mtp'  # upconverted potential
+.. literalinclude:: motep.upconvert.toml
+    :language: toml

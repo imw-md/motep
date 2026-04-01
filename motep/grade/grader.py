@@ -2,8 +2,6 @@
 
 import logging
 from copy import copy
-from dataclasses import dataclass, field
-from enum import StrEnum
 from pathlib import Path
 from pprint import pformat
 
@@ -17,41 +15,10 @@ from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
-from motep.setting import Setting, parse_setting
+
+from .setting import GradeMode, load_setting_grade
 
 logger = logging.getLogger(__name__)
-
-
-class GradeMode(StrEnum):
-    """Extrapolation grade mode."""
-
-    CONFIGURATION = "configuration"
-    NEIGHBORHOOD = "neighborhood"
-
-
-@dataclass
-class GradeSetting(Setting):
-    """Setting for the extrapolation-grade calculations."""
-
-    mode: GradeMode = GradeMode.CONFIGURATION
-    maxvol: MaxVolSetting = field(default_factory=MaxVolSetting)
-
-    def __post_init__(self) -> None:
-        """Postprocess."""
-        self.maxvol = MaxVolSetting.from_any(self.maxvol)
-
-
-def load_setting_grade(filename: str | Path | None = None) -> GradeSetting:
-    """Load setting for `grade`.
-
-    Returns
-    -------
-    GradeSetting
-
-    """
-    if filename is None:
-        return GradeSetting()
-    return GradeSetting(**parse_setting(filename))
 
 
 class Grader:
@@ -206,48 +173,51 @@ def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
         for handler in logger.handlers:
             handler.flush()
 
-    rng = np.random.default_rng(setting.seed)
+    rng = np.random.default_rng(setting.common.seed)
 
-    mtp_file = str(Path(setting.potential_final).resolve())
+    mtp_file = str(Path(setting.potentials.final).resolve())
 
-    species = setting.species or None
+    species = setting.common.species or None
     images_training = read_images(
-        setting.data_training,
+        setting.configurations.training,
         species=species,
         comm=comm,
-        title="data_training",
+        title="configurations.training",
     )
-    if not setting.species:
+    if not setting.common.species:
         species = get_dummy_species(images_training)
-    images_in = read_images(
-        setting.data_in,
-        species=species,
-        comm=comm,
-        title="data_in",
-    )
 
     mtp_data = read_mtp(mtp_file)
     mtp_data.species = species
 
-    if setting.engine == "mlippy":
+    if setting.common.engine == "mlippy":
         msg = "`mlippy` engine is not available for `motep grade`"
         raise ValueError(msg)
 
     grader = Grader(
         mtp_data,
-        engine=setting.engine,
+        engine=setting.common.engine,
         rng=rng,
-        mode=setting.mode,
-        maxvol_setting=MaxVolSetting.from_any(setting.maxvol),
+        mode=setting.grade.mode,
+        maxvol_setting=MaxVolSetting.from_any(setting.grade.maxvol),
         comm=comm,
     )
     grader.update(images_training)
-    images_out = grader.grade(images_in)
 
-    if comm.rank == 0:
-        logger.info("%s\n", "=" * 72)
-        logger.info("[data_active]")
-        logger.info(grader.indices)
-        for handler in logger.handlers:
-            handler.flush()
-        motep.io.write(setting.data_out[0], images_out)
+    initial = setting.configurations.initial
+    final = setting.configurations.final
+    for i, (filename_in, filename_out) in enumerate(zip(initial, final, strict=True)):
+        images_in = read_images(
+            [filename_in],
+            species=species,
+            comm=comm,
+            title=f"configurations.initial[{i}]",
+        )
+        images_out = grader.grade(images_in)
+        if comm.rank == 0:
+            logger.info("%s\n", "=" * 72)
+            logger.info("[data_active]")
+            logger.info(grader.indices)
+            for handler in logger.handlers:
+                handler.flush()
+            motep.io.write(filename_out, images_out)

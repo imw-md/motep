@@ -1,0 +1,4 @@
+[potentials]
+trained = 'trained.mtp'  # trained potential with, e.g., a lower level
+initial = 'initial.mtp'  # untrained potential with, e.g., a higher level
+final = 'final.mtp'  # upconverted potential

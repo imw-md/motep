@@ -1,14 +1,12 @@
 """`motep train`."""
 
 import logging
-from dataclasses import dataclass, field
 from pathlib import Path
 from pprint import pformat
 from typing import TYPE_CHECKING
 
 import numpy as np
 from ase import Atoms
-from scipy.optimize._minimize import MINIMIZE_METHODS  # noqa: PLC2701
 
 from motep.io.mlip.mtp import read_mtp, write_mtp
 from motep.io.utils import get_dummy_species, read_images
@@ -16,62 +14,14 @@ from motep.loss import ErrorPrinter, LossFunction, LossFunctionBase, LossSetting
 from motep.optimizers import make_optimizer
 from motep.parallel import DummyMPIComm, world
 from motep.potentials.mtp.data import MTPData
-from motep.setting import Setting, parse_setting
 from motep.utils import measure_time
+
+from .setting import load_setting_train
 
 if TYPE_CHECKING:
     from motep.optimizers.base import OptimizerBase
 
 logger = logging.getLogger(__name__)
-
-
-def _convert_steps(steps: list[dict]) -> list[dict]:
-    for i, value in enumerate(steps):
-        if not isinstance(value, dict):
-            steps["steps"][i] = {"method": value}
-        if value["method"].lower() in MINIMIZE_METHODS:
-            if "kwargs" not in value:
-                value["kwargs"] = {}
-            value["kwargs"]["method"] = value["method"]
-            value["method"] = "minimize"
-    return steps
-
-
-@dataclass
-class TrainSetting(Setting):
-    """Setting of the training."""
-
-    loss: LossSetting = field(default_factory=LossSetting)
-    steps: list[dict] = field(
-        default_factory=lambda: [
-            {"method": "minimize"},
-        ],
-    )
-    update_mindist: bool = False
-
-    def __post_init__(self) -> None:
-        """Postprocess attributes."""
-        if isinstance(self.loss, dict):
-            self.loss = LossSetting(**self.loss)
-
-        # Default 'optimized' is defined in each `Optimizer` class.
-
-        # convert the old style "steps" like {'steps`: ['L-BFGS-B']} to the new one
-        # {'steps`: {'method': 'L-BFGS-B'}
-        self.steps = _convert_steps(self.steps)
-
-
-def load_setting_train(filename: str | Path | None = None) -> TrainSetting:
-    """Load setting for `train`.
-
-    Returns
-    -------
-    TrainSetting
-
-    """
-    if filename is None:
-        return TrainSetting()
-    return TrainSetting(**parse_setting(filename))
 
 
 class Trainer:
@@ -194,16 +144,16 @@ def train_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
         for handler in logger.handlers:
             handler.flush()
 
-    untrained_mtp = str(Path(setting.potential_initial).resolve())
+    untrained_mtp = str(Path(setting.potentials.initial).resolve())
 
-    species = setting.species or None
+    species = setting.common.species or None
     images = read_images(
-        setting.data_training,
+        setting.configurations.training,
         species=species,
         comm=comm,
-        title="data_training",
+        title="configurations.training",
     )
-    if not setting.species:
+    if not setting.common.species:
         species = get_dummy_species(images)
 
     mtp_data = read_mtp(untrained_mtp)
@@ -211,8 +161,8 @@ def train_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
 
     trainer = Trainer(
         mtp_data,
-        seed=setting.seed,
-        engine=setting.engine,
+        seed=setting.common.seed,
+        engine=setting.common.engine,
         loss=setting.loss,
         steps=setting.steps,
         comm=comm,
@@ -222,4 +172,4 @@ def train_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
 
     if comm.rank == 0:
         logger.info("%s\n", "=" * 72)
-        write_mtp(setting.potential_final, mtp_data)
+        write_mtp(setting.potentials.final, mtp_data)
