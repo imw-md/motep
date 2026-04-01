@@ -218,7 +218,6 @@ def grade_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
         species = get_dummy_species(images_training)
 
     mtp_data = read_mtp(mtp_file)
-    mtp_data.optimized = ["moment_coeffs"]
     mtp_data.species = species
 
     if setting.common.engine == "mlippy":

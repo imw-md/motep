@@ -12,6 +12,7 @@ from motep.io.mlip.mtp import read_mtp
 _optimized = [
     ["moment_coeffs"],
     ["moment_coeffs", "species_coeffs"],
+    ["moment_coeffs", "species_coeffs", "radial_coeffs"],
 ]
 
 
