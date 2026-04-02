@@ -6,15 +6,16 @@ import numpy as np
 from ase import Atoms
 
 from motep.potentials.mmtp.base import MagEngineBase
-from motep.potentials.mtp import get_types
+from motep.potentials.mtp.data import get_types
 
 try:
     from . import _mmtp_cext
 except ImportError as e:
-    raise ImportError(
+    msg = (
         "C extension module '_mmtp_cext' not found. "
         "Please build the extension with: pip install -e ."
-    ) from e
+    )
+    raise ImportError(msg) from e
 
 
 class CExtMagMTPEngine(MagEngineBase):
@@ -95,8 +96,8 @@ class CExtMagMTPEngine(MagEngineBase):
 
         # Use the run implementation to get the magnetic gradients,
         # which is cheap compared to the train call.
-        # Use a throwaway mbd to avoid double-accumulating mbd.values.
-        _tmp_mbd = types.SimpleNamespace(values=np.zeros_like(self.mbd.values))
+        # Use a throwaway mbd to avoid double-accumulating mbd.vatoms.
+        _tmp_mbd = types.SimpleNamespace(vatoms=np.zeros_like(self.mbd.vatoms))
         _, _, grad_mag_i, grad_mag_j = _mmtp_cext.calc_mag_run(
             js,
             rs,

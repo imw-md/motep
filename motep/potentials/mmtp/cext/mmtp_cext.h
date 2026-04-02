@@ -1,8 +1,6 @@
 #ifndef MMTP_CEXT_H
 #define MMTP_CEXT_H
 
-#include <Python.h>
-#include <numpy/arrayobject.h>
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -30,11 +28,11 @@ void calc_mag_run(
     const int *alpha_index_times, /* (n_times, 4): [i1, i2, mult, i3] */
     int n_times,
     const double *moment_coeffs, /* (alpha_scalar_moments) */
-    double *energies,             /* (n_atoms) */
-    double *gradient,             /* (n_atoms, n_neighbors, 3) */
-    double *grad_mag_i,           /* (n_atoms, n_neighbors) */
-    double *grad_mag_j,           /* (n_atoms, n_neighbors) */
-    double *mbd_values);          /* (n_alpha_scalar) */
+    double *energies,            /* (n_atoms) */
+    double *gradient,            /* (n_atoms, n_neighbors, 3) */
+    double *grad_mag_i,          /* (n_atoms, n_neighbors) */
+    double *grad_mag_j,          /* (n_atoms, n_neighbors) */
+    double *mbd_vatoms);         /* (n_alpha_scalar, n_atoms) */
 
 /* Calculate forces from gradients */
 void calc_forces_from_gradient(
@@ -78,7 +76,7 @@ void calc_mag_train(
     double *rbd_values,
     double *rbd_dqdris,
     double *rbd_dqdeps,
-    double *mbd_values,
+    double *mbd_vatoms,
     double *mbd_dbdris,
     double *mbd_dbdeps,
     double *mbd_dedcs,
@@ -113,7 +111,7 @@ void calc_mag_train_mgrad(
     double *rbd_dqdris,
     double *rbd_dqdmis,
     double *rbd_dqdeps,
-    double *mbd_values,
+    double *mbd_vatoms,
     double *mbd_dbdris,
     double *mbd_dbdmis,
     double *mbd_dbdeps,

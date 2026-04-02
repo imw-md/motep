@@ -29,7 +29,7 @@ void calc_mag_run(
     double *gradient,
     double *grad_mag_i,
     double *grad_mag_j,
-    double *mbd_values)
+    double *mbd_vatoms)
 {
     int rbs = radial_basis_size;
     int mbs = mag_basis_size;
@@ -156,7 +156,13 @@ void calc_mag_run(
             energies[i] += moment_coeffs[i_am] * moment_values[idx];
         }
 
-        accumulate_mbd_values(n_alpha_scalar, alpha_moment_mapping, moment_values, mbd_values);
+        accumulate_mbd_vatoms(
+            i,
+            n_atoms,
+            n_alpha_scalar,
+            alpha_moment_mapping,
+            moment_values,
+            mbd_vatoms);
 
         free(r_abs);
         free(r_unit);
@@ -253,7 +259,7 @@ void calc_mag_train(
     double *rbd_values,
     double *rbd_dqdris,
     double *rbd_dqdeps,
-    double *mbd_values,
+    double *mbd_vatoms,
     double *mbd_dbdris,
     double *mbd_dbdeps,
     double *mbd_dedcs,
@@ -404,11 +410,13 @@ void calc_mag_train(
         free(dedmb);
         free(dgdmb);
 
-        accumulate_mbd_values(
+        accumulate_mbd_vatoms(
+            i,
+            n_atoms,
             n_alpha_scalar,
             alpha_moment_mapping,
             moment_values,
-            mbd_values);
+            mbd_vatoms);
 
         accumulate_mbd_dbdris_dbdeps(
             i,
@@ -468,7 +476,7 @@ void calc_mag_train_mgrad(
     double *rbd_dqdris,
     double *rbd_dqdmis,
     double *rbd_dqdeps,
-    double *mbd_values,
+    double *mbd_vatoms,
     double *mbd_dbdris,
     double *mbd_dbdmis,
     double *mbd_dbdeps,
@@ -675,11 +683,13 @@ void calc_mag_train_mgrad(
         free(dgmidmb);
         free(dgmjdmb);
 
-        accumulate_mbd_values(
+        accumulate_mbd_vatoms(
+            i,
+            n_atoms,
             n_alpha_scalar,
             alpha_moment_mapping,
             moment_values,
-            mbd_values);
+            mbd_vatoms);
 
         accumulate_mbd_dbdris_dbdeps(
             i,

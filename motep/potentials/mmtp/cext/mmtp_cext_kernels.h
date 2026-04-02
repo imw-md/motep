@@ -49,7 +49,6 @@ static inline void calc_radial_and_mag_basis(
 {
     int rbs = radial_basis_size;
     int mbs = mag_basis_size;
-    int nrb = rbs * mbs * mbs;
 
     double *tmp_rb_vals = (double *)malloc(rbs * sizeof(double));
     double *tmp_drb_drs = (double *)malloc(rbs * sizeof(double));

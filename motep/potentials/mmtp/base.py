@@ -52,7 +52,7 @@ class MagMomentBasisData(MagModeBase, MomentBasisData):
         nrb = mtp_data.radial_basis_size * mtp_data.mag_basis_size**2
         asm = mtp_data.alpha_scalar_moments
 
-        self.values = np.full((asm), np.nan)
+        self.vatoms = np.full((asm, natoms), np.nan)
         if "train" in self.mode:
             self.dbdris = np.full((asm, natoms, 3), np.nan)
             self.dbdeps = np.full((asm, 3, 3), np.nan)
