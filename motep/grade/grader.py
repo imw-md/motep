@@ -132,7 +132,7 @@ class Grader:
 
         # Eq. (8) or the one after Eq. (11) in [Podryabinkin_CMS_2017_Active]_
         c = np.linalg.lstsq(active_set_matrix.T, matrix.T, rcond=None)[0].T
-        grades = np.max(c, axis=1)
+        grades = np.max(np.abs(c), axis=1)
 
         if self.mode == GradeMode.CONFIGURATION:
             # evaluate `MV_grade` for each configuration
