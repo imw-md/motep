@@ -13,7 +13,7 @@ import numpy.typing as npt
         nb.float64,
     ),
 )
-def _nb_chebyshev(
+def chebyshev(
     r: np.float64,
     number_of_terms: np.int32,
     min_dist: np.float64,
@@ -58,7 +58,7 @@ def calc_radial_basis(
         if r_abs[j] < max_dist:
             smooth_value = scaling * (max_dist - r_abs[j]) ** 2
             smooth_deriv = -2.0 * scaling * (max_dist - r_abs[j])
-            vs0, ds0 = _nb_chebyshev(r_abs[j], radial_basis_size, min_dist, max_dist)
+            vs0, ds0 = chebyshev(r_abs[j], radial_basis_size, min_dist, max_dist)
             for i_rb in range(radial_basis_size):
                 values[i_rb, j] = vs0[i_rb] * smooth_value
                 derivs[i_rb, j] = ds0[i_rb] * smooth_value + vs0[i_rb] * smooth_deriv

@@ -27,6 +27,10 @@ def make_mtp_engine(engine: str = "cext") -> type[EngineBase]:
         from motep.potentials.mtp.numba.engine import NumbaMTPEngine
 
         return NumbaMTPEngine
+    if engine == "numba_mag":
+        from motep.potentials.mmtp.numba.engine import NumbaMagMTPEngine
+
+        return NumbaMagMTPEngine
     if engine == "jax":
         from motep.potentials.mtp.jax.engine import JaxMTPEngine
 
@@ -35,6 +39,11 @@ def make_mtp_engine(engine: str = "cext") -> type[EngineBase]:
         from motep.potentials.mtp.cext.engine import CExtMTPEngine
 
         return CExtMTPEngine
+    if engine == "cext_mag":
+        from motep.potentials.mmtp.cext.engine import CExtMagMTPEngine
+
+        return CExtMagMTPEngine
+
     raise ValueError(engine)
 
 

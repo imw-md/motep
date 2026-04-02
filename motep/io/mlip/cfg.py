@@ -135,6 +135,8 @@ def _read_image(file: TextIO, species: list[int] | None) -> Atoms:
         _set_forces(atoms, atomdata)
     if cell is not None and stress is not None:
         _set_stress(atoms, stress)
+    if any(k in atomdata for k in ("magmom_x", "magmom_y", "magmom_z")):
+        _set_magmoms(atoms, atomdata)
     atoms.info = info  # added PK
     return atoms
 
@@ -149,6 +151,16 @@ def _set_stress(atoms: Atoms, stress: dict[str, float]) -> None:
     voigt_order = ["xx", "yy", "zz", "yz", "xz", "xy"]
     arr = np.array([stress[_] for _ in voigt_order])
     atoms.calc.results["stress"] = -arr / atoms.get_volume()
+
+
+def _set_magmoms(atoms: Atoms, atomdata: dict) -> None:
+    keys_magmoms = ["magmom_x", "magmom_y", "magmom_z"]
+    magmoms = list(zip(*[atomdata[_] for _ in keys_magmoms], strict=True))
+    magmoms = np.array(magmoms)
+    cols = np.where(~(magmoms == 0).all(axis=0))[0]
+    if len(cols) == 1:
+        magmoms = magmoms[:, cols[0]]
+    atoms.calc.results["magmoms"] = magmoms
 
 
 def _parse_value(value: str) -> int | float | bool:
