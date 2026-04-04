@@ -128,15 +128,15 @@ class RadialBasisData(ModeBase):
             self.dqdeps[...] = 0.0
 
 
-@dataclass
-class Jac:
-    scaling: float = 1.0
-    radial_coeffs: npt.NDArray[np.float64] | None = None
-    species_coeffs: npt.NDArray[np.float64] | None = None
-    moment_coeffs: npt.NDArray[np.float64] | None = None
-    optimized: list[str] = field(
-        default_factory=lambda: ["species_coeffs", "moment_coeffs", "radial_coeffs"],
-    )
+@dataclass(kw_only=True)
+class Jacobian:
+    """Placeholder of the Jacobian with respect to the MTP parameters."""
+
+    scaling: npt.NDArray[np.float64]
+    radial_coeffs: npt.NDArray[np.float64]
+    species_coeffs: npt.NDArray[np.float64]
+    moment_coeffs: npt.NDArray[np.float64]
+    optimized: list[str]
 
     @property
     def parameters(self) -> npt.NDArray[np.float64]:
@@ -159,7 +159,7 @@ class EngineWithNeighborlist(ModeBase):
 
     def __init__(self) -> None:
         self.neighbor_list: PrimitiveNeighborList | None = None
-        self.mtp_data: MTPData | None = None
+        self.mtp_data: MTPData = MTPData()
 
     def _initiate_neighbor_list(self, atoms: Atoms) -> None:
         """Initialize the ASE `PrimitiveNeighborList` object."""
@@ -268,7 +268,7 @@ class EngineBase(EngineWithNeighborlist):
     def update(self, mtp_data: MTPData) -> None:
         """Update MTP parameters."""
         self.mtp_data = mtp_data
-        if self.mtp_data.species is None:
+        if self.mtp_data.species.size == 0:
             self.mtp_data.species = list(range(self.mtp_data.species_count))
 
     def check_species(self, atoms: Atoms) -> None:
@@ -360,37 +360,41 @@ class EngineBase(EngineWithNeighborlist):
         jac.optimized = self.mtp_data.optimized
         return jac
 
-    def jac_forces(self, atoms: Atoms) -> MTPData:
+    def jac_forces(self, atoms: Atoms) -> Jacobian:
         """Calculate the Jacobian of the forces with respect to the MTP parameters.
 
-        `jac.parameters` have the shape of `(nparams, natoms, 3)`.
+        Returns
+        -------
+        Jacobian
+            Jacobian whose ``parameters`` have the shape of `(nparams, natoms, 3)`.
 
         """
         spc = self.mtp_data.species_count
         number_of_atoms = len(atoms)
 
-        jac = Jac(
+        return Jacobian(
             scaling=np.zeros((1, number_of_atoms, 3)),
             moment_coeffs=self.mbd.dbdris * -1.0,
             species_coeffs=np.zeros((spc, number_of_atoms, 3)),
             radial_coeffs=self.mbd.dgdcs * -1.0,
+            optimized=self.mtp_data.optimized,
         )  # placeholder of the Jacobian with respect to the parameters
-        jac.optimized = self.mtp_data.optimized
-        return jac
 
-    def jac_stress(self, atoms: Atoms) -> MTPData:
+    def jac_stress(self, atoms: Atoms) -> Jacobian:
         """Calculate the Jacobian of the forces with respect to the MTP parameters.
 
-        `jac.parameters` have the shape of `(nparams, natoms, 3)`.
+        Returns
+        -------
+        _Jacobian
+            Jacobian whose ``parameters`` have the shape of `(nparams, 3, 3)`.
 
         """
         spc = self.mtp_data.species_count
 
-        jac = Jac(
+        return Jacobian(
             scaling=np.zeros((1, 3, 3)),
             moment_coeffs=self.mbd.dbdeps.copy(),
             species_coeffs=np.zeros((spc, 3, 3)),
             radial_coeffs=self.mbd.dsdcs.copy(),
+            optimized=self.mtp_data.optimized,
         )  # placeholder of the Jacobian with respect to the parameters
-        jac.optimized = self.mtp_data.optimized
-        return jac
