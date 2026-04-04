@@ -117,7 +117,12 @@ class Grader:
 
         """
         if self.mode == GradeMode.CONFIGURATION:
-            return np.array([atoms.calc.engine.mbd.values for atoms in images])
+
+            def fcnf(atoms: Atoms) -> np.ndarray:
+                return atoms.calc.engine.jac_energy(atoms).parameters
+
+            return np.array([fcnf(atoms) for atoms in images])
+
         if self.mode == GradeMode.NEIGHBORHOOD:
             return np.vstack([atoms.calc.engine.mbd.vatoms.T for atoms in images])
         raise ValueError(self.mode)
