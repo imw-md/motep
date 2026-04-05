@@ -2,6 +2,9 @@
 
 import logging
 from dataclasses import dataclass, field, replace
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from numbers import Integral
 
 import numpy as np
 import numpy.typing as npt
@@ -10,7 +13,10 @@ from ase import Atoms
 logger = logging.getLogger(__name__)
 
 
-def get_types(atoms: Atoms, species: list[int]) -> npt.NDArray[np.int32]:
+def get_types(
+    atoms: Atoms,
+    species: Sequence[Integral] | npt.NDArray[np.int32],
+) -> npt.NDArray[np.int32]:
     """Get types.
 
     Returns
@@ -20,6 +26,10 @@ def get_types(atoms: Atoms, species: list[int]) -> npt.NDArray[np.int32]:
     """
     species = list(species)
     return np.fromiter((species.index(_) for _ in atoms.numbers), dtype=np.int32)
+
+
+def _default_factory_int() -> npt.NDArray[np.int32]:
+    return np.array([], dtype=np.int32)
 
 
 def _default_factory_optimized() -> list[str]:
@@ -74,7 +84,7 @@ class MTPData:
     alpha_moment_mapping: npt.NDArray[np.int32] | None = None
     species_coeffs: npt.NDArray[np.float64] | None = None
     moment_coeffs: npt.NDArray[np.float64] | None = None
-    _species: npt.NDArray[np.int32] | None = None
+    _species: npt.NDArray[np.int32] = field(default_factory=_default_factory_int)
     optimized: list[str] = field(default_factory=_default_factory_optimized)
 
     def __post_init__(self) -> None:
@@ -103,7 +113,7 @@ class MTPData:
             self.radial_coeffs = rng.uniform(-0.1, +0.1, (spc, spc, rfc, rbs))
 
     @property
-    def species(self) -> npt.NDArray[np.int32] | None:
+    def species(self) -> npt.NDArray[np.int32]:
         """Species."""
         return self._species
 
