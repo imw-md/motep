@@ -25,7 +25,11 @@ setup_map = {
     "numba_train": {"engine": "numba", "mode": "train"},
     "numba_mag": {"engine": "numba", "magnetic": True},
     "numba_mag_train": {"engine": "numba", "mode": "train", "magnetic": True},
-    "numba_mag_train_mgrad": {"engine": "numba", "mode": "train_mgrad", "magnetic": True},
+    "numba_mag_train_mgrad": {
+        "engine": "numba",
+        "mode": "train_mgrad",
+        "magnetic": True,
+    },
     "jax": {"engine": "jax"},
     "cext": {"engine": "cext"},
     "cext_train": {"engine": "cext", "mode": "train"},
@@ -127,7 +131,7 @@ def _time_mtp(
     calc = MTP(mtp_data, engine=engine, mode=mode)
     calc.use_cache = False
 
-    suffix = f" ({mode})"
+    suffix = f" ({'mag, ' if magnetic else ''}{mode})"
 
     # Make initial calc to not time things like compile time and things that are cachable
     with Timer(fmt.format(engine + suffix + " (0th)")):
