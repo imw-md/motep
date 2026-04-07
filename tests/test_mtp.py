@@ -41,12 +41,10 @@ def test_molecules(
 
     energies_ref = np.array([_.get_potential_energy() for _ in images])
     energies = np.array([_["energy"] for _ in results_all]).reshape(-1)
-    print(np.array(energies), np.array(energies_ref))
     np.testing.assert_allclose(energies, energies_ref)
 
     forces_ref = np.vstack([_.get_forces() for _ in images])
     forces = np.vstack([_["forces"] for _ in results_all])
-    print(np.array(forces), np.array(forces_ref))
     np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
 
 
@@ -75,17 +73,14 @@ def test_crystals(
 
     energies_ref = np.array([_.get_potential_energy() for _ in images])
     energies = np.array([_["energy"] for _ in results_all]).reshape(-1)
-    print(np.array(energies), np.array(energies_ref))
     np.testing.assert_allclose(energies, energies_ref)
 
     forces_ref = np.vstack([_.get_forces() for _ in images])
     forces = np.vstack([_["forces"] for _ in results_all])
-    print(np.array(forces), np.array(forces_ref))
     np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
 
     stress_ref = np.vstack([_.get_stress() for _ in images])
     stress = np.vstack([_["stress"] for _ in results_all])
-    print(np.array(stress), np.array(stress_ref))
     np.testing.assert_allclose(stress, stress_ref, rtol=0.0, atol=1e-4)
 
 
@@ -122,8 +117,6 @@ def test_forces(
     em = mtp.calculate(atoms)["energy"]
 
     f = -1.0 * (ep - em) / (2.0 * dx)
-
-    print(forces_ref[0, 0], f)
 
     assert forces_ref[0, 0] == pytest.approx(f, abs=1e-4)
 
@@ -162,8 +155,6 @@ def test_mgrad(
     em = mtp.calculate(atoms)["energy"]
 
     t = +1.0 * (ep - em) / (2.0 * dx)
-
-    print(mag_grad_ref[0], t)
 
     assert mag_grad_ref[0] == pytest.approx(t, abs=1e-4)
 

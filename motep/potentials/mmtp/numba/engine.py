@@ -21,7 +21,7 @@ from motep.potentials.mtp.numba.moment import (
     update_mbd_dedcs,
     update_mbd_dgdcs,
     update_mbd_dsdcs,
-    update_mbd_values,
+    update_mbd_vatoms,
 )
 
 from .chebyshev import calc_radial_and_mag_basis
@@ -358,7 +358,7 @@ def _calc_mag_run(
             energies[i] += coeff * mb_values[basis_i]
 
     for i in range(itypes.size):
-        update_mbd_values(mbd_values, mb_vals[i])
+        update_mbd_vatoms(i, mbd_values, mb_vals[i])
 
     return energies, gradient, grad_mag_i, grad_mag_j
 
@@ -500,7 +500,7 @@ def _calc_mag_train(
             rbd_dqdris,
             rbd_dqdeps,
         )
-        update_mbd_values(mbd_values, mb_vals[i])
+        update_mbd_vatoms(i, mbd_values, mb_vals[i])
         update_mbd_dbdris(i, js_i, mbd_dbdris, mb_jac_rs[i])
         update_mbd_dbdeps(js_i, rs_i, mbd_dbdeps, mb_jac_rs[i])
         update_mbd_dedcs(itypes[i], mbd_dedcs, dedcs[i])
@@ -679,7 +679,7 @@ def _calc_mag_train_mgrad(
             rbd_dqdmis,
             rbd_dqdeps,
         )
-        update_mbd_values(mbd_values, mb_vals[i])
+        update_mbd_vatoms(i, mbd_values, mb_vals[i])
         update_mbd_dbdris(i, js_i, mbd_dbdris, mb_jac_rs[i])
         update_mbd_dbdmis(i, js_i, mbd_dbdmis, mb_jac_mis[i], mb_jac_mjs[i])
         update_mbd_dbdeps(js_i, rs_i, mbd_dbdeps, mb_jac_rs[i])
@@ -688,5 +688,4 @@ def _calc_mag_train_mgrad(
         update_mbd_dgmdcs(i, itypes[i], js_i, mbd_dgmdcs, dgmidcs[i], dgmjdcs[i])
         update_mbd_dsdcs(itypes[i], js_i, rs_i, mbd_dsdcs, dgdcs[i])
 
-    return energies
     return energies

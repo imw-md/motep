@@ -694,7 +694,7 @@ class ErrorPrinter:
 
         key0 = "mgrad"
         logger.info("Magnetic gradient (eV/mu_B):")
-        logger.info("    Errors checked for %s configurations", {errors[key0]["N"]})
+        logger.info("    Errors checked for %s configurations", errors[key0]["N"])
         for key1 in ["MAX", "ABS", "RMS"]:
             logger.info("    %s error: %s", key1, errors[key0][key1])
         logger.info("")

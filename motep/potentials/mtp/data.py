@@ -1,9 +1,8 @@
 """Initializer."""
 
 import logging
-from dataclasses import dataclass, field, replace
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from numbers import Integral
 
 import numpy as np

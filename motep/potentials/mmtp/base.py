@@ -8,7 +8,7 @@ from scipy.optimize import Bounds, minimize
 
 from motep.potentials.mtp.base import (
     EngineBase,
-    Jac,
+    Jacobian,
     ModeBase,
     MomentBasisData,
     RadialBasisData,
@@ -147,7 +147,7 @@ class MagEngineBase(MagModeBase, EngineBase):
     def update(self, mtp_data: MagMTPData) -> None:
         """Update MTP parameters."""
         self.mtp_data: MagMTPData = mtp_data
-        if self.mtp_data.species is None:
+        if self.mtp_data.species.size == 0:
             self.mtp_data.species = list(range(self.mtp_data.species_count))
 
     def calculate(
@@ -184,7 +184,7 @@ class MagEngineBase(MagModeBase, EngineBase):
 
         return self.results
 
-    def jac_mgrad(self, atoms: Atoms) -> Jac:
+    def jac_mgrad(self, atoms: Atoms) -> Jacobian:
         """Calculate the Jacobian of the magnetic gradient with respect to parameters.
 
         `jac.parameters` have the shape of `(nparams, natoms)`.
@@ -193,13 +193,13 @@ class MagEngineBase(MagModeBase, EngineBase):
         spc = self.mtp_data.species_count
         number_of_atoms = len(atoms)
 
-        jac = Jac(
+        jac = Jacobian(
             scaling=np.zeros((1, number_of_atoms)),
             moment_coeffs=self.mbd.dbdmis,
             species_coeffs=np.zeros((spc, number_of_atoms)),
             radial_coeffs=self.mbd.dgmdcs,
+            optimized=self.mtp_data.optimized,
         )  # placeholder of the Jacobian with respect to the parameters
-        jac.optimized = self.mtp_data.optimized
         return jac
 
     def relax_magnetic_moments(

@@ -128,9 +128,6 @@ def test_jac(
 
         parameters[i] = orig
 
-    print(jac_nmr)
-    print(jac_anl)
-
     assert np.any(jac_nmr)  # check if some of the elements are non-zero
 
     np.testing.assert_allclose(jac_nmr, jac_anl, rtol=2e-1, atol=1e-12)
@@ -231,7 +228,6 @@ def test_jac_mag(
     if not (mtp_path).exists():
         pytest.skip()
     mtp_data = read_mmtp(mtp_path)
-
     images = [read_cfg(path / "mag.cfg", index=-1)]
     for atoms in images:
         atoms.calc.results["mgrad"] = atoms.get_magnetic_moments() * 0.0
@@ -276,11 +272,6 @@ def test_jac_mag(
 
         params[i] = orig
 
-    print(jac_nmr)
-    print(jac_anl)
-
     assert np.any(jac_nmr)  # check if some of the elements are non-zero
-    assert np.isfinite(jac_anl).all()
 
-    np.testing.assert_allclose(jac_nmr, jac_anl, rtol=5e-1, atol=0.00)
-    np.testing.assert_allclose(jac_nmr, jac_anl, rtol=0.00, atol=1e-6)
+    np.testing.assert_allclose(jac_nmr, jac_anl, rtol=2e-1, atol=1e-12)

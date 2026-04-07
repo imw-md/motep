@@ -516,7 +516,7 @@ def calc_mag_moments_run(
     grad: npt.NDArray[np.float64],
     grad_mag_i: npt.NDArray[np.float64],
     grad_mag_j: npt.NDArray[np.float64],
-) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+) -> npt.NDArray[np.float64]:
     amc = alpha_moments_count
     njs = r_abs.size
     moment_values = np.zeros(amc)
