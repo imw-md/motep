@@ -65,12 +65,47 @@ class Grader:
         images : list[Atoms]
             List of ASE Atoms objects used for training.
 
+        Notes
+        -----
+        Images are shallow-copied internally; the originals are not modified.
+
         """
+        images = [copy(_) for _ in images]
+        self._evaluate(images)
         matrix = self._calc_moment_basis_matrix(images)
         self.maxvol_result = self.maxvol.run(matrix)
 
+    def _evaluate(self, images: list[Atoms]) -> None:
+        """Attach a fresh calculator to each Atoms and evaluate the potential energy.
+
+        Operates in-place. The caller is responsible for shallow-copying the
+        images beforehand if the originals must not be mutated.
+
+        Parameters
+        ----------
+        images : list[Atoms]
+            List of ASE Atoms objects to evaluate. Modified in-place.
+
+        """
+        for atoms in images:
+            if atoms.calc is not None and "magmoms" in atoms.calc.results:
+                atoms.set_initial_magnetic_moments(atoms.calc.results["magmoms"])
+            atoms.calc = make_calculator(
+                self.mtp_data,
+                engine=self.engine,
+                mode="run",
+                relax_magmoms=False,
+            )
+            atoms.get_potential_energy()
+
     def _calc_moment_basis_matrix(self, images: list[Atoms]) -> np.ndarray:
         """Calculate the matrix of moment basis values.
+
+        Parameters
+        ----------
+        images : list[Atoms]
+            List of already-evaluated ASE Atoms objects (calculator results
+            must be present).
 
         Returns
         -------
@@ -81,19 +116,6 @@ class Grader:
         ValueError
 
         """
-        # shallow copies of images
-        images = [copy(_) for _ in images]
-
-        for atoms in images:
-            atoms.calc = make_calculator(
-                self.mtp_data,
-                engine=self.engine,
-                mode="run",
-                relax_magmoms=False,
-            )
-            atoms.get_potential_energy()
-
-        # Make the overdetermined matrix
         if self.mode == GradeMode.CONFIGURATION:
             return np.array([atoms.calc.engine.mbd.values for atoms in images])
         if self.mode == GradeMode.NEIGHBORHOOD:
@@ -119,23 +141,13 @@ class Grader:
 
         Notes
         -----
-        This class creates a lightweight shallow copy of the provided Atoms
+        This method creates a lightweight shallow copy of the provided Atoms
         objects. Atomic positions and arrays are treated as immutable and are
         shared with the input. Only the calculator is replaced internally.
 
         """
-        # shallow copies of images
         images = [copy(_) for _ in images]
-        for atoms in images:
-            atoms.calc = make_calculator(
-                self.mtp_data,
-                engine=self.engine,
-                mode="run",
-                relax_magmoms=False,
-            )
-            atoms.get_potential_energy()
-
-        # Make the overdetermined matrix
+        self._evaluate(images)
         matrix = self._calc_moment_basis_matrix(images)
 
         active_set_matrix = self.maxvol_result.submatrix

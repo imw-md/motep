@@ -142,8 +142,8 @@ def _read_image(file: TextIO, species: list[int] | None) -> Atoms:
 
 
 def _set_forces(atoms: Atoms, atomdata: dict) -> None:
-    keys_forces = ["fx", "fy", "fz"]
-    forces = list(zip(*[atomdata[_] for _ in keys_forces], strict=True))
+    keys = ["fx", "fy", "fz"]
+    forces = list(zip(*[atomdata[_] for _ in keys], strict=True))
     atoms.calc.results["forces"] = np.array(forces)
 
 
@@ -154,8 +154,9 @@ def _set_stress(atoms: Atoms, stress: dict[str, float]) -> None:
 
 
 def _set_magmoms(atoms: Atoms, atomdata: dict) -> None:
-    keys_magmoms = ["magmom_x", "magmom_y", "magmom_z"]
-    magmoms = list(zip(*[atomdata[_] for _ in keys_magmoms], strict=True))
+    keys = ["magmom_x", "magmom_y", "magmom_z"]
+    n = len(atoms)
+    magmoms = list(zip(*[atomdata.get(_, [0.0] * n) for _ in keys], strict=True))
     magmoms = np.array(magmoms)
     cols = np.where(~(magmoms == 0).all(axis=0))[0]
     if len(cols) == 1:

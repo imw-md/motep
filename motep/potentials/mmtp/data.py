@@ -52,8 +52,7 @@ class MagMTPData(MTPData):
     def initialize(self, rng: np.random.Generator) -> None:
         """Initialize MTP parameters.
 
-        Ensures ``radial_basis.size`` is the combined value ``rbs * mbs²`` and
-        creates ``radial_coeffs`` with the correct combined shape.
+        Creates ``radial_coeffs`` with the combined shape ``rbs * mbs²``.
         """
         if self.species_coeffs is None:
             self.species_coeffs = rng.uniform(-5.0, +5.0, self.species_count)

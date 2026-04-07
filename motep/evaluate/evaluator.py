@@ -62,7 +62,7 @@ class Evaluator:
 
         for i, atoms in enumerate(images_eval):
             # Save targets before replacing calculator
-            targets = atoms.calc.results
+            targets = atoms.calc.results if atoms.calc else {}
             atoms.calc = make_calculator(
                 self.mtp_data,
                 engine=self.engine,
