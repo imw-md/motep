@@ -86,7 +86,7 @@ class NumbaMagMTPEngine(MagEngineBase):
             mtp_data.radial_coeffs,
             mtp_data.species_coeffs,
             mtp_data.moment_coeffs,
-            self.mbd.values,
+            self.mbd.vatoms,
         )
 
         forces = _calc_forces_from_gradient(lgrads, js)
@@ -132,7 +132,7 @@ class NumbaMagMTPEngine(MagEngineBase):
             self.rbd.values,
             self.rbd.dqdris,
             self.rbd.dqdeps,
-            self.mbd.values,
+            self.mbd.vatoms,
             self.mbd.dbdris,
             self.mbd.dbdeps,
             self.mbd.dedcs,
@@ -162,7 +162,7 @@ class NumbaMagMTPEngine(MagEngineBase):
             mtp_data.radial_coeffs,
             mtp_data.species_coeffs,
             mtp_data.moment_coeffs,
-            self.mbd.values.copy(),  # Don't accumulate extra mbd values
+            self.mbd.vatoms.copy(),  # Don't accumulate extra mbd values
         )
 
         moment_coeffs = mtp_data.moment_coeffs
@@ -211,7 +211,7 @@ class NumbaMagMTPEngine(MagEngineBase):
             self.rbd.dqdris,
             self.rbd.dqdmis,
             self.rbd.dqdeps,
-            self.mbd.values,
+            self.mbd.vatoms,
             self.mbd.dbdris,
             self.mbd.dbdmis,
             self.mbd.dbdeps,
@@ -280,7 +280,7 @@ def _calc_mgrad_from_gradient(
         nb.float64[:, :, :, :],
         nb.float64[:],
         nb.float64[:],
-        nb.float64[:],
+        nb.float64[:, :],
     ),
     # parallel=True,
     cache=True,
@@ -387,7 +387,7 @@ def _calc_mag_run(
         nb.float64[:, :, :],
         nb.float64[:, :, :, :, :],
         nb.float64[:, :, :, :, :],
-        nb.float64[:],
+        nb.float64[:, :],
         nb.float64[:, :, :],
         nb.float64[:, :, :],
         nb.float64[:, :, :, :],
@@ -535,7 +535,7 @@ def _calc_mag_train(
         nb.float64[:, :, :, :, :],
         nb.float64[:, :, :, :],
         nb.float64[:, :, :, :, :],
-        nb.float64[:],
+        nb.float64[:, :],
         nb.float64[:, :, :],
         nb.float64[:, :],
         nb.float64[:, :, :],
