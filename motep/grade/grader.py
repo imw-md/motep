@@ -87,13 +87,14 @@ class Grader:
             List of ASE Atoms objects to evaluate. Modified in-place.
 
         """
+        mode = "train" if "radial_coeffs" in self.mtp_data.optimized else "run"
         for atoms in images:
             if atoms.calc is not None and "magmoms" in atoms.calc.results:
                 atoms.set_initial_magnetic_moments(atoms.calc.results["magmoms"])
             atoms.calc = make_calculator(
                 self.mtp_data,
                 engine=self.engine,
-                mode="run",
+                mode=mode,
                 relax_magmoms=False,
             )
             atoms.get_potential_energy()
