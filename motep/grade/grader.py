@@ -72,7 +72,7 @@ class Grader:
         """
         images = [copy(_) for _ in images]
         self._evaluate(images)
-        matrix = self._calc_moment_basis_matrix(images)
+        matrix = self._calc_jacobian(images)
         self.maxvol_result = self.maxvol.run(matrix)
 
     def _evaluate(self, images: list[Atoms]) -> None:
@@ -98,8 +98,8 @@ class Grader:
             )
             atoms.get_potential_energy()
 
-    def _calc_moment_basis_matrix(self, images: list[Atoms]) -> np.ndarray:
-        """Calculate the matrix of moment basis values.
+    def _calc_jacobian(self, images: list[Atoms]) -> np.ndarray:
+        """Calculate the Jacobian of energies with respect to the parameters.
 
         Parameters
         ----------
@@ -109,7 +109,8 @@ class Grader:
 
         Returns
         -------
-        moment_basis_matrix : np.ndarray
+        np.ndarray
+            Jacobian.
 
         Raises
         ------
@@ -158,7 +159,7 @@ class Grader:
         """
         images = [copy(_) for _ in images]
         self._evaluate(images)
-        matrix = self._calc_moment_basis_matrix(images)
+        matrix = self._calc_jacobian(images)
 
         active_set_matrix = self.maxvol_result.submatrix
 
