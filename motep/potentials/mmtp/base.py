@@ -40,7 +40,7 @@ class MagMomentBasisData(MagModeBase, MomentBasisData):
         if "train" in self.mode:
             self.dbdris = np.full((asm, natoms, 3), np.nan)
             self.dbdeps = np.full((asm, 3, 3), np.nan)
-            self.dedcs = np.full((spc, spc, rfc, nrb), np.nan)
+            self.dvdcs = np.full((spc, spc, rfc, nrb, natoms), np.nan)
             self.dgdcs = np.full((spc, spc, rfc, nrb, natoms, 3), np.nan)
             self.dsdcs = np.full((spc, spc, rfc, nrb, 3, 3), np.nan)
 
