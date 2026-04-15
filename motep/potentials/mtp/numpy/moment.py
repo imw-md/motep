@@ -40,7 +40,7 @@ class MomentBasis:
         """
         species_count = self.mtp_data.species_count
         rfs = self.mtp_data.radial_funcs_count
-        rbs = self.mtp_data.radial_basis_size
+        rbs = self.mtp_data.radial_basis.size
         amc = self.mtp_data.alpha_moments_count
         alpha_index_basic = self.mtp_data.alpha_index_basic
         alpha_index_times = self.mtp_data.alpha_index_times

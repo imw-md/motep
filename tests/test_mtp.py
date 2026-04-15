@@ -6,7 +6,8 @@ import numpy as np
 import pytest
 
 from motep.io.mlip.cfg import read_cfg
-from motep.io.mlip.mtp import read_mtp
+from motep.io.mlip.mtp import read_mmtp, read_mtp
+from motep.potentials.mmtp.cext.engine import CExtMagMTPEngine
 from motep.potentials.mtp.base import EngineBase
 from motep.potentials.mtp.cext.engine import CExtMTPEngine
 from motep.potentials.mtp.jax.engine import JaxMTPEngine
@@ -40,12 +41,10 @@ def test_molecules(
 
     energies_ref = np.array([_.get_potential_energy() for _ in images])
     energies = np.array([_["energy"] for _ in results_all]).reshape(-1)
-    print(np.array(energies), np.array(energies_ref))
     np.testing.assert_allclose(energies, energies_ref)
 
     forces_ref = np.vstack([_.get_forces() for _ in images])
     forces = np.vstack([_["forces"] for _ in results_all])
-    print(np.array(forces), np.array(forces_ref))
     np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
 
 
@@ -74,17 +73,14 @@ def test_crystals(
 
     energies_ref = np.array([_.get_potential_energy() for _ in images])
     energies = np.array([_["energy"] for _ in results_all]).reshape(-1)
-    print(np.array(energies), np.array(energies_ref))
     np.testing.assert_allclose(energies, energies_ref)
 
     forces_ref = np.vstack([_.get_forces() for _ in images])
     forces = np.vstack([_["forces"] for _ in results_all])
-    print(np.array(forces), np.array(forces_ref))
     np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
 
     stress_ref = np.vstack([_.get_stress() for _ in images])
     stress = np.vstack([_["stress"] for _ in results_all])
-    print(np.array(stress), np.array(stress_ref))
     np.testing.assert_allclose(stress, stress_ref, rtol=0.0, atol=1e-4)
 
 
@@ -122,9 +118,45 @@ def test_forces(
 
     f = -1.0 * (ep - em) / (2.0 * dx)
 
-    print(forces_ref[0, 0], f)
-
     assert forces_ref[0, 0] == pytest.approx(f, abs=1e-4)
+
+
+@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+# @pytest.mark.parametrize("molecule", [762, 291, 14214, 23028])
+# @pytest.mark.parametrize("engine", [NumbaMagMTPEngine, CExtMagMTPEngine])
+@pytest.mark.parametrize("engine", [CExtMagMTPEngine])
+@pytest.mark.parametrize("mode", ["run", "train", "train_mgrad"])
+def test_mgrad(
+    engine: type[EngineBase],
+    level: int,
+    mode: str,
+    data_path: pathlib.Path,
+) -> None:
+    """Test if forces are consistent with finite-difference values."""
+    path = data_path / "original/mag"
+    mtp_path = path / f"{level:02d}.mmtp"
+    if not (mtp_path).exists():
+        pytest.skip()
+    mtp_data = read_mmtp(mtp_path)
+    mtp = engine(mtp_data, mode=mode)
+    atoms_ref = read_cfg(path / "mag.cfg", index=-1)
+    atoms_ref.set_initial_magnetic_moments(atoms_ref.get_magnetic_moments())
+
+    mag_grad_ref = mtp.calculate(atoms_ref)["mgrad"]
+
+    dx = 1e-6
+
+    atoms = atoms_ref.copy()
+    atoms.arrays["initial_magmoms"][0] += dx
+    ep = mtp.calculate(atoms)["energy"]
+
+    atoms = atoms_ref.copy()
+    atoms.arrays["initial_magmoms"][0] -= dx
+    em = mtp.calculate(atoms)["energy"]
+
+    t = +1.0 * (ep - em) / (2.0 * dx)
+
+    assert mag_grad_ref[0] == pytest.approx(t, abs=1e-4)
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])

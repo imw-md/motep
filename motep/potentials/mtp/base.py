@@ -69,7 +69,7 @@ class MomentBasisData(ModeBase):
         """Initialize moment basis properties."""
         spc = mtp_data.species_count
         rfc = mtp_data.radial_funcs_count
-        rbs = mtp_data.radial_basis_size
+        rbs = mtp_data.radial_basis.size
         asm = mtp_data.alpha_scalar_moments
 
         self.vatoms = np.full((asm, natoms), np.nan)
@@ -97,9 +97,9 @@ class RadialBasisData(ModeBase):
 
     Attributes
     ----------
-    values : np.ndarray (species_count, species_count, radial_basis_size)
+    values : np.ndarray (species_count, species_count, radial_basis.size)
         Radial basis values summed over atoms.
-    dqdris : (species_count, species_count, radial_basis_size, 3, natoms)
+    dqdris : (species_count, species_count, radial_basis.size, 3, natoms)
         Derivaties of radial basis functions summed over atoms.
 
     """
@@ -113,7 +113,7 @@ class RadialBasisData(ModeBase):
     def initialize(self, natoms: int, mtp_data: MTPData) -> None:
         """Initialize radial basis properties."""
         spc = mtp_data.species_count
-        rbs = mtp_data.radial_basis_size
+        rbs = mtp_data.radial_basis.size
 
         if "train" in self.mode:
             self.values = np.full((spc, spc, rbs), np.nan)
@@ -164,7 +164,7 @@ class EngineWithNeighborlist(ModeBase):
     def _initiate_neighbor_list(self, atoms: Atoms) -> None:
         """Initialize the ASE `PrimitiveNeighborList` object."""
         self.neighbor_list = PrimitiveNeighborList(
-            cutoffs=[0.5 * self.mtp_data.max_dist] * len(atoms),
+            cutoffs=[0.5 * self.mtp_data.radial_basis.max] * len(atoms),
             skin=0.3,  # cutoff + skin is used, recalc only if diff in pos > skin
             self_interaction=False,  # Exclude [0, 0, 0]
             bothways=True,  # return both ij and ji
@@ -202,7 +202,7 @@ class EngineWithNeighborlist(ModeBase):
     def _get_interatomic_vectors(self, atoms: Atoms) -> np.ndarray:
         if "train" in self.mode and hasattr(self, "_interatomic_vectors"):
             return self._interatomic_vectors
-        max_dist = self.mtp_data.max_dist
+        max_dist = self.mtp_data.radial_basis.max
         positions = atoms.positions
         offsets = self._offsets
         interatomic_vectors = positions[self._neighbors]  # r_j

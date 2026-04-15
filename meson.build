@@ -38,3 +38,18 @@ py.extension_module(
   subdir: 'motep/potentials/mtp/cext',
   install: true,
 )
+
+py.extension_module(
+  '_mmtp_cext',
+  [
+    'motep/potentials/mmtp/cext/mmtp_cext.c',
+    'motep/potentials/mmtp/cext/mmtp_cext_module.c',
+  ],
+  include_directories: include_directories(
+    inc_numpy,
+    'motep/potentials/mmtp/cext',
+    'motep/potentials/mtp/cext',
+  ),
+  subdir: 'motep/potentials/mmtp/cext',
+  install: true,
+)

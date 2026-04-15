@@ -61,8 +61,8 @@ class JaxMTPEngine(EngineBase):
             self.basis_converter.remapped_coeffs,
             mtp_data.radial_coeffs,
             mtp_data.scaling,
-            mtp_data.min_dist,
-            mtp_data.max_dist,
+            mtp_data.radial_basis.min,
+            mtp_data.radial_basis.max,
             # Static parameters:
             mtp_data.radial_coeffs.shape[3],
             self.moment_basis.basic_moments,

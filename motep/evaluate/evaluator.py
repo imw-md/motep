@@ -6,7 +6,7 @@ from pathlib import Path
 from pprint import pformat
 
 import motep.io
-from motep.calculator import MTP
+from motep.calculator import make_calculator
 from motep.io.mlip.mtp import read_mtp
 from motep.io.utils import get_dummy_species, read_images
 from motep.loss import ErrorPrinter
@@ -25,6 +25,7 @@ class Evaluator:
         self,
         mtp_data: MTPData,
         engine: str = "cext",
+        relax_magmoms: bool | None = None,
     ) -> None:
         """Initialize Evaluator.
 
@@ -34,10 +35,13 @@ class Evaluator:
             MTP potential data.
         engine : str
             Engine to use for calculations ("numpy", "numba", "jax", "cext", etc.).
+        relax_magmoms : bool or None
+            Whether to relax magnetic moments.  ``None`` uses mode-based default.
 
         """
         self.mtp_data = mtp_data
         self.engine = engine
+        self.relax_magmoms = relax_magmoms
 
     def evaluate(self, images: list) -> list:
         """Run MTP calculations on images.
@@ -59,7 +63,11 @@ class Evaluator:
         for i, atoms in enumerate(images_eval):
             # Save targets before replacing calculator
             targets = atoms.calc.results if atoms.calc else {}
-            atoms.calc = MTP(self.mtp_data, engine=self.engine, mode="run")
+            atoms.calc = make_calculator(
+                self.mtp_data,
+                engine=self.engine,
+                relax_magmoms=self.relax_magmoms,
+            )
             atoms.calc.targets = targets
             energy = atoms.get_potential_energy()
             logger.info("configuration %d: %s", i, energy)
@@ -101,7 +109,11 @@ def evaluate_from_setting(filename_setting: str, comm: DummyMPIComm) -> None:
     mtp_data.species = species
 
     # Run evaluation
-    evaluator = Evaluator(mtp_data, engine=setting.common.engine)
+    evaluator = Evaluator(
+        mtp_data,
+        engine=setting.common.engine,
+        relax_magmoms=setting.common.relax_magmoms,
+    )
     images_final = evaluator.evaluate(images_initial)
 
     # Print errors

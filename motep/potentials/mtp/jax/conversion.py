@@ -78,7 +78,7 @@ class MLIPMomentBasis:
         )
 
         # f * tensor = dMb/dc (before summation over neighbors)
-        # `val.shape == (alpha_index_basis_count, radial_basis_size, neighbors)`
+        # `val.shape == (alpha_index_basis_count, radial_basis.size, neighbors)`
         val = rb_values[mu, :] * mult0[:, :]
         moment_values[: mu.size] = val.sum(axis=1)
         _contract_moments(moment_values, alpha_index_times)

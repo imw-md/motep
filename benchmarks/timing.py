@@ -13,6 +13,7 @@ from motep.calculator import MTP
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.parallel import world
+from motep.potentials.mmtp.data import MagMTPData
 
 comm = world
 
@@ -22,12 +23,35 @@ setup_map = {
     "numpy": {"engine": "numpy"},
     "numba": {"engine": "numba"},
     "numba_train": {"engine": "numba", "mode": "train"},
+    "numba_mag": {"engine": "numba", "magnetic": True},
+    "numba_mag_train": {"engine": "numba", "mode": "train", "magnetic": True},
+    "numba_mag_train_mgrad": {
+        "engine": "numba",
+        "mode": "train_mgrad",
+        "magnetic": True,
+    },
     "jax": {"engine": "jax"},
     "cext": {"engine": "cext"},
     "cext_train": {"engine": "cext", "mode": "train"},
+    "cext_mag": {"engine": "cext", "magnetic": True},
+    "cext_mag_train": {"engine": "cext", "mode": "train", "magnetic": True},
+    "cext_mag_train_mgrad": {"engine": "cext", "mode": "train_mgrad", "magnetic": True},
 }
 
-all_setups = ["numpy", "numba", "numba_train", "jax", "cext", "cext_train"]
+all_setups = [
+    "numpy",
+    "numba",
+    "numba_train",
+    "numba_mag",
+    "numba_mag_train",
+    "numba_mag_train_mgrad",
+    "jax",
+    "cext",
+    "cext_train",
+    "cext_mag",
+    "cext_mag_train",
+    "cext_mag_train_mgrad",
+]
 
 
 def print_num_threads():
@@ -89,9 +113,17 @@ def _time_mtp(
     *,
     engine: str,
     mode: str = "run",
+    magnetic: bool = False,
 ) -> np.ndarray:
     mtp_data = read_mtp(pot_path)
     species = []
+
+    # Reinitialize radial coefficients if magnetic, since they change size
+    if magnetic:
+        mtp_data = MagMTPData.from_base(mtp_data)
+        mtp_data.radial_coeffs = None
+        mtp_data.initialize(np.random.default_rng(123))
+
     for atomic_number in images[0].numbers:
         if atomic_number not in species:
             species.append(atomic_number)
@@ -99,7 +131,7 @@ def _time_mtp(
     calc = MTP(mtp_data, engine=engine, mode=mode)
     calc.use_cache = False
 
-    suffix = f" ({mode})"
+    suffix = f" ({'mag, ' if magnetic else ''}{mode})"
 
     # Make initial calc to not time things like compile time and things that are cachable
     with Timer(fmt.format(engine + suffix + " (0th)")):

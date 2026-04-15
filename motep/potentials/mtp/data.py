@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from numbers import Integral
 
 import numpy as np
@@ -36,6 +36,33 @@ def _default_factory_optimized() -> list[str]:
 
 
 @dataclass
+class BasisData:
+    """Basis function configuration."""
+
+    type: str = ""
+    min: np.float64 = field(default_factory=lambda: np.float64(np.nan))
+    max: np.float64 = field(default_factory=lambda: np.float64(np.nan))
+    size: np.int32 = field(default_factory=lambda: np.int32(0))
+
+    def __post_init__(self) -> None:
+        """Validate basis parameters.
+
+        Raises:
+            ValueError: If min >= max or size < 1 (when initialized).
+
+        """
+        # Skip validation when values are not yet initialized
+        if self.size == 0 or np.isnan(self.min) or np.isnan(self.max):
+            return
+        msg = f"min ({self.min}) must be < max ({self.max})"
+        if self.min >= self.max:
+            raise ValueError(msg)
+        if self.size < 1:
+            msg = f"size must be >= 1, got {self.size}"
+            raise ValueError(msg)
+
+
+@dataclass
 class MTPData:
     """Subclass of `dict` to handle MTP parameters."""
 
@@ -44,11 +71,8 @@ class MTPData:
     scaling: float = 1.0
     species_count: int = 0
     potential_tag: str = ""
-    radial_basis_type: str = ""
-    min_dist: np.float64 = np.nan
-    max_dist: np.float64 = np.nan
+    radial_basis: BasisData = field(default_factory=BasisData)
     radial_funcs_count: int = 0
-    radial_basis_size: int = 0
     radial_coeffs: npt.NDArray[np.float64] | None = None
     alpha_moments_count: int = 0
     alpha_index_basic_count: int = 0
@@ -61,6 +85,12 @@ class MTPData:
     moment_coeffs: npt.NDArray[np.float64] | None = None
     _species: npt.NDArray[np.int32] = field(default_factory=_default_factory_int)
     optimized: list[str] = field(default_factory=_default_factory_optimized)
+
+    def __post_init__(self) -> None:
+        """Convert dict radial_basis to BasisData if needed."""
+        if isinstance(self.radial_basis, dict):
+            default = self.__dataclass_fields__["radial_basis"].default_factory()
+            self.radial_basis = replace(default, **self.radial_basis)
 
     def initialize(self, rng: np.random.Generator) -> None:
         """Initialize MTP parameters.
@@ -78,7 +108,7 @@ class MTPData:
         if self.radial_coeffs is None:
             spc = self.species_count
             rfc = self.radial_funcs_count
-            rbs = self.radial_basis_size
+            rbs = self.radial_basis.size
             self.radial_coeffs = rng.uniform(-0.1, +0.1, (spc, spc, rfc, rbs))
 
     @property
@@ -117,7 +147,7 @@ class MTPData:
         """
         species_count = self.species_count
         rfc = self.radial_funcs_count
-        rbs = self.radial_basis_size
+        rbs = self.radial_basis.size
         asm = self.alpha_scalar_moments
 
         n = 0
@@ -140,7 +170,7 @@ class MTPData:
         """Get number of parameters optimized."""
         species_count = self.species_count
         rfc = self.radial_funcs_count
-        rbs = self.radial_basis_size
+        rbs = self.radial_basis.size
         asm = self.alpha_scalar_moments
         n = 0
         if "scaling" in self.optimized:

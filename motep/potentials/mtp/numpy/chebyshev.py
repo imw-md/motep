@@ -23,7 +23,7 @@ class RadialBasisBase(ABC):
         ----------
         coeffs : npt.NDArray[np.float64]
             Coefficients of radial basis functions with the shape of
-            (species_count, species_count, radial_funcs_count, radial_basis_size).
+            (species_count, species_count, radial_funcs_count, radial_basis.size).
 
         """
 
@@ -44,11 +44,11 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
     ----------
     basis_vs : npt.NDArray[np.float64]
         Values of the basis functions multiplied by the smoothing funciton
-        with the shape of (radial_basis_size, neighbors).
+        with the shape of (radial_basis.size, neighbors).
         This is T(r) * (R_cut - r)^2 in Eq. (4) in [Podryabinkin_JCP_2023_MLIP]_.
     basis_ds : npt.NDArray[np.float64]
         Derivatives of the basis functions multiplied by the smoothing funciton
-        with the shape of (radial_basis_size, neighbors).
+        with the shape of (radial_basis.size, neighbors).
 
     .. [Podryabinkin_JCP_2023_MLIP]
           E. Podryabinkin, K. Garifullin, A. Shapeev, and I. Novikov,
@@ -77,14 +77,14 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
         Returns
         -------
         values : npt.NDArray[np.float64]
-            (radial_basis_size, neighbors)
+            (radial_basis.size, neighbors)
         derivs : npt.NDArray[np.float64]
-            (radial_basis_size, neighbors)
+            (radial_basis.size, neighbors)
 
         """
-        min_dist = self.mtp_data.min_dist
-        max_dist = self.mtp_data.max_dist
-        radial_basis_size = self.mtp_data.radial_basis_size
+        min_dist = self.mtp_data.radial_basis.min
+        max_dist = self.mtp_data.radial_basis.max
+        radial_basis_size = self.mtp_data.radial_basis.size
 
         values = np.zeros((radial_basis_size, r_abs.size))
         derivs = np.zeros((radial_basis_size, r_abs.size))
@@ -127,7 +127,7 @@ class ChebyshevArrayRadialBasis(RadialBasisBase):
 
         """
         scaling = self.mtp_data.scaling
-        max_dist = self.mtp_data.max_dist
+        max_dist = self.mtp_data.radial_basis.max
 
         in_cutoff = r_abs < max_dist
         smooth_values = np.where(in_cutoff, scaling * (max_dist - r_abs) ** 2, 0.0)
@@ -172,8 +172,8 @@ class ChebyshevPolynomialRadialBasis(RadialBasisBase):
         """Initialize radial basis functions."""
         from numpy.polynomial import Chebyshev
 
-        min_dist = self.mtp_data.min_dist
-        max_dist = self.mtp_data.max_dist
+        min_dist = self.mtp_data.radial_basis.min
+        max_dist = self.mtp_data.radial_basis.max
 
         radial_basis_funcs = []
         radial_basis_dfdrs = []  # derivatives
@@ -210,7 +210,7 @@ class ChebyshevPolynomialRadialBasis(RadialBasisBase):
     ) -> tuple[np.ndarray, np.ndarray]:
         """Calculate values of radial basis functions."""
         scaling = self.mtp_data.scaling
-        max_dist = self.mtp_data.max_dist
+        max_dist = self.mtp_data.radial_basis.max
         radial_funcs_count = self.mtp_data.radial_funcs_count
 
         is_within_cutoff = r_abs < max_dist

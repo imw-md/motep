@@ -54,10 +54,12 @@ def test_radial_funcs(
 ):
     mtp_data = MTPData(
         scaling=1.0,
-        min_dist=2.0,
-        max_dist=5.0,
+        radial_basis={
+            "min": 2.0,
+            "max": 5.0,
+            "size": radial_coeffs.shape[3],
+        },
         radial_funcs_count=radial_coeffs.shape[2],
-        radial_basis_size=radial_coeffs.shape[3],
     )
     rb: RadialBasisBase = radial_basis_class(mtp_data)
     rb.update_coeffs(radial_coeffs)

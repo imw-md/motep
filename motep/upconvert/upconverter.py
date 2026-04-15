@@ -18,15 +18,16 @@ def _init(src: MTPData, dst: MTPData) -> None:
     dst.scaling = src.scaling
     dst.species_count = max(dst.species_count, src.species_count)
     dst.potential_tag = src.potential_tag
-    dst.radial_basis_type = src.radial_basis_type
-    dst.min_dist = src.min_dist
-    dst.max_dist = src.max_dist
+    dst.radial_basis.type = src.radial_basis.type
+    dst.radial_basis.min = src.radial_basis.min
+    dst.radial_basis.max = src.radial_basis.max
     dst.radial_funcs_count = max(dst.radial_funcs_count, src.radial_funcs_count)
     dst.radial_funcs_count = max(dst.radial_funcs_count, src.radial_funcs_count)
     spc = dst.species_count
     rfc = dst.radial_funcs_count
-    rbs = dst.radial_basis_size
-    dst.radial_coeffs = np.zeros((spc, spc, rfc, rbs))
+    rbs = dst.radial_basis.size
+    nrb = rbs * dst.magnetic_basis.size**2 if hasattr(dst, "magnetic_basis") else rbs
+    dst.radial_coeffs = np.zeros((spc, spc, rfc, nrb))
     dst.species_coeffs = np.zeros(dst.species_count)
     dst.moment_coeffs = np.zeros(dst.alpha_scalar_moments)
 
@@ -34,20 +35,21 @@ def _init(src: MTPData, dst: MTPData) -> None:
 def _copy_radial_coeffs(src: MTPData, dst: MTPData) -> None:
     spc = src.species_count
     rfc = src.radial_funcs_count
-    rbs = src.radial_basis_size
-    dst.radial_coeffs[:spc, :spc, :rfc, :rbs] = src.radial_coeffs
+    rbs = src.radial_basis.size
+    nrb = rbs * src.magnetic_basis.size**2 if hasattr(src, "magnetic_basis") else rbs
+    dst.radial_coeffs[:spc, :spc, :rfc, :nrb] = src.radial_coeffs
 
     # Zeros in both radial_coeffs and moment_coeffs may be troublesome during training.
     # Therefore, new radial parts are initialized by the average of the old ones.
 
     tmp = src.radial_coeffs.mean(axis=0)[None, :, :, :]
-    dst.radial_coeffs[spc:, :spc, :rfc, :rbs] = tmp
+    dst.radial_coeffs[spc:, :spc, :rfc, :nrb] = tmp
 
     tmp = src.radial_coeffs.mean(axis=1)[:, None, :, :]
-    dst.radial_coeffs[:spc, spc:, :rfc, :rbs] = tmp
+    dst.radial_coeffs[:spc, spc:, :rfc, :nrb] = tmp
 
     tmp = src.radial_coeffs.mean(axis=2)[:, :, None, :]
-    dst.radial_coeffs[:spc, :spc, rfc:, :rbs] = tmp
+    dst.radial_coeffs[:spc, :spc, rfc:, :nrb] = tmp
 
 
 def _copy_species_coeffs(src: MTPData, dst: MTPData) -> None:

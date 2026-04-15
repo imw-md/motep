@@ -67,9 +67,9 @@ class Level2MTPOptimizer(LLSOptimizerBase):
     def _update_parameters(self, coeffs: np.ndarray) -> np.ndarray:
         mtp_data = self.loss.mtp_data
         species_count = mtp_data.species_count
-        rbs = mtp_data.radial_basis_size
-        size = species_count * species_count * rbs
-        shape = species_count, species_count, rbs
+        nrb = mtp_data.radial_coeffs.shape[3]
+        size = species_count * species_count * nrb
+        shape = species_count, species_count, nrb
 
         mtp_data.scaling = 1.0
         mtp_data.moment_coeffs[...] = 0.0
@@ -103,6 +103,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
             tmp.append(np.sqrt(setting.forces_weight) * self._calc_matrix_forces())
         if "stress" in self.minimized:
             tmp.append(np.sqrt(setting.stress_weight) * self._calc_matrix_stress())
+        if "mgrad" in self.minimized:
+            tmp.append(np.sqrt(setting.mgrad_weight) * self._calc_matrix_mgrad())
         return np.vstack(tmp)
 
     def _calc_matrix_energy(self) -> np.ndarray:
@@ -110,8 +112,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         mtp_data = loss.mtp_data
         images = loss.images
         species_count = mtp_data.species_count
-        radial_basis_size = mtp_data.radial_basis_size
-        size = species_count * species_count * radial_basis_size
+        nrb = mtp_data.radial_coeffs.shape[3]
+        size = species_count * species_count * nrb
         matrix = np.stack([atoms.calc.engine.rbd.values for atoms in images])
         if self.loss.setting.energy_per_atom:
             cs = self.loss.loss_energy.inverse_numbers_of_atoms
@@ -122,8 +124,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
 
     def _calc_matrix_forces(self) -> np.ndarray:
         species_count = self.loss.mtp_data.species_count
-        radial_basis_size = self.loss.mtp_data.radial_basis_size
-        size = species_count * species_count * radial_basis_size
+        nrb = self.loss.mtp_data.radial_coeffs.shape[3]
+        size = species_count * species_count * nrb
 
         if not self.loss.loss_forces.idcs_frc.size:
             return np.empty((0, size))
@@ -136,7 +138,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
                 [
                     (
                         images[i].calc.engine.rbd.dqdris.transpose(3, 4, 0, 1, 2)
-                        * sqrt(self.loss.loss_energy.inverse_numbers_of_atoms[i])
+                        * sqrt(self.loss.loss_forces.inverse_numbers_of_atoms[i])
                     ).flat
                     for i in idcs
                 ],
@@ -157,8 +159,8 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         idcs = self.loss.loss_stress.idcs_str
 
         species_count = self.loss.mtp_data.species_count
-        radial_basis_size = self.loss.mtp_data.radial_basis_size
-        size = species_count * species_count * radial_basis_size
+        nrb = self.loss.mtp_data.radial_coeffs.shape[3]
+        size = species_count * species_count * nrb
 
         matrix = np.array([images[i].calc.engine.rbd.dqdeps.T for i in idcs])
         if self.loss.setting.stress_times_volume:
@@ -170,3 +172,35 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         if self.loss.setting.stress_per_conf:
             matrix /= sqrt(len(images))
         return matrix.reshape((-1, size))
+
+    def _calc_matrix_mgrad(self) -> np.ndarray:
+        species_count = self.loss.mtp_data.species_count
+        nrb = self.loss.mtp_data.radial_coeffs.shape[3]
+        size = species_count * species_count * nrb
+
+        if not self.loss.loss_mgrad.idcs_mgd.size:
+            return np.empty((0, size))
+
+        images = self.loss.images
+        idcs = self.loss.loss_mgrad.idcs_mgd
+
+        if self.loss.setting.forces_per_atom:
+            matrix = np.hstack(
+                [
+                    (
+                        images[i].calc.engine.rbd.dqdmis.transpose(3, 0, 1, 2)
+                        * sqrt(self.loss.loss_mgrad.inverse_numbers_of_atoms[i])
+                    ).flat
+                    for i in idcs
+                ],
+            )
+        else:
+            matrix = np.hstack(
+                [
+                    images[i].calc.engine.rbd.dqdmis.transpose(3, 0, 1, 2).flat
+                    for i in idcs
+                ],
+            )
+        if self.loss.setting.forces_per_conf:
+            matrix /= sqrt(len(images))
+        return matrix.reshape(-1, size)
