@@ -92,7 +92,7 @@ jobs:
       - name: Install runtime NumPy and test deps
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "numpy${{ matrix.numpy }}" ase scipy numba jax pytest
+          python -m pip install "numpy${{ matrix.numpy }}" --only-binary=numba ase scipy numba jax pytest
       - name: Install built wheel
         run: python -m pip install --no-deps dist/*cp311*.whl
       - name: Run pytest
