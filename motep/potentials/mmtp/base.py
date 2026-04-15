@@ -25,24 +25,7 @@ class MagModeBase(ModeBase):
 
 @dataclass
 class MagMomentBasisData(MagModeBase, MomentBasisData):
-    """Data related to the moment basis.
-
-    Attributes
-    ----------
-    values : np.ndarray (alpha_moments_count)
-        Basis values summed over atoms.
-        This corresponds to b_j in Eq. (5) in [Podryabinkin_CMS_2017_Active]_.
-    dbdris : np.ndarray (alpha_moments_count, 3, number_of_atoms)
-        Derivatives of basis functions with respect to Cartesian coordinates of atoms
-        summed over atoms.
-        This corresponds to nabla b_j in Eq. (7a) in [Podryabinkin_CMS_2017_Active]_.
-    dbdeps : np.ndarray (alpha_moments_count, 3, 3)
-        Derivatives of cumulated basis functions with respect to the strain tensor.
-
-    .. [Podryabinkin_CMS_2017_Active]
-       E. V. Podryabinkin and A. V. Shapeev, Comput. Mater. Sci. 140, 171 (2017).
-
-    """
+    """Data related to the moment basis."""
 
     dgmdcs: npt.NDArray[np.float64] | None = None
 
@@ -121,7 +104,7 @@ class MagEngineBase(MagModeBase, EngineBase):
         *,
         mode: str = "run",
     ) -> None:
-        """MLIP-2 MTP.
+        """Magnetic MTP as described in [Novikov_nCM_2022_Magnetic]_.
 
         Parameters
         ----------
@@ -131,6 +114,9 @@ class MagEngineBase(MagModeBase, EngineBase):
             Mode of operation. 'train' computes and stores basis data for
             training; 'train_mgrad' additionally computes basis data for
             training to magnetic gradients; 'run' is the default runtime mode.
+
+        .. [Novikov_nCM_2022_Magnetic]
+            I. Novikov, Blazej Grabowski, Fritz Körmann and A. V. Shapeev, npj Comput. Mater. 8, 13 (2022).
 
         """
         self.update(MagMTPData.from_base(mtp_data))
