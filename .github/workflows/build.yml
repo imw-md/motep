@@ -39,6 +39,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
+          - macos-15-intel
     steps:
       - uses: actions/checkout@v6
         with:
@@ -72,6 +73,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
+          - macos-15-intel
         numpy:
           - "==1.23.5"
           - ">=2,<3"
