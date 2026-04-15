@@ -13,8 +13,13 @@ runs:
       with:
         name: motep-ubuntu-latest
         path: dist
-    - name: Download macOS wheels
+    - name: Download ARM macOS wheels
       uses: actions/download-artifact@v8
       with:
         name: motep-macos-latest
+        path: dist
+    - name: Download Intel macOS wheels
+      uses: actions/download-artifact@v8
+      with:
+        name: motep-macos-15-intel
         path: dist
