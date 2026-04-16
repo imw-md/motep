@@ -25,10 +25,6 @@ class CExtMagMTPEngine(MagEngineBase):
     but uses compiled C code for better performance in some scenarios.
     """
 
-    def __init__(self, *args: tuple, **kwargs: dict) -> None:
-        """Initialize the engine."""
-        super().__init__(*args, **kwargs)
-
     def _calculate(self, atoms: Atoms, magmoms: np.ndarray | None = None) -> tuple:
         """Main calculation dispatch."""
         if magmoms is None:

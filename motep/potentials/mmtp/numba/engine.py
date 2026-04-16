@@ -37,10 +37,6 @@ from .moment import (
 class NumbaMagMTPEngine(MagEngineBase):
     """MTP Engine based on Numba."""
 
-    def __init__(self, *args: tuple, **kwargs: dict) -> None:
-        """Intialize the engine."""
-        super().__init__(*args, **kwargs)
-
     def _calculate(self, atoms: Atoms, magmoms: np.ndarray | None = None) -> tuple:
         if magmoms is None:
             magmoms = atoms.get_initial_magnetic_moments()
@@ -278,7 +274,7 @@ def _calc_mgrad_from_gradient(
         nb.int32[:, :],
         nb.int32[:],
         nb.float64[:, :, :, :],
-        nb.float64[:],
+        nb.float64[:, :],
         nb.float64[:],
         nb.float64[:, :],
     ),
@@ -305,7 +301,7 @@ def _calc_mag_run(
     radial_coeffs: npt.NDArray[np.float64],
     species_coeffs: npt.NDArray[np.float64],
     moment_coeffs: npt.NDArray[np.float64],
-    mbd_values: npt.NDArray[np.float64],
+    mbd_vatoms: npt.NDArray[np.float64],
 ):
     energies = species_coeffs[itypes]
     gradient = np.zeros((itypes.size, all_jtypes.shape[1], 3))
@@ -382,7 +378,7 @@ def _calc_mag_run(
         nb.int32[:, :],
         nb.int32[:],
         nb.float64[:, :, :, :],
-        nb.float64[:],
+        nb.float64[:, :],
         nb.float64[:],
         nb.float64[:, :, :],
         nb.float64[:, :, :, :, :],
@@ -420,7 +416,7 @@ def _calc_mag_train(
     rbd_values: npt.NDArray[np.float64],
     rbd_dqdris: npt.NDArray[np.float64],
     rbd_dqdeps: npt.NDArray[np.float64],
-    mbd_values: npt.NDArray[np.float64],
+    mbd_vatoms: npt.NDArray[np.float64],
     mbd_dbdris: npt.NDArray[np.float64],
     mbd_dbdeps: npt.NDArray[np.float64],
     mbd_dedcs: npt.NDArray[np.float64],
@@ -500,7 +496,7 @@ def _calc_mag_train(
             rbd_dqdris,
             rbd_dqdeps,
         )
-        update_mbd_vatoms(i, mbd_values, mb_vals[i])
+        update_mbd_vatoms(i, mbd_vatoms, mb_vals[i])
         update_mbd_dbdris(i, js_i, mbd_dbdris, mb_jac_rs[i])
         update_mbd_dbdeps(js_i, rs_i, mbd_dbdeps, mb_jac_rs[i])
         update_mbd_dedcs(itypes[i], mbd_dedcs, dedcs[i])
@@ -529,7 +525,7 @@ def _calc_mag_train(
         nb.int32[:, :],
         nb.int32[:],
         nb.float64[:, :, :, :],
-        nb.float64[:],
+        nb.float64[:, :],
         nb.float64[:],
         nb.float64[:, :, :],
         nb.float64[:, :, :, :, :],
@@ -571,7 +567,7 @@ def _calc_mag_train_mgrad(
     rbd_dqdris: npt.NDArray[np.float64],
     rbd_dqdmis: npt.NDArray[np.float64],
     rbd_dqdeps: npt.NDArray[np.float64],
-    mbd_values: npt.NDArray[np.float64],
+    mbd_vatoms: npt.NDArray[np.float64],
     mbd_dbdris: npt.NDArray[np.float64],
     mbd_dbdmis: npt.NDArray[np.float64],
     mbd_dbdeps: npt.NDArray[np.float64],
@@ -679,7 +675,7 @@ def _calc_mag_train_mgrad(
             rbd_dqdmis,
             rbd_dqdeps,
         )
-        update_mbd_vatoms(i, mbd_values, mb_vals[i])
+        update_mbd_vatoms(i, mbd_vatoms, mb_vals[i])
         update_mbd_dbdris(i, js_i, mbd_dbdris, mb_jac_rs[i])
         update_mbd_dbdmis(i, js_i, mbd_dbdmis, mb_jac_mis[i], mb_jac_mjs[i])
         update_mbd_dbdeps(js_i, rs_i, mbd_dbdeps, mb_jac_rs[i])

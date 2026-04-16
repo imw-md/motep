@@ -351,7 +351,7 @@ class EngineBase(EngineWithNeighborlist):
         sps = self.mtp_data.species
         nbs = list(atoms.numbers)
 
-        jac = MTPData(
+        jac = Jacobian(
             scaling=0.0,
             moment_coeffs=self.mbd.values.copy(),
             species_coeffs=np.fromiter((nbs.count(s) for s in sps), dtype=float),
