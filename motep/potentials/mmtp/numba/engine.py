@@ -18,9 +18,9 @@ from motep.potentials.mtp.numba.moment import (
     store_radial_basis,
     update_mbd_dbdeps,
     update_mbd_dbdris,
-    update_mbd_dedcs,
     update_mbd_dgdcs,
     update_mbd_dsdcs,
+    update_mbd_dvdcs,
     update_mbd_vatoms,
 )
 
@@ -499,7 +499,7 @@ def _calc_mag_train(
         update_mbd_vatoms(i, mbd_vatoms, mb_vals[i])
         update_mbd_dbdris(i, js_i, mbd_dbdris, mb_jac_rs[i])
         update_mbd_dbdeps(js_i, rs_i, mbd_dbdeps, mb_jac_rs[i])
-        update_mbd_dedcs(itypes[i], mbd_dedcs, dedcs[i])
+        update_mbd_dvdcs(i, itypes[i], mbd_dedcs, dedcs[i])
         update_mbd_dgdcs(i, itypes[i], js_i, mbd_dgdcs, dgdcs[i])
         update_mbd_dsdcs(itypes[i], js_i, rs_i, mbd_dsdcs, dgdcs[i])
 
@@ -679,7 +679,7 @@ def _calc_mag_train_mgrad(
         update_mbd_dbdris(i, js_i, mbd_dbdris, mb_jac_rs[i])
         update_mbd_dbdmis(i, js_i, mbd_dbdmis, mb_jac_mis[i], mb_jac_mjs[i])
         update_mbd_dbdeps(js_i, rs_i, mbd_dbdeps, mb_jac_rs[i])
-        update_mbd_dedcs(itypes[i], mbd_dedcs, dedcs[i])
+        update_mbd_dvdcs(i, itypes[i], mbd_dedcs, dedcs[i])
         update_mbd_dgdcs(i, itypes[i], js_i, mbd_dgdcs, dgdcs[i])
         update_mbd_dgmdcs(i, itypes[i], js_i, mbd_dgmdcs, dgmidcs[i], dgmjdcs[i])
         update_mbd_dsdcs(itypes[i], js_i, rs_i, mbd_dsdcs, dgdcs[i])
