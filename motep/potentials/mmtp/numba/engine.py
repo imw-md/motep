@@ -18,7 +18,7 @@ from motep.potentials.mtp.numba.moment import (
     store_radial_basis,
     update_mbd_dbdeps,
     update_mbd_dbdris,
-    update_mbd_dedcs,
+    update_mbd_dvdcs,
     update_mbd_dgdcs,
     update_mbd_dsdcs,
     update_mbd_vatoms,
@@ -131,7 +131,7 @@ class NumbaMagMTPEngine(MagEngineBase):
             self.mbd.vatoms,
             self.mbd.dbdris,
             self.mbd.dbdeps,
-            self.mbd.dedcs,
+            self.mbd.dvdcs,
             self.mbd.dgdcs,
             self.mbd.dsdcs,
         )
@@ -211,7 +211,7 @@ class NumbaMagMTPEngine(MagEngineBase):
             self.mbd.dbdris,
             self.mbd.dbdmis,
             self.mbd.dbdeps,
-            self.mbd.dedcs,
+            self.mbd.dvdcs,
             self.mbd.dgdcs,
             self.mbd.dgmdcs,
             self.mbd.dsdcs,
@@ -386,7 +386,7 @@ def _calc_mag_run(
         nb.float64[:, :],
         nb.float64[:, :, :],
         nb.float64[:, :, :],
-        nb.float64[:, :, :, :],
+        nb.float64[:, :, :, :, :],  # mbd_dvdcs
         nb.float64[:, :, :, :, :, :],
         nb.float64[:, :, :, :, :, :],
     ),
@@ -419,7 +419,7 @@ def _calc_mag_train(
     mbd_vatoms: npt.NDArray[np.float64],
     mbd_dbdris: npt.NDArray[np.float64],
     mbd_dbdeps: npt.NDArray[np.float64],
-    mbd_dedcs: npt.NDArray[np.float64],
+    mbd_dvdcs: npt.NDArray[np.float64],
     mbd_dgdcs: npt.NDArray[np.float64],
     mbd_dsdcs: npt.NDArray[np.float64],
 ):
@@ -429,8 +429,8 @@ def _calc_mag_train(
     drb_drs = np.empty((nis, radial_coeffs.shape[3], njs))
     mb_vals = np.empty((nis, alpha_moment_mapping.size))
     mb_jac_rs = np.empty((nis, alpha_moment_mapping.size, njs, 3))
-    dedcs = np.empty((nis, species_count, rfs, rbs))
-    dgdcs = np.empty((nis, species_count, rfs, rbs, njs, 3))
+    dvdcs_l = np.empty((nis, species_count, rfs, rbs))
+    dgdcs_l = np.empty((nis, species_count, rfs, rbs, njs, 3))
 
     energies = species_coeffs[itypes]
     for i in nb.prange(itypes.size):
@@ -452,7 +452,7 @@ def _calc_mag_train(
             min_mag,
             max_mag,
         )
-        (mb_vals_i, mb_jac_rs_i, dedcs_i, dgdcs_i) = calc_moments_train(
+        mb_vals_i, mb_jac_rs_i, dvdcs, dgdcs = calc_moments_train(
             itypes[i],
             jtypes_i,
             r_abs,
@@ -474,8 +474,8 @@ def _calc_mag_train(
         drb_drs[i] = drb_drs_i
         mb_vals[i] = mb_vals_i
         mb_jac_rs[i] = mb_jac_rs_i
-        dedcs[i] = dedcs_i
-        dgdcs[i] = dgdcs_i
+        dvdcs_l[i] = dvdcs
+        dgdcs_l[i] = dgdcs
 
     for i in range(itypes.size):
         js_i = js[i, :]
@@ -499,9 +499,9 @@ def _calc_mag_train(
         update_mbd_vatoms(i, mbd_vatoms, mb_vals[i])
         update_mbd_dbdris(i, js_i, mbd_dbdris, mb_jac_rs[i])
         update_mbd_dbdeps(js_i, rs_i, mbd_dbdeps, mb_jac_rs[i])
-        update_mbd_dedcs(itypes[i], mbd_dedcs, dedcs[i])
-        update_mbd_dgdcs(i, itypes[i], js_i, mbd_dgdcs, dgdcs[i])
-        update_mbd_dsdcs(itypes[i], js_i, rs_i, mbd_dsdcs, dgdcs[i])
+        update_mbd_dvdcs(i, itypes[i], mbd_dvdcs, dvdcs_l[i])
+        update_mbd_dgdcs(i, itypes[i], js_i, mbd_dgdcs, dgdcs_l[i])
+        update_mbd_dsdcs(itypes[i], js_i, rs_i, mbd_dsdcs, dgdcs_l[i])
 
     return energies
 
@@ -535,7 +535,7 @@ def _calc_mag_train(
         nb.float64[:, :, :],
         nb.float64[:, :],
         nb.float64[:, :, :],
-        nb.float64[:, :, :, :],
+        nb.float64[:, :, :, :, :],  # mbd_dvdcs
         nb.float64[:, :, :, :, :, :],
         nb.float64[:, :, :, :, :],
         nb.float64[:, :, :, :, :, :],
@@ -571,7 +571,7 @@ def _calc_mag_train_mgrad(
     mbd_dbdris: npt.NDArray[np.float64],
     mbd_dbdmis: npt.NDArray[np.float64],
     mbd_dbdeps: npt.NDArray[np.float64],
-    mbd_dedcs: npt.NDArray[np.float64],
+    mbd_dvdcs: npt.NDArray[np.float64],
     mbd_dgdcs: npt.NDArray[np.float64],
     mbd_dgmdcs: npt.NDArray[np.float64],
     mbd_dsdcs: npt.NDArray[np.float64],
@@ -586,8 +586,8 @@ def _calc_mag_train_mgrad(
     mb_jac_rs = np.empty((nis, alpha_moment_mapping.size, njs, 3))
     mb_jac_mis = np.empty((nis, alpha_moment_mapping.size, njs))
     mb_jac_mjs = np.empty((nis, alpha_moment_mapping.size, njs))
-    dedcs = np.empty((nis, species_count, rfs, rbs))
-    dgdcs = np.empty((nis, species_count, rfs, rbs, njs, 3))
+    dvdcs_l = np.empty((nis, species_count, rfs, rbs))
+    dgdcs_l = np.empty((nis, species_count, rfs, rbs, njs, 3))
     dgmidcs = np.empty((nis, species_count, rfs, rbs, njs))
     dgmjdcs = np.empty((nis, species_count, rfs, rbs, njs))
 
@@ -616,8 +616,8 @@ def _calc_mag_train_mgrad(
             mb_jac_rs_i,
             mb_jac_mis_i,
             mb_jac_mjs_i,
-            dedcs_i,
-            dgdcs_i,
+            dvdcs,
+            dgdcs,
             dgmidcs_i,
             dgmjdcs_i,
         ) = calc_mag_moments_train(
@@ -648,8 +648,8 @@ def _calc_mag_train_mgrad(
         mb_jac_rs[i] = mb_jac_rs_i
         mb_jac_mis[i] = mb_jac_mis_i
         mb_jac_mjs[i] = mb_jac_mjs_i
-        dedcs[i] = dedcs_i
-        dgdcs[i] = dgdcs_i
+        dvdcs_l[i] = dvdcs
+        dgdcs_l[i] = dgdcs
         dgmidcs[i] = dgmidcs_i
         dgmjdcs[i] = dgmjdcs_i
 
@@ -679,9 +679,9 @@ def _calc_mag_train_mgrad(
         update_mbd_dbdris(i, js_i, mbd_dbdris, mb_jac_rs[i])
         update_mbd_dbdmis(i, js_i, mbd_dbdmis, mb_jac_mis[i], mb_jac_mjs[i])
         update_mbd_dbdeps(js_i, rs_i, mbd_dbdeps, mb_jac_rs[i])
-        update_mbd_dedcs(itypes[i], mbd_dedcs, dedcs[i])
-        update_mbd_dgdcs(i, itypes[i], js_i, mbd_dgdcs, dgdcs[i])
+        update_mbd_dvdcs(i, itypes[i], mbd_dvdcs, dvdcs_l[i])
+        update_mbd_dgdcs(i, itypes[i], js_i, mbd_dgdcs, dgdcs_l[i])
         update_mbd_dgmdcs(i, itypes[i], js_i, mbd_dgmdcs, dgmidcs[i], dgmjdcs[i])
-        update_mbd_dsdcs(itypes[i], js_i, rs_i, mbd_dsdcs, dgdcs[i])
+        update_mbd_dsdcs(itypes[i], js_i, rs_i, mbd_dsdcs, dgdcs_l[i])
 
     return energies

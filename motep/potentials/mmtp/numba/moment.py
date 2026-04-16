@@ -278,7 +278,7 @@ def _calc_mag_moment_basic_with_jacobian_radial_coeffs(
         nb.float64[:, :, :, :, :],
     ),
 )
-def _calc_mag_dedcs_and_dgdcs(
+def _calc_mag_dvdcs_and_dgdcs(
     alpha_index_basic_count: np.int32,
     alpha_index_times: np.ndarray,
     alpha_moment_mapping: np.ndarray,
@@ -299,7 +299,7 @@ def _calc_mag_dedcs_and_dgdcs(
 
     Returns
     -------
-    dedcs : np.ndarray
+    dvdcs : np.ndarray
         dV/dc.
     dgdcs : np.ndarray
         d(dV/dr)/dc.
@@ -341,14 +341,14 @@ def _calc_mag_dedcs_and_dgdcs(
                 dgdmb[i1, j, ixyz0] += mult * dgdmb[i3, j, ixyz0] * moment_values[i2]
                 dgdmb[i2, j, ixyz0] += mult * dgdmb[i3, j, ixyz0] * moment_values[i1]
 
-    dedcs = np.zeros((spc, rfc, rbs))
+    dvdcs = np.zeros((spc, rfc, rbs))
     for iamc in range(alpha_index_basic_count):
         v1 = dedmb[iamc]
         for ispc in range(spc):
             for irfc in range(rfc):
                 for irbs in range(rbs):
                     v0 = moment_jac_cs[iamc, ispc, irfc, irbs]
-                    dedcs[ispc, irfc, irbs] += v0 * v1
+                    dvdcs[ispc, irfc, irbs] += v0 * v1
 
     dgdcs = np.zeros(moment_jac_rc.shape[1:])
     dgmidcs = np.zeros(moment_jac_mic.shape[1:])
@@ -372,7 +372,7 @@ def _calc_mag_dedcs_and_dgdcs(
                             dgdcs[ispc, irfc, irbs, j, ixyz] += v2 * v1
                             dgdcs[ispc, irfc, irbs, j, ixyz] += v3 * v4
 
-    return dedcs, dgdcs, dgmidcs, dgmjdcs
+    return dvdcs, dgdcs, dgmidcs, dgmjdcs
 
 
 @nb.njit
@@ -641,7 +641,7 @@ def calc_mag_moments_train(
         moment_jac_mjs,
     )
 
-    dedcs, dgdcs, dgmidcs, dgmjdcs = _calc_mag_dedcs_and_dgdcs(
+    dvdcs, dgdcs, dgmidcs, dgmjdcs = _calc_mag_dvdcs_and_dgdcs(
         alpha_index_basic.shape[0],
         alpha_index_times,
         alpha_moment_mapping,
@@ -661,7 +661,7 @@ def calc_mag_moments_train(
         moment_jac_rs[alpha_moment_mapping],
         moment_jac_mis[alpha_moment_mapping],
         moment_jac_mjs[alpha_moment_mapping],
-        dedcs,
+        dvdcs,
         dgdcs,
         dgmidcs,
         dgmjdcs,
