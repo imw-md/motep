@@ -61,14 +61,17 @@ class LLSOptimizerBase(ParallelOptimizerBase):
         # `species_coeffs` do not affect forces and stresses,
         # and therefore the corresponding sub-mattrices should be zero-filled.
         if "forces" in self.minimized:
-            nforces = sum(atoms.calc.targets["forces"].size for atoms in images)
+            idcs_frc = self.loss.loss_forces.idcs_frc
+            nforces = sum(images[i].calc.targets["forces"].size for i in idcs_frc)
             shape = (nforces, len(species))
             tmp.append(np.zeros(shape))
         if "stress" in self.minimized:
-            shape = (9 * len(images), len(species))
+            idcs_str = self.loss.loss_stress.idcs_str
+            shape = (9 * idcs_str.size, len(species))
             tmp.append(np.zeros(shape))
         if "mgrad" in self.minimized:
-            nmmg = sum(atoms.calc.targets["mgrad"].size for atoms in images)
+            idcs_mgd = self.loss.loss_mgrad.idcs_mgd
+            nmmg = sum(images[i].calc.targets["mgrad"].size for i in idcs_mgd)
             shape = (nmmg, len(species))
             tmp.append(np.zeros(shape))
         return np.vstack(tmp)

@@ -17,6 +17,10 @@ from motep.potentials.mtp.data import MTPData
 
 logger = logging.getLogger(__name__)
 
+_optimized = [["radial_coeffs"], ["radial_coeffs", "species_coeffs"]]
+
+_minimized = [["energy"], ["energy", "forces"], ["energy", "forces", "stress"]]
+
 
 def make_molecules(
     molecule: int,
@@ -48,21 +52,24 @@ def make_crystals(
     return images, mtp_data
 
 
-def test_without_forces(data_path: pathlib.Path) -> None:
+@pytest.mark.parametrize("minimized", _minimized)
+@pytest.mark.parametrize("optimized", _optimized)
+def test_without_forces_and_stress(
+    data_path: pathlib.Path,
+    optimized: list[str],
+    minimized: list[str],
+) -> None:
     """Test if `Level2MTPOptimizer` works for the training data without forces."""
-    engine = "numpy"
     molecule = 762
     level = 2
     images, mtp_data = make_molecules(molecule, level, data_path)
 
     for atoms in images:
-        del atoms.calc.results["forces"]
+        for key in ["forces", "stress"]:
+            if key in atoms.calc.results:
+                del atoms.calc.results[key]
 
-    setting = LossSetting(
-        energy_weight=1.0,
-        forces_weight=0.01,
-        stress_weight=0.0,
-    )
+    setting = LossSetting()
 
     rng = np.random.default_rng(42)
 
@@ -71,12 +78,8 @@ def test_without_forces(data_path: pathlib.Path) -> None:
         mtp_data=mtp_data,
         setting=setting,
         comm=world,
-        engine=engine,
     )
 
-    optimized = ["radial_coeffs"]
-
-    minimized = ["energy", "forces"]
     optimizer = Level2MTPOptimizer(loss, optimized=optimized, minimized=minimized)
 
     mtp_data.optimized = optimized
@@ -184,13 +187,7 @@ def test_molecules(
     assert f_e00 < f_ref
 
 
-@pytest.mark.parametrize(
-    "optimized",
-    [
-        ["radial_coeffs"],
-        ["radial_coeffs", "species_coeffs"],
-    ],
-)
+@pytest.mark.parametrize("optimized", _optimized)
 @pytest.mark.parametrize(
     (
         "energy_per_atom",
