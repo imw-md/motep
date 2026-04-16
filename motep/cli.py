@@ -9,7 +9,7 @@ import motep.grade.cli
 import motep.train.cli
 import motep.upconvert.cli
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("motep")
 logger.setLevel(logging.DEBUG)
 stdout_handler = logging.StreamHandler(sys.stdout)
 stdout_handler.setLevel(logging.INFO)
