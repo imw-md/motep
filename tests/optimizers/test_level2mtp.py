@@ -50,7 +50,6 @@ def make_crystals(
 
 def test_without_forces(data_path: pathlib.Path) -> None:
     """Test if `Level2MTPOptimizer` works for the training data without forces."""
-    engine = "numpy"
     molecule = 762
     level = 2
     images, mtp_data = make_molecules(molecule, level, data_path)
@@ -71,7 +70,6 @@ def test_without_forces(data_path: pathlib.Path) -> None:
         mtp_data=mtp_data,
         setting=setting,
         comm=world,
-        engine=engine,
     )
 
     optimized = ["radial_coeffs"]
