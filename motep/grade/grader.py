@@ -72,7 +72,7 @@ class Grader:
         """
         images = [copy(_) for _ in images]
         self._evaluate(images)
-        matrix = self._calc_moment_basis_matrix(images)
+        matrix = self._calc_jacobian(images)
         self.maxvol_result = self.maxvol.run(matrix)
 
     def _evaluate(self, images: list[Atoms]) -> None:
@@ -87,19 +87,20 @@ class Grader:
             List of ASE Atoms objects to evaluate. Modified in-place.
 
         """
+        mode = "train" if "radial_coeffs" in self.mtp_data.optimized else "run"
         for atoms in images:
             if atoms.calc is not None and "magmoms" in atoms.calc.results:
                 atoms.set_initial_magnetic_moments(atoms.calc.results["magmoms"])
             atoms.calc = make_calculator(
                 self.mtp_data,
                 engine=self.engine,
-                mode="run",
+                mode=mode,
                 relax_magmoms=False,
             )
             atoms.get_potential_energy()
 
-    def _calc_moment_basis_matrix(self, images: list[Atoms]) -> np.ndarray:
-        """Calculate the matrix of moment basis values.
+    def _calc_jacobian(self, images: list[Atoms]) -> np.ndarray:
+        """Calculate the Jacobian of energies with respect to the parameters.
 
         Parameters
         ----------
@@ -109,7 +110,8 @@ class Grader:
 
         Returns
         -------
-        moment_basis_matrix : np.ndarray
+        np.ndarray
+            Jacobian.
 
         Raises
         ------
@@ -117,9 +119,19 @@ class Grader:
 
         """
         if self.mode == GradeMode.CONFIGURATION:
-            return np.array([atoms.calc.engine.mbd.values for atoms in images])
+
+            def fcnf(atoms: Atoms) -> np.ndarray:
+                return atoms.calc.engine.jac_energy(atoms).parameters
+
+            return np.array([fcnf(atoms) for atoms in images])
+
         if self.mode == GradeMode.NEIGHBORHOOD:
-            return np.vstack([atoms.calc.engine.mbd.vatoms.T for atoms in images])
+
+            def fnbh(atoms: Atoms) -> np.ndarray:
+                return atoms.calc.engine.jac_energies(atoms).parameters.T
+
+            return np.vstack([fnbh(atoms) for atoms in images])
+
         raise ValueError(self.mode)
 
     def grade(self, images: list[Atoms]) -> list[Atoms]:
@@ -148,7 +160,7 @@ class Grader:
         """
         images = [copy(_) for _ in images]
         self._evaluate(images)
-        matrix = self._calc_moment_basis_matrix(images)
+        matrix = self._calc_jacobian(images)
 
         active_set_matrix = self.maxvol_result.submatrix
 

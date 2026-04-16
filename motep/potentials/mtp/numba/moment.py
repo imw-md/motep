@@ -43,17 +43,18 @@ def update_mbd_dbdeps(
                     )
 
 
-@nb.njit((nb.int32, nb.float64[:, :, :, :], nb.float64[:, :, :]))
-def update_mbd_dedcs(
+@nb.njit((nb.int32, nb.int32, nb.float64[:, :, :, :, :], nb.float64[:, :, :]))
+def update_mbd_dvdcs(
+    i: np.int32,
     itype: np.int32,
-    mbd_dedcs: npt.NDArray[np.float64],
-    tmp_dedcs: npt.NDArray[np.float64],
+    mbd_dvdcs: npt.NDArray[np.float64],
+    tmp_dvdcs: npt.NDArray[np.float64],
 ) -> None:
-    _, s1, s2, s3 = mbd_dedcs.shape
+    _, s1, s2, s3, _ = mbd_dvdcs.shape
     for i1 in range(s1):
         for i2 in range(s2):
             for i3 in range(s3):
-                mbd_dedcs[itype, i1, i2, i3] += tmp_dedcs[i1, i2, i3]
+                mbd_dvdcs[itype, i1, i2, i3, i] += tmp_dvdcs[i1, i2, i3]
 
 
 @nb.njit(
@@ -393,21 +394,21 @@ def _calc_moment_basic_with_jacobian_radial_coeffs(
 
 
 @nb.njit(nb.float64[:, :, :](nb.int32[:], nb.float64[:], nb.float64[:, :, :, :]))
-def _calc_dedcs(
+def _calc_dvdcs(
     alpha_moment_mapping: np.ndarray,
     moment_coeffs: np.ndarray,
     moment_jac_cs: np.ndarray,
-) -> None:
+) -> np.ndarray:
     spc, rfc, rbs = moment_jac_cs.shape[1:]
-    dedcs = np.zeros((spc, rfc, rbs))
+    dvdcs = np.zeros((spc, rfc, rbs))
     for i, j in enumerate(alpha_moment_mapping):
         for ispc in range(spc):
             for irfc in range(rfc):
                 for irbs in range(rbs):
-                    dedcs[ispc, irfc, irbs] += (
+                    dvdcs[ispc, irfc, irbs] += (
                         moment_jac_cs[j, ispc, irfc, irbs] * moment_coeffs[i]
                     )
-    return dedcs
+    return dvdcs
 
 
 @nb.njit(
@@ -422,7 +423,7 @@ def _calc_dedcs(
         nb.float64[:, :, :, :, :, :],
     ),
 )
-def _calc_dedcs_and_dgdcs(
+def _calc_dvdcs_and_dgdcs(
     alpha_index_basic_count: np.int32,
     alpha_index_times: np.ndarray,
     alpha_moment_mapping: np.ndarray,
@@ -431,7 +432,7 @@ def _calc_dedcs_and_dgdcs(
     moment_jac_rs: np.ndarray,
     moment_jac_cs: np.ndarray,
     moment_jac_rc: np.ndarray,
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     """Calculate dV/dc and d(dV/dr)/dc.
 
     - dV/dc: Jacobian of site energy to radial basis coefficients
@@ -439,7 +440,7 @@ def _calc_dedcs_and_dgdcs(
 
     Returns
     -------
-    dedcs : np.ndarray
+    dvdcs : np.ndarray
         dV/dc.
     dgdcs : np.ndarray
         d(dV/dr)/dc.
@@ -467,14 +468,14 @@ def _calc_dedcs_and_dgdcs(
                 dgdmb[i1, j, ixyz0] += mult * dgdmb[i3, j, ixyz0] * moment_values[i2]
                 dgdmb[i2, j, ixyz0] += mult * dgdmb[i3, j, ixyz0] * moment_values[i1]
 
-    dedcs = np.zeros((spc, rfc, rbs))
+    dvdcs = np.zeros((spc, rfc, rbs))
     for iamc in range(alpha_index_basic_count):
         v1 = dedmb[iamc]
         for ispc in range(spc):
             for irfc in range(rfc):
                 for irbs in range(rbs):
                     v0 = moment_jac_cs[iamc, ispc, irfc, irbs]
-                    dedcs[ispc, irfc, irbs] += v0 * v1
+                    dvdcs[ispc, irfc, irbs] += v0 * v1
 
     dgdcs = np.zeros(moment_jac_rc.shape[1:])
     for iamc in range(alpha_index_basic_count):
@@ -496,7 +497,7 @@ def _calc_dedcs_and_dgdcs(
                             v1 = dgdmb[iamc, j, ixyz]
                             dgdcs[ispc, irfc, irbs, j, ixyz] += v0 * v1
 
-    return dedcs, dgdcs
+    return dvdcs, dgdcs
 
 
 @nb.njit(
@@ -560,7 +561,7 @@ def calc_moments_train(
 
     _contract_moments(alpha_index_times, moment_values, moment_jac_rs)
 
-    dedcs, dgdcs = _calc_dedcs_and_dgdcs(
+    dvdcs, dgdcs = _calc_dvdcs_and_dgdcs(
         alpha_index_basic.shape[0],
         alpha_index_times,
         alpha_moment_mapping,
@@ -574,7 +575,7 @@ def calc_moments_train(
     return (
         moment_values[alpha_moment_mapping],
         moment_jac_rs[alpha_moment_mapping],
-        dedcs,
+        dvdcs,
         dgdcs,
     )
 

@@ -324,17 +324,19 @@ void calc_train(
             dgdmb);
 
         /* ====================================================================
-         * Step 6b: Accumulate dedcs from basic moment jacobians
+         * Step 6b: Accumulate dvdcs from basic moment jacobians
          * ==================================================================== */
-        accumulate_mbd_dedcs(
+        accumulate_mbd_dvdcs(
+            i,
             itype,
+            n_atoms,
             n_basic,
             species_count,
             radial_funcs_count,
             rbs,
             moment_jac_cs,
             dedmb,
-            mbd->dedcs);
+            mbd->dvdcs);
 
         /* ====================================================================
          * Step 6c: Accumulate dgdcs from basic moment jacobians

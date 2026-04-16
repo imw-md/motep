@@ -9,13 +9,21 @@ from motep.grade.grader import GradeMode, Grader
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 
+_optimized = [
+    ["moment_coeffs"],
+    ["moment_coeffs", "species_coeffs"],
+    ["moment_coeffs", "species_coeffs", "radial_coeffs"],
+]
+
 
 @pytest.mark.parametrize("mode", list(GradeMode))
-def test_grader(mode: GradeMode, data_path: Path) -> None:
+@pytest.mark.parametrize("optimized", _optimized)
+def test_grader(optimized: list[str], mode: GradeMode, data_path: Path) -> None:
     """Test if `Grader` works."""
     path = data_path / "fitting/crystals/multi/10"
     images_training = read_cfg(path / "out.cfg", index=":")
     mtp_data = read_mtp(path / "pot.mtp")
+    mtp_data.optimized = optimized
 
     grades_ref = [atoms.calc.results["MV_grade"] for atoms in images_training]
 

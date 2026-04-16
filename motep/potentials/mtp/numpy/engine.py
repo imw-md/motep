@@ -67,7 +67,7 @@ class NumpyMTPEngine(EngineBase):
             js_i = js[i, :]
             rs_i = rs[i, :, :]
             jtypes = itypes[js_i]
-            basis_values, basis_jac_rs, dedcs, dgdcs = self._calc_basis(
+            basis_values, basis_jac_rs, dvdcs, dgdcs = self._calc_basis(
                 i,
                 itype,
                 js_i,
@@ -92,7 +92,7 @@ class NumpyMTPEngine(EngineBase):
                 self.mbd.dbdris[:, j] += basis_jac_rs[:, k]
             self.mbd.dbdeps += rs_i.T @ basis_jac_rs
 
-            self.mbd.dedcs[itype] += dedcs
+            self.mbd.dvdcs[itype, ..., i] = dvdcs
 
             for k, j in enumerate(js_i):
                 self.mbd.dgdcs[itype, :, :, :, i] -= dgdcs[:, :, :, k]

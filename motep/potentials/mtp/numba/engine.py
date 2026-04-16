@@ -15,9 +15,9 @@ from .moment import (
     store_radial_basis,
     update_mbd_dbdeps,
     update_mbd_dbdris,
-    update_mbd_dedcs,
     update_mbd_dgdcs,
     update_mbd_dsdcs,
+    update_mbd_dvdcs,
     update_mbd_vatoms,
 )
 
@@ -103,7 +103,7 @@ class NumbaMTPEngine(EngineBase):
             self.mbd.vatoms,
             self.mbd.dbdris,
             self.mbd.dbdeps,
-            self.mbd.dedcs,
+            self.mbd.dvdcs,
             self.mbd.dgdcs,
             self.mbd.dsdcs,
         )
@@ -233,7 +233,7 @@ def _calc_run(
         nb.float64[:, :],  # mbd_vatoms
         nb.float64[:, :, :],
         nb.float64[:, :, :],
-        nb.float64[:, :, :, :],
+        nb.float64[:, :, :, :, :],  # mbd_dvdcs
         nb.float64[:, :, :, :, :, :],
         nb.float64[:, :, :, :, :, :],
     ),
@@ -260,7 +260,7 @@ def _calc_train(
     mbd_vatoms: npt.NDArray[np.float64],
     mbd_dbdris: npt.NDArray[np.float64],
     mbd_dbdeps: npt.NDArray[np.float64],
-    mbd_dedcs: npt.NDArray[np.float64],
+    mbd_dvdcs: npt.NDArray[np.float64],
     mbd_dgdcs: npt.NDArray[np.float64],
     mbd_dsdcs: npt.NDArray[np.float64],
 ):
@@ -269,7 +269,7 @@ def _calc_train(
     rb_ders = np.empty((itypes.size, radial_coeffs.shape[3], js.shape[1]))
     mb_vals = np.empty((itypes.size, alpha_moment_mapping.size))
     mb_ders = np.empty((itypes.size, alpha_moment_mapping.size, *rs.shape[1:]))
-    dedcs_l = np.empty((itypes.size, species_count, rfs, rbs))
+    dvdcs_l = np.empty((itypes.size, species_count, rfs, rbs))
     dgdcs_l = np.empty((itypes.size, species_count, rfs, rbs, *rs.shape[1:]))
 
     energies = species_coeffs[itypes]
@@ -286,7 +286,7 @@ def _calc_train(
             min_dist,
             max_dist,
         )
-        basis_values, basis_jac_rs, dedcs, dgdcs = calc_moments_train(
+        basis_values, basis_jac_rs, dvdcs, dgdcs = calc_moments_train(
             itypes[i],
             jtypes_i,
             r_abs,
@@ -308,7 +308,7 @@ def _calc_train(
         rb_ders[i] = rb_derivs
         mb_vals[i] = basis_values
         mb_ders[i] = basis_jac_rs
-        dedcs_l[i] = dedcs
+        dvdcs_l[i] = dvdcs
         dgdcs_l[i] = dgdcs
 
     for i in range(itypes.size):
@@ -333,7 +333,7 @@ def _calc_train(
         update_mbd_vatoms(i, mbd_vatoms, mb_vals[i])
         update_mbd_dbdris(i, js_i, mbd_dbdris, mb_ders[i])
         update_mbd_dbdeps(js_i, rs_i, mbd_dbdeps, mb_ders[i])
-        update_mbd_dedcs(itypes[i], mbd_dedcs, dedcs_l[i])
+        update_mbd_dvdcs(i, itypes[i], mbd_dvdcs, dvdcs_l[i])
         update_mbd_dgdcs(i, itypes[i], js_i, mbd_dgdcs, dgdcs_l[i])
         update_mbd_dsdcs(itypes[i], js_i, rs_i, mbd_dsdcs, dgdcs_l[i])
 

@@ -24,7 +24,7 @@ typedef struct
     double *vatoms; /* (alpha_scalar_moments, n_atoms) */
     double *dbdris; /* (alpha_scalar_moments, n_atoms, 3) */
     double *dbdeps; /* (alpha_scalar_moments, 3, 3) */
-    double *dedcs;  /* (species_count, species_count, radial_funcs_count, radial_basis_size) */
+    double *dvdcs;  /* (species_count, species_count, radial_funcs_count, radial_basis_size, n_atoms) */
     double *dgdcs;  /* (species_count, species_count, radial_funcs_count, radial_basis_size, n_atoms, 3) */
     double *dsdcs;  /* (species_count, species_count, radial_funcs_count, radial_basis_size, 3, 3) */
 } MomentBasisData;

@@ -262,7 +262,7 @@ void calc_mag_train(
     double *mbd_vatoms,
     double *mbd_dbdris,
     double *mbd_dbdeps,
-    double *mbd_dedcs,
+    double *mbd_dvdcs,
     double *mbd_dgdcs,
     double *mbd_dsdcs)
 {
@@ -377,15 +377,17 @@ void calc_mag_train(
             dedmb,
             dgdmb);
 
-        accumulate_mbd_dedcs(
+        accumulate_mbd_dvdcs(
+            i,
             itype,
+            n_atoms,
             n_basic,
             species_count,
             radial_funcs_count,
             nrb,
             moment_jac_cs,
             dedmb,
-            mbd_dedcs);
+            mbd_dvdcs);
 
         accumulate_mbd_dgdcs_dsdcs(
             i,
@@ -480,7 +482,7 @@ void calc_mag_train_mgrad(
     double *mbd_dbdris,
     double *mbd_dbdmis,
     double *mbd_dbdeps,
-    double *mbd_dedcs,
+    double *mbd_dvdcs,
     double *mbd_dgdcs,
     double *mbd_dgmdcs,
     double *mbd_dsdcs)
@@ -628,15 +630,17 @@ void calc_mag_train_mgrad(
             dgmidmb,
             dgmjdmb);
 
-        accumulate_mbd_dedcs(
+        accumulate_mbd_dvdcs(
+            i,
             itype,
+            n_atoms,
             n_basic,
             species_count,
             radial_funcs_count,
             nrb,
             moment_jac_cs,
             dedmb,
-            mbd_dedcs);
+            mbd_dvdcs);
 
         accumulate_mbd_dgdcs_dsdcs(
             i,

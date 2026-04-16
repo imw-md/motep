@@ -11,8 +11,8 @@ from motep.grade.grader import load_setting_grade
 def test_cli_grade(data_path: Path, tmp_path: Path) -> None:
     """Test `motep grade`."""
     with chdir(tmp_path):
-        shutil.copy2(data_path / "original/molecules/291/training.cfg", ".")
-        shutil.copy2(data_path / "fitting/molecules/291/02/pot.mtp", "final.mtp")
+        shutil.copy2(data_path / "original/crystals/cubic/training.cfg", ".")
+        shutil.copy2(data_path / "fitting/crystals/cubic/02/pot.mtp", "final.mtp")
         shutil.copy2("training.cfg", "initial.cfg")
         Path("motep.grade.toml").touch()  # empty
         args = ["motep", "grade", "motep.grade.toml"]
