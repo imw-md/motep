@@ -354,7 +354,7 @@ def _calc_mag_run(
             energies[i] += coeff * mb_values[basis_i]
 
     for i in range(itypes.size):
-        update_mbd_vatoms(i, mbd_values, mb_vals[i])
+        update_mbd_vatoms(i, mbd_vatoms, mb_vals[i])
 
     return energies, gradient, grad_mag_i, grad_mag_j
 

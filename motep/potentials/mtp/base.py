@@ -351,14 +351,13 @@ class EngineBase(EngineWithNeighborlist):
         sps = self.mtp_data.species
         nbs = list(atoms.numbers)
 
-        jac = Jacobian(
+        return Jacobian(
             scaling=0.0,
             moment_coeffs=self.mbd.values.copy(),
             species_coeffs=np.fromiter((nbs.count(s) for s in sps), dtype=float),
             radial_coeffs=self.mbd.dedcs.copy(),
+            optimized=self.mtp_data.optimized,
         )  # placeholder of the Jacobian with respect to the parameters
-        jac.optimized = self.mtp_data.optimized
-        return jac
 
     def jac_forces(self, atoms: Atoms) -> Jacobian:
         """Calculate the Jacobian of the forces with respect to the MTP parameters.

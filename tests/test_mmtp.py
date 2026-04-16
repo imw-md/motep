@@ -22,7 +22,7 @@ from motep.potentials.mmtp.numba.engine import NumbaMagMTPEngine
 def test_mmtp_energies_forces_stress(
     level: int,
     mode: str,
-    engine: MagEngineBase,
+    engine: type[MagEngineBase],
     data_path: pathlib.Path,
 ) -> None:
     """Test that cext and numba implementations produce identical energies, forces, and stress.
@@ -81,6 +81,15 @@ def test_mmtp_energies_forces_stress(
         rtol=1e-10,
         atol=1e-12,
         err_msg=f"Stress differs at level {level}, mode {mode}, engine {engine}",
+    )
+
+    # Compare magnetic gradients
+    np.testing.assert_allclose(
+        result["mgrad"],
+        ref_result["mgrad"],
+        rtol=1e-10,
+        atol=1e-12,
+        err_msg=f"Mgrad differs at level {level}, mode {mode}, engine {engine}",
     )
 
 
