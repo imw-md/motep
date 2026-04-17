@@ -42,7 +42,7 @@ class LLSOptimizerBase(ParallelOptimizerBase):
         """Initialize the optimizer."""
         super().__init__(loss=loss, **kwargs)
         if minimized is None:
-            minimized = ["energy", "forces", "stress"]
+            minimized = ["energy", "forces", "stress", "mgrad"]
         self.minimized = minimized
 
     @abstractmethod
