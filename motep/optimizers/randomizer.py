@@ -3,15 +3,14 @@
 from typing import Any
 
 import numpy as np
-import numpy.typing as npt
 from scipy.optimize._optimize import OptimizeResult
 
 from motep.loss import LossFunctionBase
-from motep.optimizers.base import ParallelOptimizerBase
+from motep.optimizers.base import OptimizerBase
 from motep.optimizers.scipy import Callback
 
 
-class Randomizer(ParallelOptimizerBase):
+class Randomizer(OptimizerBase):
     """Special `Optimizer` class that actually randomizes parameters."""
 
     def __init__(
@@ -35,14 +34,14 @@ class Randomizer(ParallelOptimizerBase):
     def optimized_allowed(self) -> list[str]:
         return ["species_coeffs", "radial_coeffs", "moment_coeffs"]
 
-    def _optimize(self, **kwargs: dict[str, Any]) -> npt.NDArray[np.float64]:
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
         parameters = self.loss.mtp_data.parameters
         callback = Callback(self.loss)
         rng: np.random.Generator = self.loss.setting["rng"]
 
         # Calculate basis functions of `loss.images`
-        loss_value = self.rank0_loss(parameters)
-        self.rank0_gather_data()
+        loss_value = self.loss(parameters)
+        self.loss.gather_data()
 
         # Print the value of the loss function.
         callback(OptimizeResult(x=parameters, fun=loss_value))
@@ -57,9 +56,7 @@ class Randomizer(ParallelOptimizerBase):
         parameters = mtp_data.parameters
 
         # Evaluate loss with the new parameters
-        loss_value = self.rank0_loss(parameters)
+        loss_value = self.loss(parameters)
 
         # Print the value of the loss function.
         callback(OptimizeResult(x=parameters, fun=loss_value))
-
-        return parameters

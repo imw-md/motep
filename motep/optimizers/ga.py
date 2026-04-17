@@ -6,10 +6,9 @@ from collections.abc import Callable
 from typing import Any
 
 import numpy as np
-import numpy.typing as npt
 from scipy.optimize import minimize
 
-from motep.optimizers.base import ParallelOptimizerBase
+from motep.optimizers.base import OptimizerBase
 
 logger = logging.getLogger(__name__)
 
@@ -375,7 +374,7 @@ def elite_callback(gen: int, elite: float) -> None:
     logger.info("Generation %s: Top Elite - %s", gen, elite)
 
 
-class GeneticAlgorithmOptimizer(ParallelOptimizerBase):
+class GeneticAlgorithmOptimizer(OptimizerBase):
     """Optimizer based on genetic algorithm (GA).
 
     This function is a wrapper for using the GA to optimize a target function.
@@ -387,18 +386,12 @@ class GeneticAlgorithmOptimizer(ParallelOptimizerBase):
 
     """
 
-    def _optimize(self, **kwargs: dict[str, Any]) -> npt.NDArray[np.float64]:
-        """Optimize parameters.
-
-        Returns
-        -------
-        npt.NDArray[np.float64]
-
-        """
+    def optimize(self, **kwargs: dict[str, Any]) -> None:
+        """Optimize parameters."""
         parameters = self.loss.mtp_data.parameters
         bounds = _limit_bounds(self.loss.mtp_data.get_bounds())
         ga = GeneticAlgorithm(
-            self.rank0_loss,
+            self.loss,
             parameters,
             lower_bound=bounds[:, 0],
             upper_bound=bounds[:, 1],
@@ -409,8 +402,8 @@ class GeneticAlgorithmOptimizer(ParallelOptimizerBase):
             superhuman=True,
         )
         ga.initialize_population()
-        return ga.evolve_with_mix(
-            self.rank0_loss,
+        self.loss.mtp_data.parameters = ga.evolve_with_mix(
+            self.loss,
             generations=30,
             elite_callback=elite_callback,
         )
