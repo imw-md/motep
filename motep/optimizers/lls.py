@@ -27,9 +27,10 @@ class LLSOptimizerBase(ParallelOptimizerBase):
     Attributes
     ----------
     minimized : list[str]
-        Properties whose errors are minimized by optimizing `radial_coeffs`.
-        The elements must be some of `energy`, `forces`, `stress`, and `mgrad`
-        (if magnetic).
+        Properties whose errors are minimized. The elements must be some of
+        ``energy``, ``forces``, ``stress``, and ``mgrad`` (magnetic moment
+        gradients, for magnetic potentials).
+        Default: ``["energy", "forces", "stress", "mgrad"]``.
 
     """
 
