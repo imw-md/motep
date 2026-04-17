@@ -32,8 +32,6 @@ class OptimizerBase(ABC):
     def __init__(
         self,
         loss: LossFunctionBase,
-        *,
-        comm: DummyMPIComm = world,
         **kwargs: dict[str, Any],
     ) -> None:
         """Initialize the `Optimizer` class.
@@ -42,8 +40,6 @@ class OptimizerBase(ABC):
         ----------
         loss : :class:`motep.loss.LossFunction`
             :class:`motep.loss.LossFunction` object.
-        comm : MPI.Comm
-            MPI.Comm object.
         **kwargs : dict[str, Any]
             Options passed to the `Optimizer` class.
 
@@ -53,7 +49,6 @@ class OptimizerBase(ABC):
 
         """
         self.loss = loss
-        self.comm = comm
 
         if "optimized" not in kwargs:
             self.optimized = self.optimized_default

@@ -253,7 +253,7 @@ class LLSOptimizer(LLSOptimizerBase):
         callback(OptimizeResult(x=parameters, fun=loss_value))
 
         # Prepare and solve the LLS problem
-        if self.comm.rank == 0:
+        if self.loss.comm.rank == 0:
             logger.debug("Calculate `matrix`")
             matrix = self._calc_matrix()
             logger.debug("Calculate `vector`")
@@ -262,7 +262,7 @@ class LLSOptimizer(LLSOptimizerBase):
             coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
         else:
             coeffs = None
-        coeffs = self.comm.bcast(coeffs, root=0)
+        coeffs = self.loss.comm.bcast(coeffs, root=0)
 
         # Update `mtp_data` and `parameters`
         parameters = self._update_parameters(coeffs)
