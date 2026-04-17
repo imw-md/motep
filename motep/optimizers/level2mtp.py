@@ -17,22 +17,22 @@ logger = logging.getLogger(__name__)
 class Level2MTPOptimizer(LLSOptimizerBase):
     """Optimizer for Level 2 MTP.
 
-    The elements of the ``optimized`` attribute must be:
-
-    - ``species_coeffs``
-    - ``radial_coeffs``
-
-    ``moment_coeffs`` cannot be optimized with this optimizer.
+    ``moment_coeffs`` and ``radial_coeffs`` are automatically set to be a level 2 MTP.
+    Further, ``species_coeffs`` can also be optimized.
 
     """
 
     @property
     def optimized_default(self) -> list[str]:
-        return ["species_coeffs", "radial_coeffs"]
+        return ["scaling", "species_coeffs", "moment_coeffs", "radial_coeffs"]
 
     @property
     def optimized_allowed(self) -> list[str]:
-        return ["species_coeffs", "radial_coeffs"]
+        return ["scaling", "species_coeffs", "moment_coeffs", "radial_coeffs"]
+
+    @property
+    def optimized_always(self) -> list[str]:
+        return ["scaling", "moment_coeffs", "radial_coeffs"]
 
     def _optimize(self, **kwargs: dict[str, Any]) -> npt.NDArray[np.float64]:
         parameters = self.loss.mtp_data.parameters

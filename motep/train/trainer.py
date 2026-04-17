@@ -127,7 +127,8 @@ class Trainer:
                     self.mtp_data.log()
 
                 # Instantiate an `Optimizer` class
-                optimizer: OptimizerBase = make_optimizer(step["method"])(loss, **step)
+                optimizer_class = make_optimizer(step["method"])
+                optimizer = optimizer_class(loss, optimized=step.get("optimized"))
                 optimizer.optimize(**step.get("kwargs", {}))
                 loss.broadcast_results()
                 if self.comm.rank == 0:
