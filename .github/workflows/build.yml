@@ -97,7 +97,7 @@ jobs:
         run: python -m pip install --no-deps dist/*cp311*.whl
       - name: Run pytest
         run: |
-          python -m pytest -v tests/test_mtp.py
+          python -m pytest -v tests/potentials/mtp/test_engines.py
   publish_testpypi:
     name: Publish Python 🐍 distributions 📦 to TestPyPI
     needs: [build_sdist, build_wheels, test_built_wheels]
