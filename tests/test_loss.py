@@ -195,37 +195,20 @@ def test_stress_weight_scaling() -> None:
     np.testing.assert_allclose(val_no_stv / val_no_epa, expected_ratio)
 
 
-@pytest.mark.parametrize(
-    (
-        "energy_per_atom",
-        "forces_per_atom",
-        "stress_times_volume",
-        "energy_per_conf",
-        "forces_per_conf",
-        "stress_per_conf",
-    ),
-    [
-        (True, True, False, True, True, True),  # default
-    ],
-)
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("engine", ["cext"])
-def test_jac_mag(
+def test_jac_mag_smoke(
     *,
-    engine: str,
     level: int,
-    energy_per_atom: bool,
-    forces_per_atom: bool,
-    stress_times_volume: bool,
-    energy_per_conf: bool,
-    forces_per_conf: bool,
-    stress_per_conf: bool,
     data_path: pathlib.Path,
 ) -> None:
-    """Test the Jacobian for the forces with respect to the parameters."""
+    """Smoke-test that LossFunction.jac runs without error for magnetic potentials.
+
+    Correctness of the engine-level Jacobian is tested in
+    tests/potentials/mmtp/test_jacobian.py.
+    """
     path = data_path / "original/mag"
     mtp_path = path / f"{level:02d}.mmtp"
-    if not (mtp_path).exists():
+    if not mtp_path.exists():
         pytest.skip()
     mtp_data = read_mmtp(mtp_path)
     images = [read_cfg(path / "mag.cfg", index=-1)]
@@ -234,15 +217,9 @@ def test_jac_mag(
 
     setting = LossSetting(
         energy_weight=1.0,
-        forces_weight=1.0 if forces_per_atom else 0.01,
+        forces_weight=0.01,
         stress_weight=0.001,
         mgrad_weight=0.1,
-        energy_per_atom=energy_per_atom,
-        forces_per_atom=forces_per_atom,
-        stress_times_volume=stress_times_volume,
-        energy_per_conf=energy_per_conf,
-        forces_per_conf=forces_per_conf,
-        stress_per_conf=stress_per_conf,
     )
 
     loss = LossFunction(
@@ -250,28 +227,8 @@ def test_jac_mag(
         mtp_data=mtp_data,
         setting=setting,
         comm=world,
-        engine=engine,
+        engine="cext",
     )
     loss(mtp_data.parameters)
-    jac_anl = loss.jac(mtp_data.parameters)
-
-    jac_nmr = np.full_like(jac_anl, np.nan)
-
-    dx = 1e-9
-
-    params = mtp_data.parameters
-
-    for i, orig in enumerate(params):
-        params[i] = orig + dx
-        lp = loss(params)
-
-        params[i] = orig - dx
-        lm = loss(params)
-
-        jac_nmr[i] = (lp - lm) / (2.0 * dx)
-
-        params[i] = orig
-
-    assert np.any(jac_nmr)  # check if some of the elements are non-zero
-
-    np.testing.assert_allclose(jac_nmr, jac_anl, rtol=2e-1, atol=1e-12)
+    jac = loss.jac(mtp_data.parameters)
+    assert jac.shape == mtp_data.parameters.shape

@@ -22,18 +22,17 @@ from motep.potentials.mmtp.numba.engine import NumbaMagMTPEngine
 def test_mmtp_energies_forces_stress(
     level: int,
     mode: str,
-    engine: type[MagEngineBase],
+    engine: MagEngineBase,
     data_path: pathlib.Path,
 ) -> None:
     """Test that cext and numba implementations produce identical energies, forces, and stress.
 
     This test loads a magnetic MTP model at the specified level and compares
-    the results from the C extension and Numba implementations. Skips if an engine
-    does not support the basis type in the test file.
+    the results from the C extension and Numba implementations.
     """
     path = data_path / "original/mag"
     mtp_path = path / f"{level:02d}.mmtp"
-    if not (mtp_path).exists():
+    if not mtp_path.exists():
         pytest.skip(f"Data file {mtp_path} not found")
 
     mtp_data = read_mmtp(mtp_path)
@@ -95,26 +94,23 @@ def test_mmtp_energies_forces_stress(
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("mode", ["run", "train", "train_mgrad"])
+@pytest.mark.parametrize("engine", [CExtMagMTPEngine, NumbaMagMTPEngine])
 def test_mgrad(
+    engine: type[MagEngineBase],
     level: int,
     mode: str,
     data_path: pathlib.Path,
 ) -> None:
-    """Test if magnetic gradients are consistent with finite-difference values.
-
-    Uses only numba engine for testing, since energies and forces are compared
-    in test_mmtp_energies_forces_stress. Skips if the engine does not support
-    the basis type in the test file.
-    """
+    """Test if magnetic gradients are consistent with finite-difference values."""
     path = data_path / "original/mag"
     mtp_path = path / f"{level:02d}.mmtp"
-    if not (mtp_path).exists():
+    if not mtp_path.exists():
         pytest.skip(f"Data file {mtp_path} not found")
 
     mtp_data = read_mmtp(mtp_path)
 
     try:
-        mtp = NumbaMagMTPEngine(mtp_data, mode=mode)
+        mtp = engine(mtp_data, mode=mode)
     except NotImplementedError as e:
         pytest.skip(f"Engine does not support this configuration: {e}")
 
@@ -136,3 +132,109 @@ def test_mgrad(
     t = +1.0 * (ep - em) / (2.0 * dx)
 
     assert mag_grad_ref[0] == pytest.approx(t, abs=1e-4)
+
+
+@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize("engine", [CExtMagMTPEngine, NumbaMagMTPEngine])
+def test_forces(
+    engine: type[MagEngineBase],
+    level: int,
+    data_path: pathlib.Path,
+) -> None:
+    """Test if MMTP forces are consistent with finite-difference values."""
+    path = data_path / "original/mag"
+    mtp_path = path / f"{level:02d}.mmtp"
+    if not mtp_path.exists():
+        pytest.skip(f"Data file {mtp_path} not found")
+
+    mtp_data = read_mmtp(mtp_path)
+
+    try:
+        mtp = engine(mtp_data)
+    except NotImplementedError as e:
+        pytest.skip(f"Engine does not support this configuration: {e}")
+
+    atoms_ref = read_cfg(path / "mag.cfg", index=-1)
+    atoms_ref.set_initial_magnetic_moments(atoms_ref.get_magnetic_moments())
+
+    forces_ref = mtp.calculate(atoms_ref)["forces"]
+
+    dx = 1e-6
+
+    atoms = atoms_ref.copy()
+    atoms.positions[0, 0] += dx
+    ep = mtp.calculate(atoms)["energy"]
+
+    atoms = atoms_ref.copy()
+    atoms.positions[0, 0] -= dx
+    em = mtp.calculate(atoms)["energy"]
+
+    f = -1.0 * (ep - em) / (2.0 * dx)
+
+    assert forces_ref[0, 0] == pytest.approx(f, abs=1e-4)
+
+
+@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize("engine", [CExtMagMTPEngine, NumbaMagMTPEngine])
+def test_stress(
+    engine: type[MagEngineBase],
+    level: int,
+    data_path: pathlib.Path,
+) -> None:
+    """Test if MMTP stresses are consistent with finite-difference values."""
+    path = data_path / "original/mag"
+    mtp_path = path / f"{level:02d}.mmtp"
+    if not mtp_path.exists():
+        pytest.skip(f"Data file {mtp_path} not found")
+
+    mtp_data = read_mmtp(mtp_path)
+
+    try:
+        mtp = engine(mtp_data)
+    except NotImplementedError as e:
+        pytest.skip(f"Engine does not support this configuration: {e}")
+
+    atoms_ref = read_cfg(path / "mag.cfg", index=-1)
+    magmoms = atoms_ref.get_magnetic_moments().copy()
+    atoms_ref.set_initial_magnetic_moments(magmoms)
+
+    stress_ref = mtp.calculate(atoms_ref)["stress"]
+
+    stress = np.zeros((3, 3), dtype=float)
+    eps = 1e-6
+    cell = atoms_ref.cell.copy()
+    volume = atoms_ref.get_volume()
+    for i in range(3):
+        x = np.eye(3)
+        x[i, i] = 1.0 + eps
+        atoms = atoms_ref.copy()
+        atoms.set_cell(cell @ x, scale_atoms=True)
+        atoms.set_initial_magnetic_moments(magmoms)
+        eplus = mtp.calculate(atoms)["energy"]
+
+        x[i, i] = 1.0 - eps
+        atoms = atoms_ref.copy()
+        atoms.set_cell(cell @ x, scale_atoms=True)
+        atoms.set_initial_magnetic_moments(magmoms)
+        eminus = mtp.calculate(atoms)["energy"]
+
+        stress[i, i] = (eplus - eminus) / (2.0 * eps * volume)
+        x[i, i] = 1.0
+
+        j = i - 2
+        x[i, j] = x[j, i] = +0.5 * eps
+        atoms = atoms_ref.copy()
+        atoms.set_cell(cell @ x, scale_atoms=True)
+        atoms.set_initial_magnetic_moments(magmoms)
+        eplus = mtp.calculate(atoms)["energy"]
+
+        x[i, j] = x[j, i] = -0.5 * eps
+        atoms = atoms_ref.copy()
+        atoms.set_cell(cell @ x, scale_atoms=True)
+        atoms.set_initial_magnetic_moments(magmoms)
+        eminus = mtp.calculate(atoms)["energy"]
+
+        stress[i, j] = stress[j, i] = (eplus - eminus) / (2 * eps * volume)
+
+    stress = stress.ravel()[[0, 4, 8, 5, 2, 1]]
+    np.testing.assert_allclose(stress, stress_ref, rtol=0.0, atol=1e-4)
