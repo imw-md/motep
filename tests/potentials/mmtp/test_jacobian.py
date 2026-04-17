@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
+from ase import Atoms
 
 from motep.calculator import MMTP
 from motep.io.mlip.cfg import read_cfg
@@ -19,7 +20,7 @@ def make_mag_atoms(
     engine: str,
     level: int,
     data_path: pathlib.Path,
-) -> "MMTP":
+) -> Atoms:
     """Make ASE Atoms with an MMTP calculator in train mode."""
     path = data_path / "original/mag"
     mtp_path = path / f"{level:02d}.mmtp"
