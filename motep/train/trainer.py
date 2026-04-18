@@ -128,7 +128,7 @@ class Trainer:
 
                 # Instantiate an `Optimizer` class
                 optimizer_class = make_optimizer(step["method"])
-                optimizer = optimizer_class(loss, optimized=step.get("optimized"))
+                optimizer = optimizer_class(loss, **step)
                 optimizer.optimize(**step.get("kwargs", {}))
                 loss.broadcast_results()
                 if self.comm.rank == 0:

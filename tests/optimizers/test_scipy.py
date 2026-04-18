@@ -67,7 +67,7 @@ def test_scaling_vs_jac(data_path: pathlib.Path) -> None:
 
     step = {"method": "L-BFGS-B", "kwargs": {"jac": True, "options": {"maxiter": 10}}}
 
-    optimizer = ScipyMinimizeOptimizer(loss, optimized=optimized)
+    optimizer = ScipyMinimizeOptimizer(loss, optimized=optimized, **step)
 
     with pytest.raises(ValueError, match="scaling"):
         optimizer.optimize(**step.get("kwargs", {}))

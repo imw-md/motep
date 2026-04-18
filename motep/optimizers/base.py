@@ -31,8 +31,7 @@ class OptimizerBase(ABC):
     def __init__(
         self,
         loss: LossFunctionBase,
-        *,
-        optimized: list[str] | None = None,
+        **kwargs,
     ) -> None:
         """Initialize the `Optimizer` class.
 
@@ -40,8 +39,8 @@ class OptimizerBase(ABC):
         ----------
         loss : :class:`motep.loss.LossFunction`
             :class:`motep.loss.LossFunction` object.
-        optimized : list[str]
-            Parameters to be optimized.
+        **kwargs
+            Options passed to the `Optimizer` class.
 
         Raises
         ------
@@ -50,13 +49,15 @@ class OptimizerBase(ABC):
         """
         self.loss = loss
 
-        self.optimized = self.optimized_default if optimized is None else optimized
-        if not all(_ in self.optimized_allowed for _ in self.optimized):
+        optimized: list[str] | None = kwargs.get("optimized")
+        if optimized is None:
+            optimized = self.optimized_default.copy()
+        if not all(_ in self.optimized_allowed for _ in optimized):
             msg = f"Some keywords cannot be optimized with {__name__}."
             raise ValueError(msg)
 
         # add always optimized parameters
-        self.optimized += self.optimized_always
+        self.optimized = optimized + self.optimized_always
 
         # avoid duplication of parameters
         self.optimized = sorted(set(self.optimized), key=self.optimized.index)
