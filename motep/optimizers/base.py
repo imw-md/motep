@@ -51,7 +51,7 @@ class OptimizerBase(ABC):
 
         optimized: list[str] | None = kwargs.get("optimized")
         if optimized is None:
-            optimized = self.optimized_default.copy()
+            optimized = self.optimized_default
         if not all(_ in self.optimized_allowed for _ in optimized):
             msg = f"Some keywords cannot be optimized with {__name__}."
             raise ValueError(msg)
