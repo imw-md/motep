@@ -8,7 +8,6 @@ import numpy as np
 import numpy.typing as npt
 
 from motep.loss import LossFunctionBase
-from motep.parallel import DummyMPIComm, world
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +31,7 @@ class OptimizerBase(ABC):
     def __init__(
         self,
         loss: LossFunctionBase,
-        *,
-        comm: DummyMPIComm = world,
-        **kwargs: dict[str, Any],
+        **kwargs,
     ) -> None:
         """Initialize the `Optimizer` class.
 
@@ -42,9 +39,7 @@ class OptimizerBase(ABC):
         ----------
         loss : :class:`motep.loss.LossFunction`
             :class:`motep.loss.LossFunction` object.
-        comm : MPI.Comm
-            MPI.Comm object.
-        **kwargs : dict[str, Any]
+        **kwargs
             Options passed to the `Optimizer` class.
 
         Raises
@@ -53,15 +48,19 @@ class OptimizerBase(ABC):
 
         """
         self.loss = loss
-        self.comm = comm
 
-        if "optimized" not in kwargs:
-            self.optimized = self.optimized_default
-        elif all(_ in self.optimized_allowed for _ in kwargs["optimized"]):
-            self.optimized = kwargs["optimized"]
-        else:
-            msg = f"Some keywords cannot be optimized in {__name__}."
+        optimized: list[str] | None = kwargs.get("optimized")
+        if optimized is None:
+            optimized = self.optimized_default
+        if not all(_ in self.optimized_allowed for _ in optimized):
+            msg = f"Some keywords cannot be optimized with {__name__}."
             raise ValueError(msg)
+
+        # add always optimized parameters
+        self.optimized = optimized + self.optimized_always
+
+        # avoid duplication of parameters
+        self.optimized = sorted(set(self.optimized), key=self.optimized.index)
 
         self.loss.mtp_data.optimized = self.optimized
 
@@ -78,6 +77,11 @@ class OptimizerBase(ABC):
     @abstractmethod
     def optimized_allowed(self) -> list[str]:
         """Return allowed `optimized`."""
+
+    @property
+    def optimized_always(self) -> list[str]:
+        """Parameters optimized always regardless they are specified or not."""
+        return []
 
 
 class ParallelOptimizerBase(OptimizerBase):
