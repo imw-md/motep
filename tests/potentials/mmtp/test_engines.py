@@ -16,6 +16,35 @@ from motep.potentials.mmtp.cext.engine import CExtMagMTPEngine
 from motep.potentials.mmtp.numba.engine import NumbaMagMTPEngine
 
 
+@pytest.fixture
+def mag_engine_and_atoms(data_path: pathlib.Path):
+    path = data_path / "original/mag"
+    mtp_path = path / "02.mmtp"
+    if not mtp_path.exists():
+        pytest.skip(f"Data file {mtp_path} not found")
+    mtp_data = read_mmtp(mtp_path)
+    engine = NumbaMagMTPEngine(mtp_data)
+    atoms = read_cfg(path / "mag.cfg", index=-1)
+    atoms.set_initial_magnetic_moments(atoms.get_magnetic_moments())
+    return engine, atoms
+
+
+class TestCollinearMagmoms:
+    def test_2d_all_zero_columns_accepted(self, mag_engine_and_atoms) -> None:
+        engine, atoms = mag_engine_and_atoms
+        magmoms_2d = np.zeros((len(atoms), 3))
+        result = engine.calculate(atoms, magmoms=magmoms_2d)
+        assert "energy" in result
+
+    def test_2d_noncollinear_raises(self, mag_engine_and_atoms) -> None:
+        engine, atoms = mag_engine_and_atoms
+        magmoms_2d = np.zeros((len(atoms), 3))
+        magmoms_2d[:, 0] = 1.0
+        magmoms_2d[:, 2] = 1.0
+        with pytest.raises(ValueError, match="Non-collinear"):
+            engine.calculate(atoms, magmoms=magmoms_2d)
+
+
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("mode", ["run", "train", "train_mgrad"])
 @pytest.mark.parametrize("engine_class", [CExtMagMTPEngine])
