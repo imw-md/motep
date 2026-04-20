@@ -18,7 +18,7 @@ from motep.potentials.mmtp.numba.engine import NumbaMagMTPEngine
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("mode", ["run", "train", "train_mgrad"])
-@pytest.mark.parametrize("engine", [CExtMagMTPEngine])
+@pytest.mark.parametrize("engine_class", [CExtMagMTPEngine])
 def test_mmtp_energies_forces_stress(
     level: int,
     mode: str,
@@ -94,7 +94,7 @@ def test_mmtp_energies_forces_stress(
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("mode", ["run", "train", "train_mgrad"])
-@pytest.mark.parametrize("engine", [CExtMagMTPEngine, NumbaMagMTPEngine])
+@pytest.mark.parametrize("engine_class", [CExtMagMTPEngine, NumbaMagMTPEngine])
 def test_mgrad(
     engine_class: type[MagEngineBase],
     level: int,
@@ -135,7 +135,7 @@ def test_mgrad(
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("engine", [CExtMagMTPEngine, NumbaMagMTPEngine])
+@pytest.mark.parametrize("engine_class", [CExtMagMTPEngine, NumbaMagMTPEngine])
 def test_forces(
     engine_class: type[MagEngineBase],
     level: int,
@@ -175,7 +175,7 @@ def test_forces(
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("engine", [CExtMagMTPEngine, NumbaMagMTPEngine])
+@pytest.mark.parametrize("engine_class", [CExtMagMTPEngine, NumbaMagMTPEngine])
 def test_stress(
     engine_class: type[MagEngineBase],
     level: int,
