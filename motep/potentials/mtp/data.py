@@ -44,6 +44,11 @@ class BasisData:
     max: np.float64 = field(default_factory=lambda: np.float64(np.nan))
     size: np.int32 = field(default_factory=lambda: np.int32(0))
 
+    def __setattr__(self, name: str, value: object) -> None:
+        if name == "size":
+            value = np.int32(value)
+        super().__setattr__(name, value)
+
     def __post_init__(self) -> None:
         """Validate basis parameters.
 
