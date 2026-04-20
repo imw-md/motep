@@ -25,10 +25,8 @@ class CExtMagMTPEngine(MagEngineBase):
     but uses compiled C code for better performance in some scenarios.
     """
 
-    def _calculate(self, atoms: Atoms, magmoms: np.ndarray | None = None) -> tuple:
+    def _calculate(self, atoms: Atoms, magmoms: np.ndarray) -> tuple:
         """Main calculation dispatch."""
-        if magmoms is None:
-            magmoms = atoms.get_initial_magnetic_moments()
         if self.mode == "run":
             return self._calc_mag_run(atoms, magmoms)
         if self.mode == "train":
