@@ -8,7 +8,7 @@ import pytest
 from ase import Atoms
 
 from motep.io.mlip.cfg import read_cfg
-from motep.io.mlip.mtp import read_mtp
+from motep.io.mlip.mtp import read_mmtp, read_mtp
 from motep.loss import ErrorPrinter, LossFunction, LossSetting
 from motep.optimizers.lls import LLSOptimizer
 from motep.parallel import world
@@ -82,7 +82,6 @@ def test_without_forces(data_path: pathlib.Path) -> None:
     minimized = ["energy", "forces"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
     optimizer.optimize()
-    print()
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
@@ -127,7 +126,6 @@ def test_molecules(
     minimized = ["energy"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
     optimizer.optimize()
-    print()
 
     mtp_data.log()
     f0 = loss(mtp_data.parameters)  # update paramters
@@ -141,7 +139,6 @@ def test_molecules(
     minimized = ["energy", "forces"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
     optimizer.optimize()
-    print()
 
     mtp_data.log()
     f1 = loss(mtp_data.parameters)  # update parameters
@@ -236,7 +233,6 @@ def test_crystals(
     minimized = ["energy"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
     optimizer.optimize()
-    print()
 
     mtp_data.log()
     f0 = loss(mtp_data.parameters)  # update parameters
@@ -250,7 +246,6 @@ def test_crystals(
     minimized = ["energy", "forces"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
     optimizer.optimize()
-    print()
 
     mtp_data.log()
     f1 = loss(mtp_data.parameters)  # update parameters
@@ -265,7 +260,6 @@ def test_crystals(
     minimized = ["energy", "forces", "stress"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
     optimizer.optimize()
-    print()
 
     mtp_data.log()
     f2 = loss(mtp_data.parameters)  # update parameters
@@ -318,7 +312,6 @@ def test_species_coeffs(
     optimized = ["moment_coeffs"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
     optimizer.optimize()
-    print()
 
     mtp_data.log()
     f0 = loss(mtp_data.parameters)  # update parameters
@@ -326,10 +319,129 @@ def test_species_coeffs(
     optimized = ["moment_coeffs", "species_coeffs"]
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
     optimizer.optimize()
-    print()
 
     mtp_data.log()
     f1 = loss(mtp_data.parameters)  # update parameters
 
     # Check loss functions
     assert f0 > f1
+
+
+@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize(
+    "optimized",
+    [["moment_coeffs"], ["moment_coeffs", "species_coeffs"]],
+)
+def test_mmtp(
+    level: int,
+    optimized: list[str],
+    data_path: pathlib.Path,
+) -> None:
+    """Test `LLSOptimizer` for magnetic MTPs.
+
+    The loss function should decrease (or at least not increase) after LLS
+    optimization for magnetic MTP potentials.
+    """
+    path = data_path / "original/mag"
+    mtp_path = path / f"{level:02d}.mmtp"
+    if not mtp_path.exists():
+        pytest.skip(f"Data file {mtp_path} not found")
+
+    mtp_data = read_mmtp(mtp_path)
+    images = read_cfg(path / "mag.cfg", index=":")
+
+    setting = LossSetting(
+        energy_weight=1.0,
+        forces_weight=0.01,
+        stress_weight=0.001,
+    )
+
+    rng = np.random.default_rng(42)
+
+    mtp_data.optimized = optimized
+    mtp_data.initialize(rng=rng)
+
+    loss = LossFunction(
+        images,
+        mtp_data=mtp_data,
+        setting=setting,
+        comm=world,
+        engine="cext",
+    )
+
+    parameters_ref = np.array(mtp_data.parameters, copy=True)
+    f_1 = loss(parameters_ref)
+
+    minimized = ["energy", "forces", "stress"]
+    optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
+    optimizer.optimize()
+
+    f_2 = loss(mtp_data.parameters)
+
+    assert f_2 <= f_1
+
+
+@pytest.mark.parametrize("level", [4, 6, 8, 10])  # skip level 2 since trivial
+def test_mmtp_illconditioned(
+    level: int,
+    data_path: pathlib.Path,
+) -> None:
+    """Test that LLS handles ill-conditioned matrices from large radial_coeffs.
+
+    Radial_coeffs can be O(1e3), causing LLS matrix columns to span many orders
+    of magnitude.  Without column scaling, lstsq produces catastrophically wrong
+    solutions.
+    """
+    path = data_path / "original/mag"
+    mtp_path = path / f"{level:02d}.mmtp"
+    if not mtp_path.exists():
+        pytest.skip(f"Data file {mtp_path} not found")
+
+    mtp_data = read_mmtp(mtp_path)
+    images = read_cfg(path / "mag.cfg", index=":")
+
+    setting = LossSetting(
+        energy_weight=1.0,
+        forces_weight=0.01,
+        stress_weight=0.001,
+    )
+
+    rng = np.random.default_rng(42)
+
+    mtp_data.optimized = ["species_coeffs", "radial_coeffs"]
+    mtp_data.initialize(rng=rng)
+
+    # Inflate radial_coeffs to O(1e3).
+    mtp_data.radial_coeffs *= 1e4
+    mtp_data.moment_coeffs[...] = 0.0
+    mtp_data.moment_coeffs[0] = 1.0
+
+    loss = LossFunction(
+        images,
+        mtp_data=mtp_data,
+        setting=setting,
+        comm=world,
+        engine="cext",
+    )
+
+    minimized = ["energy", "forces", "stress"]
+    f_1 = loss(mtp_data.parameters)
+
+    optimized = ["moment_coeffs", "species_coeffs"]
+    optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
+
+    # Verify the matrix is actually ill-conditioned before scaling.
+    optimizer.rank0_loss(mtp_data.parameters)
+    optimizer.rank0_gather_data()
+    matrix = optimizer._calc_matrix()
+    cond = np.linalg.cond(matrix)
+    logger.info("Raw matrix cond=%.2e for level %d", cond, level)
+    assert cond > 1e10, f"Matrix not ill-conditioned enough: cond={cond:.2e}"
+
+    optimizer.optimize()
+
+    f_2 = loss(mtp_data.parameters)
+
+    assert f_2 < f_1
+    msg = f"Loss not well optimized (>1), from {f_1:.6e} to {f_2:.6e} "
+    assert f_2 < 1, msg

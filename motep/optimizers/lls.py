@@ -259,8 +259,23 @@ class LLSOptimizer(LLSOptimizerBase):
         matrix = self._calc_matrix()
         logger.debug("Calculate `vector`")
         vector = self._calc_vector()
+
         logger.debug("Calculate `coeffs`")
-        coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
+        # Column-scale to improve conditioning.
+        col_norms = np.linalg.norm(matrix, axis=0)
+        col_norms[col_norms == 0] = 1.0  # avoid division by zero
+        matrix_scaled = matrix / col_norms
+        result = np.linalg.lstsq(matrix_scaled, vector, rcond=None)
+        coeffs = result[0] / col_norms
+
+        sv = result[3]
+        logger.debug(
+            "LLS: shape=%s, rank=%s/%s, cond=%.2e",
+            matrix.shape,
+            result[2],
+            matrix.shape[1],
+            sv.max() / sv.min() if sv.min() > 0 else float("inf"),
+        )
 
         # Update `mtp_data` and `parameters`
         parameters = self._update_parameters(coeffs)
