@@ -159,8 +159,8 @@ def _set_magmoms(atoms: Atoms, atomdata: dict) -> None:
     magmoms = list(zip(*[atomdata.get(_, [0.0] * n) for _ in keys], strict=True))
     magmoms = np.array(magmoms)
     cols = np.where(~(magmoms == 0).all(axis=0))[0]
-    if len(cols) == 1:
-        magmoms = magmoms[:, cols[0]]
+    if len(cols) <= 1:
+        magmoms = magmoms[:, cols[0]] if len(cols) == 1 else np.zeros(n)
     atoms.calc.results["magmoms"] = magmoms
 
 
