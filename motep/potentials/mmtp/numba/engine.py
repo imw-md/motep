@@ -18,9 +18,9 @@ from motep.potentials.mtp.numba.moment import (
     store_radial_basis,
     update_mbd_dbdeps,
     update_mbd_dbdris,
-    update_mbd_dvdcs,
     update_mbd_dgdcs,
     update_mbd_dsdcs,
+    update_mbd_dvdcs,
     update_mbd_vatoms,
 )
 
@@ -37,9 +37,7 @@ from .moment import (
 class NumbaMagMTPEngine(MagEngineBase):
     """MTP Engine based on Numba."""
 
-    def _calculate(self, atoms: Atoms, magmoms: np.ndarray | None = None) -> tuple:
-        if magmoms is None:
-            magmoms = atoms.get_initial_magnetic_moments()
+    def _calculate(self, atoms: Atoms, magmoms: np.ndarray) -> tuple:
         if self.mode == "run":
             return self._calc_mag_run(atoms, magmoms)
         if self.mode == "train":

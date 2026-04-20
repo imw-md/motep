@@ -17,6 +17,47 @@ from motep.potentials.mtp.base import (
 from .data import MagMTPData
 
 
+def _ensure_collinear_magmoms(
+    atoms: Atoms, magmoms: npt.NDArray[np.float64] | None = None
+) -> npt.NDArray[np.float64]:
+    """Ensure magnetic moments are a 1D collinear array.
+
+    Parameters
+    ----------
+    atoms : Atoms
+        The atomic structure.
+    magmoms : np.ndarray or None
+        Magnetic moments. If None, reads from
+        ``atoms.get_initial_magnetic_moments()``.
+
+    Returns
+    -------
+    1D array of scalar magnetic moments.
+
+    Raises
+    ------
+    ValueError
+        If 2D magmoms have more than one non-zero component (non-collinear).
+
+    """
+    if magmoms is None:
+        magmoms = atoms.get_initial_magnetic_moments()
+    if magmoms.ndim == 2:
+        nonzero_cols = np.where(~(magmoms == 0).all(axis=0))[0]
+        if len(nonzero_cols) > 1:
+            msg = (
+                "Non-collinear magnetic moments (multiple non-zero "
+                "components) are not supported. Got non-zero columns: "
+                f"{nonzero_cols.tolist()}"
+            )
+            raise ValueError(msg)
+        if len(nonzero_cols) == 1:
+            magmoms = magmoms[:, nonzero_cols[0]]
+        else:
+            magmoms = np.zeros(magmoms.shape[0])
+    return np.asarray(magmoms, dtype=np.float64)
+
+
 class MagModeBase(ModeBase):
     """Base mode class for magnetic MTPs defining available operation modes."""
 
@@ -158,6 +199,8 @@ class MagEngineBase(MagModeBase, EngineBase):
         if self.update_neighbor_list(atoms):
             self.initialize_basis_data(atoms)
 
+        magmoms = _ensure_collinear_magmoms(atoms, magmoms)
+
         energies, forces, stress, mgrad = self._calculate(atoms, magmoms=magmoms)
 
         self._symmetrize_stress(atoms, stress)
@@ -209,8 +252,7 @@ class MagEngineBase(MagModeBase, EngineBase):
             Results dictionary including relaxed ``magmoms`` and ``magmom``.
 
         """
-        if magmoms_init is None:
-            magmoms_init = atoms.get_initial_magnetic_moments()
+        magmoms_init = _ensure_collinear_magmoms(atoms, magmoms_init)
         mtp_data = self.mtp_data
 
         self.check_species(atoms)
