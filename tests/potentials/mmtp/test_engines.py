@@ -22,7 +22,7 @@ from motep.potentials.mmtp.numba.engine import NumbaMagMTPEngine
 def test_mmtp_energies_forces_stress(
     level: int,
     mode: str,
-    engine: MagEngineBase,
+    engine_class: type[MagEngineBase],
     data_path: pathlib.Path,
 ) -> None:
     """Test that cext and numba implementations produce identical energies, forces, and stress.
@@ -39,7 +39,7 @@ def test_mmtp_energies_forces_stress(
 
     # Create engines with both implementations
     try:
-        engine_instance = engine(mtp_data, mode=mode)
+        engine = engine_class(mtp_data, mode=mode)
     except NotImplementedError as e:
         pytest.skip(f"Engine does not support this configuration: {e}")
 
@@ -52,7 +52,7 @@ def test_mmtp_energies_forces_stress(
     atoms.set_initial_magnetic_moments(atoms.get_magnetic_moments())
 
     # Calculate with both engines
-    result = engine_instance.calculate(atoms)
+    result = engine.calculate(atoms)
     ref_result = ref_engine.calculate(atoms)
 
     # Compare energies
@@ -61,7 +61,7 @@ def test_mmtp_energies_forces_stress(
         ref_result["energy"],
         rtol=1e-10,
         atol=1e-12,
-        err_msg=f"Energies differ at level {level}, mode {mode}, engine {engine}",
+        err_msg=f"Energies differ at level {level}, mode {mode}, engine {engine_class}",
     )
 
     # Compare forces
@@ -70,7 +70,7 @@ def test_mmtp_energies_forces_stress(
         ref_result["forces"],
         rtol=1e-10,
         atol=1e-12,
-        err_msg=f"Forces differ at level {level}, mode {mode}, engine {engine}",
+        err_msg=f"Forces differ at level {level}, mode {mode}, engine {engine_class}",
     )
 
     # Compare stress
@@ -79,7 +79,7 @@ def test_mmtp_energies_forces_stress(
         ref_result["stress"],
         rtol=1e-10,
         atol=1e-12,
-        err_msg=f"Stress differs at level {level}, mode {mode}, engine {engine}",
+        err_msg=f"Stress differs at level {level}, mode {mode}, engine {engine_class}",
     )
 
     # Compare magnetic gradients
@@ -88,7 +88,7 @@ def test_mmtp_energies_forces_stress(
         ref_result["mgrad"],
         rtol=1e-10,
         atol=1e-12,
-        err_msg=f"Mgrad differs at level {level}, mode {mode}, engine {engine}",
+        err_msg=f"Mgrad differs at level {level}, mode {mode}, engine {engine_class}",
     )
 
 
@@ -96,7 +96,7 @@ def test_mmtp_energies_forces_stress(
 @pytest.mark.parametrize("mode", ["run", "train", "train_mgrad"])
 @pytest.mark.parametrize("engine", [CExtMagMTPEngine, NumbaMagMTPEngine])
 def test_mgrad(
-    engine: type[MagEngineBase],
+    engine_class: type[MagEngineBase],
     level: int,
     mode: str,
     data_path: pathlib.Path,
@@ -110,24 +110,24 @@ def test_mgrad(
     mtp_data = read_mmtp(mtp_path)
 
     try:
-        mtp = engine(mtp_data, mode=mode)
+        engine = engine_class(mtp_data, mode=mode)
     except NotImplementedError as e:
         pytest.skip(f"Engine does not support this configuration: {e}")
 
     atoms_ref = read_cfg(path / "mag.cfg", index=-1)
     atoms_ref.set_initial_magnetic_moments(atoms_ref.get_magnetic_moments())
 
-    mag_grad_ref = mtp.calculate(atoms_ref)["mgrad"]
+    mag_grad_ref = engine.calculate(atoms_ref)["mgrad"]
 
     dx = 1e-6
 
     atoms = atoms_ref.copy()
     atoms.arrays["initial_magmoms"][0] += dx
-    ep = mtp.calculate(atoms)["energy"]
+    ep = engine.calculate(atoms)["energy"]
 
     atoms = atoms_ref.copy()
     atoms.arrays["initial_magmoms"][0] -= dx
-    em = mtp.calculate(atoms)["energy"]
+    em = engine.calculate(atoms)["energy"]
 
     t = +1.0 * (ep - em) / (2.0 * dx)
 
@@ -137,7 +137,7 @@ def test_mgrad(
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("engine", [CExtMagMTPEngine, NumbaMagMTPEngine])
 def test_forces(
-    engine: type[MagEngineBase],
+    engine_class: type[MagEngineBase],
     level: int,
     data_path: pathlib.Path,
 ) -> None:
@@ -150,24 +150,24 @@ def test_forces(
     mtp_data = read_mmtp(mtp_path)
 
     try:
-        mtp = engine(mtp_data)
+        engine = engine_class(mtp_data)
     except NotImplementedError as e:
         pytest.skip(f"Engine does not support this configuration: {e}")
 
     atoms_ref = read_cfg(path / "mag.cfg", index=-1)
     atoms_ref.set_initial_magnetic_moments(atoms_ref.get_magnetic_moments())
 
-    forces_ref = mtp.calculate(atoms_ref)["forces"]
+    forces_ref = engine.calculate(atoms_ref)["forces"]
 
     dx = 1e-6
 
     atoms = atoms_ref.copy()
     atoms.positions[0, 0] += dx
-    ep = mtp.calculate(atoms)["energy"]
+    ep = engine.calculate(atoms)["energy"]
 
     atoms = atoms_ref.copy()
     atoms.positions[0, 0] -= dx
-    em = mtp.calculate(atoms)["energy"]
+    em = engine.calculate(atoms)["energy"]
 
     f = -1.0 * (ep - em) / (2.0 * dx)
 
@@ -177,7 +177,7 @@ def test_forces(
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("engine", [CExtMagMTPEngine, NumbaMagMTPEngine])
 def test_stress(
-    engine: type[MagEngineBase],
+    engine_class: type[MagEngineBase],
     level: int,
     data_path: pathlib.Path,
 ) -> None:
@@ -190,7 +190,7 @@ def test_stress(
     mtp_data = read_mmtp(mtp_path)
 
     try:
-        mtp = engine(mtp_data)
+        mtp = engine_class(mtp_data)
     except NotImplementedError as e:
         pytest.skip(f"Engine does not support this configuration: {e}")
 
