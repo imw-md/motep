@@ -128,9 +128,7 @@ def test_local_minimum(data_path: pathlib.Path) -> None:
 
 @pytest.mark.parametrize("level", [2, 4, 6])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
-@pytest.mark.parametrize("engine", ["cext", "numba"])
 def test_molecules(
-    engine: str,
     molecule: int,
     level: int,
     data_path: pathlib.Path,
@@ -151,7 +149,6 @@ def test_molecules(
         mtp_data=mtp_data,
         setting=setting,
         comm=world,
-        engine=engine,
     )
 
     optimizer = NoInteractionOptimizer(loss)

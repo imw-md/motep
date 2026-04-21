@@ -9,16 +9,39 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.potentials.mtp.base import EngineBase
 from motep.potentials.mtp.cext.engine import CExtMTPEngine
-from motep.potentials.mtp.jax.engine import JaxMTPEngine
-from motep.potentials.mtp.numba.engine import NumbaMTPEngine
 from motep.potentials.mtp.numpy.engine import NumpyMTPEngine
+
+try:
+    from motep.potentials.mtp.numba.engine import NumbaMTPEngine
+
+    _numba_available = True
+except ImportError:
+    NumbaMTPEngine = None  # type: ignore[assignment,misc]
+    _numba_available = False
+
+try:
+    from motep.potentials.mtp.jax.engine import JaxMTPEngine
+
+    _jax_available = True
+except ImportError:
+    JaxMTPEngine = None  # type: ignore[assignment,misc]
+    _jax_available = False
+
+_numba_param = pytest.param(
+    NumbaMTPEngine,
+    marks=pytest.mark.skipif(not _numba_available, reason="numba not available"),
+)
+_jax_param = pytest.param(
+    JaxMTPEngine,
+    marks=pytest.mark.skipif(not _jax_available, reason="JAX not available"),
+)
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
 @pytest.mark.parametrize("mode", ["run", "train"])
 @pytest.mark.parametrize(
-    "engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine, CExtMTPEngine]
+    "engine", [NumpyMTPEngine, _numba_param, _jax_param, CExtMTPEngine]
 )
 # @pytest.mark.parametrize("molecule", [762])
 def test_molecules(
@@ -52,7 +75,7 @@ def test_molecules(
 @pytest.mark.parametrize("crystal", ["multi"])
 @pytest.mark.parametrize("mode", ["run", "train"])
 # @pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
-@pytest.mark.parametrize("engine", [NumbaMTPEngine, JaxMTPEngine, CExtMTPEngine])
+@pytest.mark.parametrize("engine", [_numba_param, _jax_param, CExtMTPEngine])
 def test_crystals(
     engine: type[EngineBase],
     mode: str,
@@ -87,7 +110,7 @@ def test_crystals(
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23028])
 @pytest.mark.parametrize(
-    "engine", [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine, CExtMTPEngine]
+    "engine", [NumpyMTPEngine, _numba_param, _jax_param, CExtMTPEngine]
 )
 def test_forces(
     engine: type[EngineBase],
@@ -124,7 +147,7 @@ def test_forces(
 @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize(
     "engine",
-    [NumpyMTPEngine, NumbaMTPEngine, JaxMTPEngine, CExtMTPEngine],
+    [NumpyMTPEngine, _numba_param, _jax_param, CExtMTPEngine],
 )
 def test_stress(
     engine: type[EngineBase],
@@ -186,15 +209,16 @@ def test_stress(
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("crystal", ["multi"])
-@pytest.mark.parametrize("engine", [NumbaMTPEngine, CExtMTPEngine])
+@pytest.mark.parametrize("mode", ["run", "train"])
+@pytest.mark.parametrize("engine", [_numba_param, CExtMTPEngine])
 def test_basis_data(
     engine: type[EngineBase],
+    mode: str,
     crystal: int,
     level: int,
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
-    mode = "train"
     path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
@@ -211,14 +235,16 @@ def test_basis_data(
         mbd = mtp.mbd
         mbd_ref = ref.mbd
         np.testing.assert_allclose(mbd.vatoms, mbd_ref.vatoms, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(mbd.dbdris, mbd_ref.dbdris, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(mbd.dbdeps, mbd_ref.dbdeps, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(mbd.dedcs, mbd_ref.dedcs, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(mbd.dgdcs, mbd_ref.dgdcs, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(mbd.dsdcs, mbd_ref.dsdcs, rtol=0.0, atol=1e-6)
 
-        rbd = mtp.rbd
-        rbd_ref = ref.rbd
-        np.testing.assert_allclose(rbd.values, rbd_ref.values, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(rbd.dqdris, rbd_ref.dqdris, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(rbd.dqdeps, rbd_ref.dqdeps, rtol=0.0, atol=1e-6)
+        if mode == "train":
+            np.testing.assert_allclose(mbd.dbdris, mbd_ref.dbdris, rtol=0.0, atol=1e-6)
+            np.testing.assert_allclose(mbd.dbdeps, mbd_ref.dbdeps, rtol=0.0, atol=1e-6)
+            np.testing.assert_allclose(mbd.dedcs, mbd_ref.dedcs, rtol=0.0, atol=1e-6)
+            np.testing.assert_allclose(mbd.dgdcs, mbd_ref.dgdcs, rtol=0.0, atol=1e-6)
+            np.testing.assert_allclose(mbd.dsdcs, mbd_ref.dsdcs, rtol=0.0, atol=1e-6)
+
+            rbd = mtp.rbd
+            rbd_ref = ref.rbd
+            np.testing.assert_allclose(rbd.values, rbd_ref.values, rtol=0.0, atol=1e-6)
+            np.testing.assert_allclose(rbd.dqdris, rbd_ref.dqdris, rtol=0.0, atol=1e-6)
+            np.testing.assert_allclose(rbd.dqdeps, rbd_ref.dqdeps, rtol=0.0, atol=1e-6)
