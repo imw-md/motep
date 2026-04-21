@@ -222,6 +222,43 @@ class LLSOptimizerBase(ParallelOptimizerBase):
             vector /= sqrt(len(images))
         return vector
 
+    def _calc_coeffs(self, matrix: np.ndarray, vector: np.ndarray) -> np.ndarray:
+        """Solve the LLS problem with column scaling to improve conditioning.
+
+        Each column of ``matrix`` is normalised by its Euclidean norm before
+        the solve, and the resulting coefficients are rescaled accordingly.
+        Diagnostic information (shape, numerical rank, condition number) is
+        emitted at the ``DEBUG`` log level.
+
+        Parameters
+        ----------
+        matrix : np.ndarray
+            Design matrix of shape ``(n_rows, n_coeffs)``.
+        vector : np.ndarray
+            Right-hand side vector of shape ``(n_rows,)``.
+
+        Returns
+        -------
+        np.ndarray
+            Coefficient vector of shape ``(n_coeffs,)``.
+
+        """
+        col_norms = np.linalg.norm(matrix, axis=0)
+        col_norms[col_norms == 0] = 1.0  # avoid division by zero
+        matrix_scaled = matrix / col_norms
+        result = np.linalg.lstsq(matrix_scaled, vector, rcond=None)
+        coeffs = result[0] / col_norms
+
+        sv = result[3]
+        logger.debug(
+            "LLS: shape=%s, rank=%s/%s, cond=%.2e",
+            matrix.shape,
+            result[2],
+            matrix.shape[1],
+            sv.max() / sv.min() if sv.min() > 0 else float("inf"),
+        )
+        return coeffs
+
 
 class LLSOptimizer(LLSOptimizerBase):
     """Optimizer based on linear least squares (LLS).
@@ -259,23 +296,8 @@ class LLSOptimizer(LLSOptimizerBase):
         matrix = self._calc_matrix()
         logger.debug("Calculate `vector`")
         vector = self._calc_vector()
-
         logger.debug("Calculate `coeffs`")
-        # Column-scale to improve conditioning.
-        col_norms = np.linalg.norm(matrix, axis=0)
-        col_norms[col_norms == 0] = 1.0  # avoid division by zero
-        matrix_scaled = matrix / col_norms
-        result = np.linalg.lstsq(matrix_scaled, vector, rcond=None)
-        coeffs = result[0] / col_norms
-
-        sv = result[3]
-        logger.debug(
-            "LLS: shape=%s, rank=%s/%s, cond=%.2e",
-            matrix.shape,
-            result[2],
-            matrix.shape[1],
-            sv.max() / sv.min() if sv.min() > 0 else float("inf"),
-        )
+        coeffs = self._calc_coeffs(matrix, vector)
 
         # Update `mtp_data` and `parameters`
         parameters = self._update_parameters(coeffs)
