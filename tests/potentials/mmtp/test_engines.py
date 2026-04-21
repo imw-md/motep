@@ -283,3 +283,59 @@ def test_stress(
 
     stress = stress.ravel()[[0, 4, 8, 5, 2, 1]]
     np.testing.assert_allclose(stress, stress_ref, rtol=0.0, atol=1e-4)
+
+
+@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+@pytest.mark.parametrize("mode", ["run", "train", "train_mgrad"])
+def test_basis_data(
+    mode: str,
+    level: int,
+    data_path: pathlib.Path,
+) -> None:
+    """Test that CExtMagMTPEngine basis data matches NumbaMagMTPEngine (reference)."""
+    if not _numba_available:
+        pytest.skip("numba not available")
+    path = data_path / "original/mag"
+    mtp_path = path / f"{level:02d}.mmtp"
+    if not mtp_path.exists():
+        pytest.skip(f"Data file {mtp_path} not found")
+
+    mtp_data = read_mmtp(mtp_path)
+
+    try:
+        ref = NumbaMagMTPEngine(mtp_data, mode=mode)
+    except NotImplementedError as e:
+        pytest.skip(f"Reference engine does not support this configuration: {e}")
+
+    try:
+        mtp = CExtMagMTPEngine(mtp_data, mode=mode)
+    except NotImplementedError as e:
+        pytest.skip(f"Engine does not support this configuration: {e}")
+
+    atoms = read_cfg(path / "mag.cfg", index=-1)
+    atoms.set_initial_magnetic_moments(atoms.get_magnetic_moments())
+
+    ref.calculate(atoms)
+    mtp.calculate(atoms)
+
+    mbd = mtp.mbd
+    mbd_ref = ref.mbd
+    np.testing.assert_allclose(mbd.vatoms, mbd_ref.vatoms, rtol=0.0, atol=1e-6)
+
+    if "train" in mode:
+        np.testing.assert_allclose(mbd.dbdris, mbd_ref.dbdris, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dbdeps, mbd_ref.dbdeps, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dedcs, mbd_ref.dedcs, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dgdcs, mbd_ref.dgdcs, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dsdcs, mbd_ref.dsdcs, rtol=0.0, atol=1e-6)
+
+        rbd = mtp.rbd
+        rbd_ref = ref.rbd
+        np.testing.assert_allclose(rbd.values, rbd_ref.values, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(rbd.dqdris, rbd_ref.dqdris, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(rbd.dqdeps, rbd_ref.dqdeps, rtol=0.0, atol=1e-6)
+
+    if mode == "train_mgrad":
+        np.testing.assert_allclose(mbd.dbdmis, mbd_ref.dbdmis, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(mbd.dgmdcs, mbd_ref.dgmdcs, rtol=0.0, atol=1e-6)
+        np.testing.assert_allclose(rbd.dqdmis, rbd_ref.dqdmis, rtol=0.0, atol=1e-6)

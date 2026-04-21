@@ -209,15 +209,16 @@ def test_stress(
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("crystal", ["multi"])
+@pytest.mark.parametrize("mode", ["run", "train"])
 @pytest.mark.parametrize("engine", [_numba_param, CExtMTPEngine])
 def test_basis_data(
     engine: type[EngineBase],
+    mode: str,
     crystal: int,
     level: int,
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
-    mode = "train"
     path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip()
@@ -234,14 +235,16 @@ def test_basis_data(
         mbd = mtp.mbd
         mbd_ref = ref.mbd
         np.testing.assert_allclose(mbd.vatoms, mbd_ref.vatoms, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(mbd.dbdris, mbd_ref.dbdris, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(mbd.dbdeps, mbd_ref.dbdeps, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(mbd.dedcs, mbd_ref.dedcs, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(mbd.dgdcs, mbd_ref.dgdcs, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(mbd.dsdcs, mbd_ref.dsdcs, rtol=0.0, atol=1e-6)
 
-        rbd = mtp.rbd
-        rbd_ref = ref.rbd
-        np.testing.assert_allclose(rbd.values, rbd_ref.values, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(rbd.dqdris, rbd_ref.dqdris, rtol=0.0, atol=1e-6)
-        np.testing.assert_allclose(rbd.dqdeps, rbd_ref.dqdeps, rtol=0.0, atol=1e-6)
+        if mode == "train":
+            np.testing.assert_allclose(mbd.dbdris, mbd_ref.dbdris, rtol=0.0, atol=1e-6)
+            np.testing.assert_allclose(mbd.dbdeps, mbd_ref.dbdeps, rtol=0.0, atol=1e-6)
+            np.testing.assert_allclose(mbd.dedcs, mbd_ref.dedcs, rtol=0.0, atol=1e-6)
+            np.testing.assert_allclose(mbd.dgdcs, mbd_ref.dgdcs, rtol=0.0, atol=1e-6)
+            np.testing.assert_allclose(mbd.dsdcs, mbd_ref.dsdcs, rtol=0.0, atol=1e-6)
+
+            rbd = mtp.rbd
+            rbd_ref = ref.rbd
+            np.testing.assert_allclose(rbd.values, rbd_ref.values, rtol=0.0, atol=1e-6)
+            np.testing.assert_allclose(rbd.dqdris, rbd_ref.dqdris, rtol=0.0, atol=1e-6)
+            np.testing.assert_allclose(rbd.dqdeps, rbd_ref.dqdeps, rtol=0.0, atol=1e-6)
