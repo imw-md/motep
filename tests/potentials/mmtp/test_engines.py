@@ -13,11 +13,25 @@ from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mmtp
 from motep.potentials.mmtp.base import MagEngineBase
 from motep.potentials.mmtp.cext.engine import CExtMagMTPEngine
-from motep.potentials.mmtp.numba.engine import NumbaMagMTPEngine
+
+try:
+    from motep.potentials.mmtp.numba.engine import NumbaMagMTPEngine
+
+    _numba_available = True
+except ImportError:
+    NumbaMagMTPEngine = None  # type: ignore[assignment,misc]
+    _numba_available = False
+
+_numba_mag_param = pytest.param(
+    NumbaMagMTPEngine,
+    marks=pytest.mark.skipif(not _numba_available, reason="numba not available"),
+)
 
 
 @pytest.fixture
 def mag_engine_and_atoms(data_path: pathlib.Path):
+    if not _numba_available:
+        pytest.skip("numba not available")
     path = data_path / "original/mag"
     mtp_path = path / "02.mmtp"
     if not mtp_path.exists():
@@ -72,6 +86,8 @@ def test_mmtp_energies_forces_stress(
     except NotImplementedError as e:
         pytest.skip(f"Engine does not support this configuration: {e}")
 
+    if not _numba_available:
+        pytest.skip("numba not available")
     try:
         ref_engine = NumbaMagMTPEngine(mtp_data, mode=mode)
     except NotImplementedError as e:
@@ -123,7 +139,7 @@ def test_mmtp_energies_forces_stress(
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("mode", ["run", "train", "train_mgrad"])
-@pytest.mark.parametrize("engine_class", [CExtMagMTPEngine, NumbaMagMTPEngine])
+@pytest.mark.parametrize("engine_class", [CExtMagMTPEngine, _numba_mag_param])
 def test_mgrad(
     engine_class: type[MagEngineBase],
     level: int,
@@ -164,7 +180,7 @@ def test_mgrad(
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("engine_class", [CExtMagMTPEngine, NumbaMagMTPEngine])
+@pytest.mark.parametrize("engine_class", [CExtMagMTPEngine, _numba_mag_param])
 def test_forces(
     engine_class: type[MagEngineBase],
     level: int,
@@ -204,7 +220,7 @@ def test_forces(
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("engine_class", [CExtMagMTPEngine, NumbaMagMTPEngine])
+@pytest.mark.parametrize("engine_class", [CExtMagMTPEngine, _numba_mag_param])
 def test_stress(
     engine_class: type[MagEngineBase],
     level: int,

@@ -1,5 +1,7 @@
 import pytest
 
+pytest.importorskip("jax", reason="JAX not available")
+
 from motep.potentials.mtp.jax.moment import MomentBasis, _flatten_to_moments
 
 
