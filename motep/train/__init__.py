@@ -1,4 +1,4 @@
-"""Traner."""
+"""Trainer."""
 
 from .trainer import Trainer
 
