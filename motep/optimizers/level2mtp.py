@@ -51,7 +51,7 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         logger.debug("Calculate `vector`")
         vector = self._calc_vector()
         logger.debug("Calculate `coeffs`")
-        coeffs = np.linalg.lstsq(matrix, vector, rcond=None)[0]
+        coeffs = self._calc_coeffs(matrix, vector)
 
         # Update `mtp_data` and `parameters`.
         parameters = self._update_parameters(coeffs)
