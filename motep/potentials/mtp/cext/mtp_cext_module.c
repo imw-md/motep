@@ -127,7 +127,6 @@ static PyObject *py_calc_run(PyObject *self, PyObject *args, PyObject *kwargs)
         Py_DECREF(moment_coeffs_arr);
         return NULL;
     }
-    // PyArrayObject *mbd_vatoms_arr = (PyArrayObject *)PyArray_FROM_OTF(mbd_vatoms_obj, NPY_DOUBLE, NPY_ARRAY_IN_ARRAY);
     PyArrayObject *mbd_vatoms_arr = get_inplace_double(mbd_vatoms_obj, "mbd.vatoms");
     Py_DECREF(mbd_vatoms_obj);
     if (!mbd_vatoms_arr)
