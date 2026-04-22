@@ -39,6 +39,19 @@ static int require_inplace_double(PyArrayObject *arr, const char *name)
     return 1;
 }
 
+static PyArrayObject *get_inplace_double(PyObject *obj, const char *name)
+{
+    if (!PyArray_Check(obj))
+    {
+        PyErr_Format(PyExc_TypeError, "%s must be a numpy array", name);
+        return NULL;
+    }
+    PyArrayObject *arr = (PyArrayObject *)obj;
+    if (!require_inplace_double(arr, name))
+        return NULL;
+    return arr;
+}
+
 /* ============================================================================
  * Python wrapper for calc_run
  * Accepts mtp_data as a dict-like object and extracts parameters
@@ -161,8 +174,10 @@ static PyObject *py_calc_run(PyObject *self, PyObject *args, PyObject *kwargs)
         Py_DECREF(moment_coeffs_arr);
         return NULL;
     }
-    PyArrayObject *mbd_vatoms_arr = (PyArrayObject *)PyArray_FROM_OTF(mbd_vatoms_obj, NPY_DOUBLE, NPY_ARRAY_INOUT_ARRAY);
-    if (!mbd_vatoms_arr || !require_inplace_double(mbd_vatoms_arr, "mbd.vatoms"))
+    // PyArrayObject *mbd_vatoms_arr = (PyArrayObject *)PyArray_FROM_OTF(mbd_vatoms_obj, NPY_DOUBLE, NPY_ARRAY_IN_ARRAY);
+    PyArrayObject *mbd_vatoms_arr = get_inplace_double(mbd_vatoms_obj, "mbd.vatoms");
+    Py_DECREF(mbd_vatoms_obj);
+    if (!mbd_vatoms_arr)
     {
         Py_DECREF(radial_coeffs_arr);
         Py_DECREF(species_coeffs_arr);
@@ -170,8 +185,6 @@ static PyObject *py_calc_run(PyObject *self, PyObject *args, PyObject *kwargs)
         Py_DECREF(alpha_index_basic_arr);
         Py_DECREF(alpha_index_times_arr);
         Py_DECREF(moment_coeffs_arr);
-        Py_XDECREF(mbd_vatoms_arr);
-        Py_DECREF(mbd_vatoms_obj);
         return NULL;
     }
 
@@ -186,8 +199,6 @@ static PyObject *py_calc_run(PyObject *self, PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_MemoryError, "Failed to allocate output arrays");
         Py_XDECREF(energies_arr);
         Py_XDECREF(gradient_arr);
-        Py_DECREF(mbd_vatoms_arr);
-        Py_DECREF(mbd_vatoms_obj);
         Py_DECREF(radial_coeffs_arr);
         Py_DECREF(species_coeffs_arr);
         Py_DECREF(alpha_moment_mapping_arr);
@@ -227,8 +238,6 @@ static PyObject *py_calc_run(PyObject *self, PyObject *args, PyObject *kwargs)
     Py_DECREF(alpha_index_basic_arr);
     Py_DECREF(alpha_index_times_arr);
     Py_DECREF(moment_coeffs_arr);
-    Py_DECREF(mbd_vatoms_arr);
-    Py_DECREF(mbd_vatoms_obj);
     Py_DECREF(scaling_obj);
     Py_DECREF(min_dist_obj);
     Py_DECREF(max_dist_obj);
@@ -431,16 +440,24 @@ static PyObject *py_calc_train(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    /* Convert to numpy arrays */
-    PyArrayObject *rbd_values_arr = (PyArrayObject *)PyArray_FROM_OTF(rbd_values_obj, NPY_DOUBLE, NPY_ARRAY_INOUT_ARRAY);
-    PyArrayObject *rbd_dqdris_arr = (PyArrayObject *)PyArray_FROM_OTF(rbd_dqdris_obj, NPY_DOUBLE, NPY_ARRAY_INOUT_ARRAY);
-    PyArrayObject *rbd_dqdeps_arr = (PyArrayObject *)PyArray_FROM_OTF(rbd_dqdeps_obj, NPY_DOUBLE, NPY_ARRAY_INOUT_ARRAY);
-    PyArrayObject *mbd_vatoms_arr = (PyArrayObject *)PyArray_FROM_OTF(mbd_vatoms_obj, NPY_DOUBLE, NPY_ARRAY_INOUT_ARRAY);
-    PyArrayObject *mbd_dbdris_arr = (PyArrayObject *)PyArray_FROM_OTF(mbd_dbdris_obj, NPY_DOUBLE, NPY_ARRAY_INOUT_ARRAY);
-    PyArrayObject *mbd_dbdeps_arr = (PyArrayObject *)PyArray_FROM_OTF(mbd_dbdeps_obj, NPY_DOUBLE, NPY_ARRAY_INOUT_ARRAY);
-    PyArrayObject *mbd_dvdcs_arr = (PyArrayObject *)PyArray_FROM_OTF(mbd_dvdcs_obj, NPY_DOUBLE, NPY_ARRAY_INOUT_ARRAY);
-    PyArrayObject *mbd_dgdcs_arr = (PyArrayObject *)PyArray_FROM_OTF(mbd_dgdcs_obj, NPY_DOUBLE, NPY_ARRAY_INOUT_ARRAY);
-    PyArrayObject *mbd_dsdcs_arr = (PyArrayObject *)PyArray_FROM_OTF(mbd_dsdcs_obj, NPY_DOUBLE, NPY_ARRAY_INOUT_ARRAY);
+    PyArrayObject *rbd_values_arr = get_inplace_double(rbd_values_obj, "rbd.values");
+    Py_DECREF(rbd_values_obj);
+    PyArrayObject *rbd_dqdris_arr = get_inplace_double(rbd_dqdris_obj, "rbd.dqdris");
+    Py_DECREF(rbd_dqdris_obj);
+    PyArrayObject *rbd_dqdeps_arr = get_inplace_double(rbd_dqdeps_obj, "rbd.dqdeps");
+    Py_DECREF(rbd_dqdeps_obj);
+    PyArrayObject *mbd_vatoms_arr = get_inplace_double(mbd_vatoms_obj, "mbd.vatoms");
+    Py_DECREF(mbd_vatoms_obj);
+    PyArrayObject *mbd_dbdris_arr = get_inplace_double(mbd_dbdris_obj, "mbd.dbdris");
+    Py_DECREF(mbd_dbdris_obj);
+    PyArrayObject *mbd_dbdeps_arr = get_inplace_double(mbd_dbdeps_obj, "mbd.dbdeps");
+    Py_DECREF(mbd_dbdeps_obj);
+    PyArrayObject *mbd_dvdcs_arr = get_inplace_double(mbd_dvdcs_obj, "mbd.dvdcs");
+    Py_DECREF(mbd_dvdcs_obj);
+    PyArrayObject *mbd_dgdcs_arr = get_inplace_double(mbd_dgdcs_obj, "mbd.dgdcs");
+    Py_DECREF(mbd_dgdcs_obj);
+    PyArrayObject *mbd_dsdcs_arr = get_inplace_double(mbd_dsdcs_obj, "mbd.dsdcs");
+    Py_DECREF(mbd_dsdcs_obj);
 
     if (!rbd_values_arr || !rbd_dqdris_arr || !rbd_dqdeps_arr ||
         !mbd_vatoms_arr || !mbd_dbdris_arr || !mbd_dbdeps_arr ||
@@ -452,44 +469,6 @@ static PyObject *py_calc_train(PyObject *self, PyObject *args, PyObject *kwargs)
         Py_DECREF(alpha_index_basic_arr);
         Py_DECREF(alpha_index_times_arr);
         Py_DECREF(moment_coeffs_arr);
-        Py_XDECREF(rbd_values_arr);
-        Py_XDECREF(rbd_dqdris_arr);
-        Py_XDECREF(rbd_dqdeps_arr);
-        Py_XDECREF(mbd_vatoms_arr);
-        Py_XDECREF(mbd_dbdris_arr);
-        Py_XDECREF(mbd_dbdeps_arr);
-        Py_XDECREF(mbd_dvdcs_arr);
-        Py_XDECREF(mbd_dgdcs_arr);
-        Py_XDECREF(mbd_dsdcs_arr);
-        Py_DECREF(energies_arr);
-        return NULL;
-    }
-
-    if (!require_inplace_double(rbd_values_arr, "rbd.values") ||
-        !require_inplace_double(rbd_dqdris_arr, "rbd.dqdris") ||
-        !require_inplace_double(rbd_dqdeps_arr, "rbd.dqdeps") ||
-        !require_inplace_double(mbd_vatoms_arr, "mbd.vatoms") ||
-        !require_inplace_double(mbd_dbdris_arr, "mbd.dbdris") ||
-        !require_inplace_double(mbd_dbdeps_arr, "mbd.dbdeps") ||
-        !require_inplace_double(mbd_dvdcs_arr, "mbd.dvdcs") ||
-        !require_inplace_double(mbd_dgdcs_arr, "mbd.dgdcs") ||
-        !require_inplace_double(mbd_dsdcs_arr, "mbd.dsdcs"))
-    {
-        Py_DECREF(radial_coeffs_arr);
-        Py_DECREF(species_coeffs_arr);
-        Py_DECREF(alpha_moment_mapping_arr);
-        Py_DECREF(alpha_index_basic_arr);
-        Py_DECREF(alpha_index_times_arr);
-        Py_DECREF(moment_coeffs_arr);
-        Py_DECREF(rbd_values_arr);
-        Py_DECREF(rbd_dqdris_arr);
-        Py_DECREF(rbd_dqdeps_arr);
-        Py_DECREF(mbd_vatoms_arr);
-        Py_DECREF(mbd_dbdris_arr);
-        Py_DECREF(mbd_dbdeps_arr);
-        Py_DECREF(mbd_dvdcs_arr);
-        Py_DECREF(mbd_dgdcs_arr);
-        Py_DECREF(mbd_dsdcs_arr);
         Py_DECREF(energies_arr);
         return NULL;
     }
@@ -539,15 +518,6 @@ static PyObject *py_calc_train(PyObject *self, PyObject *args, PyObject *kwargs)
     Py_DECREF(alpha_index_basic_arr);
     Py_DECREF(alpha_index_times_arr);
     Py_DECREF(moment_coeffs_arr);
-    Py_DECREF(rbd_values_arr);
-    Py_DECREF(rbd_dqdris_arr);
-    Py_DECREF(rbd_dqdeps_arr);
-    Py_DECREF(mbd_vatoms_arr);
-    Py_DECREF(mbd_dbdris_arr);
-    Py_DECREF(mbd_dbdeps_arr);
-    Py_DECREF(mbd_dvdcs_arr);
-    Py_DECREF(mbd_dgdcs_arr);
-    Py_DECREF(mbd_dsdcs_arr);
     Py_DECREF(scaling_obj);
     Py_DECREF(min_dist_obj);
     Py_DECREF(max_dist_obj);
@@ -561,15 +531,6 @@ static PyObject *py_calc_train(PyObject *self, PyObject *args, PyObject *kwargs)
     Py_DECREF(alpha_index_times_count_obj);
     Py_DECREF(moment_coeffs_obj);
     Py_DECREF(alpha_scalar_moments_obj);
-    Py_DECREF(rbd_values_obj);
-    Py_DECREF(rbd_dqdris_obj);
-    Py_DECREF(rbd_dqdeps_obj);
-    Py_DECREF(mbd_vatoms_obj);
-    Py_DECREF(mbd_dbdris_obj);
-    Py_DECREF(mbd_dbdeps_obj);
-    Py_DECREF(mbd_dvdcs_obj);
-    Py_DECREF(mbd_dgdcs_obj);
-    Py_DECREF(mbd_dsdcs_obj);
 
     return (PyObject *)energies_arr;
 }
