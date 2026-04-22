@@ -5,9 +5,7 @@ project(
 )
 
 add_project_arguments(
-  '-O3',
-  '-ffast-math',
-  '-march=native',
+  '-O2',
   language: 'c',
 )
 

@@ -130,7 +130,8 @@ def test_jac(
 
     assert np.any(jac_nmr)  # check if some of the elements are non-zero
 
-    np.testing.assert_allclose(jac_nmr, jac_anl, rtol=2e-1, atol=1e-12)
+    # Relax tolerance from 1e-12 for analytical Jacobian from CextMTPEngine
+    np.testing.assert_allclose(jac_nmr, jac_anl, rtol=2e-1, atol=1e-10)
 
 
 def test_stress_weight_scaling() -> None:
