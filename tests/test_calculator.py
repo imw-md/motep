@@ -1,5 +1,6 @@
 """Tests for the ASE calculator."""
 
+import logging
 import pathlib
 import shutil
 
@@ -83,3 +84,23 @@ def test_min_dist(data_path: pathlib.Path, tmp_path: pathlib.Path) -> None:
 
     np.testing.assert_allclose(energy, energy_ref)
     np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
+
+
+def test_warning_if_neighbors_are_below_min_dist(
+    data_path: pathlib.Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Log a warning if a nearest-neighbor distance is smaller than `min_dist`."""
+    path = data_path / "fitting/molecules/291/10"
+
+    atoms = read_cfg(path / "out.cfg", index=0)
+    energy_ref = atoms.get_potential_energy()
+
+    mtp_data = read_mtp(path / "pot.mtp")
+    mtp_data.radial_basis.min = 1.5
+    atoms.calc = MTP(mtp_data)
+    with caplog.at_level(logging.WARNING):
+        energy = atoms.get_potential_energy()
+
+    assert "smaller than min_dist" in caplog.text
+    assert not np.isclose(energy, energy_ref)

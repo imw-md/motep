@@ -1,3 +1,4 @@
+import logging
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import ClassVar
@@ -8,6 +9,22 @@ from ase import Atoms
 from ase.neighborlist import PrimitiveNeighborList
 
 from motep.potentials.mtp.data import MTPData
+
+logger = logging.getLogger(__name__)
+
+
+def _warn_if_neighbors_below_min_dist(
+    neighbor_vectors: npt.NDArray[np.float64],
+    min_dist: float,
+) -> None:
+    distances = np.linalg.norm(neighbor_vectors, axis=-1)
+    min_distance = np.min(distances)
+    if min_distance < min_dist:
+        logger.warning(
+            "Nearest-neighbor distance (%s A) is smaller than min_dist (%s A).",
+            f"{min_distance:.6f}",
+            f"{min_dist:.6f}",
+        )
 
 
 class ModeBase:
@@ -216,6 +233,13 @@ class EngineWithNeighborlist(ModeBase):
         interatomic_vectors += offsets  # account for periodic images
         interatomic_vectors -= positions[:, None, :]  # r_i
         interatomic_vectors[self._neighbors[:, :] < 0, :] = max_dist
+        valid_neighbors = self._neighbors >= 0
+        neighbor_vectors = interatomic_vectors[valid_neighbors]
+        if neighbor_vectors.size:
+            _warn_if_neighbors_below_min_dist(
+                neighbor_vectors,
+                self.mtp_data.radial_basis.min,
+            )
         return interatomic_vectors
 
     def _get_neighbors_and_offsets(self, atoms: Atoms) -> tuple[np.ndarray, np.ndarray]:
