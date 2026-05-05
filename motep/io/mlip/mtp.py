@@ -168,6 +168,19 @@ def _format_list(value: list) -> str:
     return "{" + ", ".join(f"{_format_value(_)}" for _ in value) + "}"
 
 
+def _write_basis_sections(fd: TextIO, data_dict: dict) -> None:
+    for basis_key, type_key in [
+        ("radial_basis", "radial_basis_type"),
+        ("magnetic_basis", "magnetic_basis_type"),
+    ]:
+        basis = data_dict.get(basis_key, {})
+        if basis:
+            fd.write(f"{type_key} = {basis['type']}\n")
+            fd.write(f"\tmin = {_format_value(basis['min'])}\n")
+            fd.write(f"\tmax = {_format_value(basis['max'])}\n")
+            fd.write(f"\tsize = {_format_value(basis['size'])}\n")
+
+
 def _write_mtp_file(file: os.PathLike, data_dict: dict) -> None:
     """Write a raw data dict to an MLIP .mtp file."""
     keys0 = [
@@ -178,7 +191,6 @@ def _write_mtp_file(file: os.PathLike, data_dict: dict) -> None:
         "potential_tag",
     ]
     keys2 = [
-        "radial_funcs_count",
         "alpha_moments_count",
         "alpha_index_basic_count",
         "alpha_index_basic",
@@ -195,16 +207,10 @@ def _write_mtp_file(file: os.PathLike, data_dict: dict) -> None:
         for key in keys0:
             if data_dict.get(key) is not None:
                 fd.write(f"{key} = {_format_value(data_dict[key])}\n")
-        for basis_key, type_key in [
-            ("radial_basis", "radial_basis_type"),
-            ("magnetic_basis", "magnetic_basis_type"),
-        ]:
-            basis = data_dict.get(basis_key, {})
-            if basis:
-                fd.write(f"{type_key} = {basis['type']}\n")
-                fd.write(f"\tmin = {_format_value(basis['min'])}\n")
-                fd.write(f"\tmax = {_format_value(basis['max'])}\n")
-                fd.write(f"\tsize = {_format_value(basis['size'])}\n")
+        _write_basis_sections(fd, data_dict)
+        if data_dict.get("radial_funcs_count") is not None:
+            rfc = _format_value(data_dict["radial_funcs_count"])
+            fd.write(f"radial_funcs_count = {rfc}\n")
         if data_dict.get("radial_coeffs") is not None:
             fd.write("\tradial_coeffs\n")
             for k0, k1 in itertools.product(range(species_count), repeat=2):
@@ -221,7 +227,7 @@ def write_mtp(
     file: os.PathLike,
     data: MTPData | MagMTPData,
     *,
-    legacy: bool = False,
+    legacy: bool = True,
 ) -> None:
     """Write an MLIP .mtp file.
 
