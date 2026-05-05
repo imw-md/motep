@@ -227,7 +227,7 @@ def write_mtp(
     file: os.PathLike,
     data: MTPData | MagMTPData,
     *,
-    legacy: bool = False,
+    legacy: bool = True,
 ) -> None:
     """Write an MLIP .mtp file.
 
