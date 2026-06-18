@@ -78,6 +78,8 @@ class Trainer:
         self.should_update_mindist = update_mindist
         self.relax_magmoms = relax_magmoms
 
+        self.loss_history: list[list[float]] = []
+
     def update_mindist(self, images: list[Atoms]) -> None:
         """Update min_dist of the MTP potential."""
         self.mtp_data.min_dist = np.min([_.get_all_distances(mic=True) for _ in images])
@@ -98,6 +100,8 @@ class Trainer:
         """
         if self.should_update_mindist:
             self.update_mindist(images)
+
+        self.loss_history = []
 
         loss_args = (images, self.mtp_data, self.loss)
         if self.engine == "mlippy":
@@ -130,6 +134,7 @@ class Trainer:
                 optimizer_class = make_optimizer(step["method"])
                 optimizer = optimizer_class(loss, **step)
                 optimizer.optimize(**step.get("kwargs", {}))
+                self.loss_history.append(optimizer.loss_history)
                 loss.broadcast_results()
                 if self.comm.rank == 0:
                     logger.info("")

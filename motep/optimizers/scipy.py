@@ -24,9 +24,11 @@ class Callback:
     def __init__(self, loss: LossFunctionBase) -> None:
         self.loss = loss
         self.iter = 0
+        self.history: list[float] = []
 
     def __call__(self, intermediate_result: OptimizeResult) -> None:
         fun = intermediate_result.fun
+        self.history.append(float(fun))
         if self.loss.comm.rank == 0:
             logger.info("loss %d: %s", self.iter, fun)
             for handler in logger.handlers:
@@ -62,7 +64,7 @@ class ScipyDualAnnealingOptimizer(ScipyOptimizerBase):
     def _optimize(self, **kwargs: dict[str, Any]) -> npt.NDArray[np.float64]:
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
-        callback = Callback(self.loss)
+        callback = self.callback = Callback(self.loss)
         callback(OptimizeResult(x=parameters, fun=self.rank0_loss(parameters)))
         result = dual_annealing(
             self.rank0_loss,
@@ -79,7 +81,7 @@ class ScipyDifferentialEvolutionOptimizer(ScipyOptimizerBase):
     def _optimize(self, **kwargs: dict[str, Any]) -> npt.NDArray[np.float64]:
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
-        callback = Callback(self.loss)
+        callback = self.callback = Callback(self.loss)
         callback(OptimizeResult(x=parameters, fun=self.rank0_loss(parameters)))
         result = differential_evolution(
             self.rank0_loss,
@@ -110,7 +112,7 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
         """
         parameters = self.loss.mtp_data.parameters
         bounds = self.loss.mtp_data.get_bounds()
-        callback = Callback(self.loss)
+        callback = self.callback = Callback(self.loss)
         callback(OptimizeResult(x=parameters, fun=self.rank0_loss(parameters)))
 
         kwargs["jac"] = kwargs.get("jac", True)
