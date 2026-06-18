@@ -73,4 +73,4 @@ local_scheme = "no-local-version"
 [tool.ruff.lint]
 preview = true  # necessary to activate many pycodestyle rules
 select = ["ALL"]
-ignore = ["CPY001"]
+ignore = ["CPY001", "DOC201"]
