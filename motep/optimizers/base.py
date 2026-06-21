@@ -49,6 +49,8 @@ class OptimizerBase(ABC):
         """
         self.loss = loss
 
+        self.callback = None
+
         optimized: list[str] | None = kwargs.get("optimized")
         if optimized is None:
             optimized = self.optimized_default
@@ -82,6 +84,11 @@ class OptimizerBase(ABC):
     def optimized_always(self) -> list[str]:
         """Parameters optimized always regardless they are specified or not."""
         return []
+
+    @property
+    def loss_history(self) -> list[float]:
+        """Per-evaluation loss values from the last `optimize` (empty off rank 0)."""
+        return list(self.callback.history) if self.callback is not None else []
 
 
 class ParallelOptimizerBase(OptimizerBase):

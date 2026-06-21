@@ -26,7 +26,7 @@ class NoInteractionOptimizer(ParallelOptimizerBase):
 
         """
         parameters = self.loss.mtp_data.parameters
-        callback = Callback(self.loss)
+        callback = self.callback = Callback(self.loss)
 
         # Calculate basis functions of `loss.images`
         loss_value = self.rank0_loss(parameters)
