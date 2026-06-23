@@ -2,13 +2,15 @@ name: Docs
 on:
   push:
     branches:
-      - "*"
+      - main
     paths:
       - "docs/**"
       - "examples/**"
       - ".github/workflows/docs.yml"
       - "pyproject.toml"
   pull_request:
+    branches:
+      - main
     paths:
       - "docs/**"
       - "examples/**"
