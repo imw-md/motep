@@ -24,11 +24,12 @@ class NumpyMTPEngine(EngineBase):
         super().__init__(mtp_data, **{**kwargs, "mode": "train"})
         self.mode = kwargs.get("mode", "run")
 
-    def update(self, mtp_data: MTPData) -> None:
+    def update(self, mtp_data: MTPData) -> bool:
         """Update MTP parameters."""
-        super().update(mtp_data)
+        changed = super().update(mtp_data)
         if self.mtp_data.radial_coeffs is not None:
             self.rb.update_coeffs(self.mtp_data.radial_coeffs)
+        return changed
 
     def _calc_basis(
         self,

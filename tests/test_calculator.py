@@ -86,6 +86,50 @@ def test_min_dist(data_path: pathlib.Path, tmp_path: pathlib.Path) -> None:
     np.testing.assert_allclose(forces, forces_ref, rtol=0.0, atol=1e-6)
 
 
+class _CalcCounter:
+    """Wrap ``engine._calculate`` to count how often the basis is rebuilt."""
+
+    def __init__(self, engine: object) -> None:
+        self.n = 0
+        self._orig = engine._calculate
+        engine._calculate = self._wrapped
+
+    def _wrapped(self, *args: object, **kwargs: object) -> object:
+        self.n += 1
+        return self._orig(*args, **kwargs)
+
+
+def test_guard_skips_recompute_when_coefficients_unchanged(
+    data_path: pathlib.Path,
+) -> None:
+    """Re-setting identical coefficients must not rebuild the basis."""
+    path = data_path / "fitting/molecules/291/10"
+    mtp_data = read_mtp(path / "pot.mtp")
+    atoms = read_cfg(path / "out.cfg", index=0)
+    atoms.calc = MTP(mtp_data, engine="numpy")
+    counter = _CalcCounter(atoms.calc.engine)
+
+    energy = atoms.get_potential_energy()
+    assert counter.n == 1
+
+    # Same coefficients, same geometry -> cached, no rebuild.
+    atoms.calc.update_parameters(mtp_data)
+    assert atoms.get_potential_energy() == energy
+    assert counter.n == 1
+
+    # Changing only `optimized` keeps the coefficients -> still cached.
+    mtp_data.optimized = ["moment_coeffs"]
+    atoms.calc.update_parameters(mtp_data)
+    assert atoms.get_potential_energy() == energy
+    assert counter.n == 1
+
+    # Changing a coefficient must rebuild and change the result.
+    mtp_data.moment_coeffs += mtp_data.moment_coeffs + 0.1
+    atoms.calc.update_parameters(mtp_data)
+    assert atoms.get_potential_energy() != energy
+    assert counter.n == 2
+
+
 def test_warning_if_neighbors_are_below_min_dist(
     data_path: pathlib.Path,
     caplog: pytest.LogCaptureFixture,

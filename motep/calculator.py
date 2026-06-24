@@ -117,8 +117,8 @@ class MTP(Calculator):
 
     def update_parameters(self, mtp_data: MTPData) -> None:
         """Update MTP parameters."""
-        self.engine.update(mtp_data)
-        self.results = {}  # trigger new calculation
+        if self.engine.update(mtp_data):
+            self.results = {}
 
     def calculate(
         self,
@@ -193,8 +193,8 @@ class MMTP(MTP):
         self._relaxed_magmoms: np.ndarray | None = None
 
     def update_parameters(self, mtp_data: MagMTPData) -> None:
-        self.engine.update(mtp_data)
-        self.results = {}  # trigger new calculation
+        if self.engine.update(mtp_data):
+            self.results = {}
 
     def reset(self) -> None:
         """Clear all information from old calculation."""
