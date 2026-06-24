@@ -160,7 +160,7 @@ class MagEngineBase(MagModeBase, EngineBase):
             I. Novikov, Blazej Grabowski, Fritz Körmann and A. V. Shapeev, npj Comput. Mater. 8, 13 (2022).
 
         """
-        self._last_coeffs: tuple | None = None
+        self._last_state: tuple | None = None
         self.update(MagMTPData.from_base(mtp_data))
         self.results = {}
         self.neighbor_list = None

@@ -32,6 +32,17 @@ class MagMTPData(MTPData):
         )
     )
 
+    def basis_state(self) -> tuple:
+        """Extend the base snapshot with the magnetic-basis descriptor."""
+        mb = self.magnetic_basis
+        return (
+            *super().basis_state(),
+            mb.type,
+            float(mb.min),
+            float(mb.max),
+            int(mb.size),
+        )
+
     @classmethod
     def from_base(cls, obj: MTPData) -> Self:
         """Convert base class instance to MagMTPData.

@@ -130,6 +130,24 @@ def test_guard_skips_recompute_when_coefficients_unchanged(
     assert counter.n == 2
 
 
+def test_guard_recomputes_on_radial_basis_change(data_path: pathlib.Path) -> None:
+    """Changing the radial basis (read live) must invalidate the cache."""
+    path = data_path / "fitting/molecules/291/10"
+    mtp_data = read_mtp(path / "pot.mtp")
+    atoms = read_cfg(path / "out.cfg", index=0)
+    atoms.calc = MTP(mtp_data, engine="numpy")
+    counter = _CalcCounter(atoms.calc.engine)
+
+    energy = atoms.get_potential_energy()
+    assert counter.n == 1
+
+    # Same coefficients but a different cutoff -> must rebuild and change.
+    mtp_data.radial_basis.max = mtp_data.radial_basis.max - 0.3
+    atoms.calc.update_parameters(mtp_data)
+    assert atoms.get_potential_energy() != energy
+    assert counter.n == 2
+
+
 def test_warning_if_neighbors_are_below_min_dist(
     data_path: pathlib.Path,
     caplog: pytest.LogCaptureFixture,

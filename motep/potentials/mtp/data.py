@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
+from itertools import starmap
 from numbers import Integral
 
 import numpy as np
@@ -25,6 +26,17 @@ def get_types(
     """
     species = list(species)
     return np.fromiter((species.index(_) for _ in atoms.numbers), dtype=np.int32)
+
+
+def _copy_array(x: npt.NDArray | None) -> npt.NDArray | None:
+    return None if x is None else np.array(x)
+
+
+def _fields_equal(x: object, y: object) -> bool:
+    """Value equality that tolerates ``None`` and array-valued fields."""
+    if x is None or y is None:
+        return x is y
+    return bool(np.array_equal(x, y))
 
 
 def _default_factory_int() -> npt.NDArray[np.int32]:
@@ -115,6 +127,34 @@ class MTPData:
             rfc = self.radial_funcs_count
             rbs = self.radial_basis.size
             self.radial_coeffs = rng.uniform(-0.1, +0.1, (spc, spc, rfc, rbs))
+
+    def basis_state(self) -> tuple:
+        """Snapshot of every input that determines the computed energy/forces.
+
+        Used to decide whether cached basis data can be reused after an
+        :meth:`update`. Cosmetic/bookkeeping fields (``version``,
+        ``potential_name``, ``optimized``) are excluded, as are the
+        structure-defining index arrays (``alpha_*``) since they affect shape.
+        """
+        rb = self.radial_basis
+        return (
+            float(self.scaling),
+            _copy_array(self.radial_coeffs),
+            _copy_array(self.moment_coeffs),
+            _copy_array(self.species_coeffs),
+            _copy_array(self.species),
+            rb.type,
+            float(rb.min),
+            float(rb.max),
+            int(rb.size),
+        )
+
+    @staticmethod
+    def basis_state_equal(a: tuple | None, b: tuple | None) -> bool:
+        """Whether two :meth:`basis_state` snapshots are equal."""
+        if a is None or b is None:
+            return False
+        return len(a) == len(b) and all(starmap(_fields_equal, zip(a, b, strict=True)))
 
     @property
     def species(self) -> npt.NDArray[np.int32]:

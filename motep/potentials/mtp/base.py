@@ -285,7 +285,7 @@ class EngineBase(EngineWithNeighborlist):
             training; `'run'` is the default mode suitable for MD.
 
         """
-        self._last_coeffs: tuple | None = None
+        self._last_state: tuple | None = None
         self.update(mtp_data)
         self.results = {}
         self.neighbor_list = None
@@ -303,42 +303,18 @@ class EngineBase(EngineWithNeighborlist):
         Returns
         -------
         bool
-            Whether the coefficients changed since the previous update.
+            Whether any input that determines the computed energy/forces
+            changed since the previous update (see
+            :meth:`MTPData.basis_state`). When ``False``, the cached results may
+            be reused without recomputing the basis.
 
         """
         self.mtp_data = mtp_data
         if self.mtp_data.species.size == 0:
             self.mtp_data.species = list(range(self.mtp_data.species_count))
-        return self._mark_params(mtp_data)
-
-    @staticmethod
-    def _coeffs_equal(a: tuple | None, b: tuple | None) -> bool:
-        """Element-wise equality of two coefficient snapshots."""
-        if a is None or b is None:
-            return False
-        for x, y in zip(a, b, strict=True):
-            if x is None or y is None:
-                if x is not y:  # exactly one is None
-                    return False
-                continue
-            if not np.array_equal(x, y):
-                return False
-        return True
-
-    def _mark_params(self, mtp_data: MTPData) -> bool:
-        """Record the coefficient state and report whether it changed."""
-
-        def _copy(x: np.ndarray | None) -> np.ndarray | None:
-            return None if x is None else np.array(x, dtype=float)
-
-        snapshot = (
-            float(mtp_data.scaling),
-            _copy(mtp_data.moment_coeffs),
-            _copy(mtp_data.species_coeffs),
-            _copy(mtp_data.radial_coeffs),
-        )
-        changed = not self._coeffs_equal(snapshot, self._last_coeffs)
-        self._last_coeffs = snapshot
+        state = mtp_data.basis_state()
+        changed = not mtp_data.basis_state_equal(state, self._last_state)
+        self._last_state = state
         return changed
 
     def check_species(self, atoms: Atoms) -> None:
