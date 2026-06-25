@@ -140,6 +140,4 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
             **kwargs,
         )
         self.print_result(result)
-        if not result.success:
-            self.rank0_loss(result.x)
         return result.x
