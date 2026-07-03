@@ -20,9 +20,9 @@ def test_upconvert(src_level: int, dst_level: int, data_path: Path) -> None:
     src_dat = read_mtp(src_path / "pot.mtp")
     dst_dat = read_mtp(dst_path / "pot.mtp")
     upconvert(src_dat, dst_dat)
-    src_mtp = NumbaMTPEngine(src_dat, mode="run")
-    dst_mtp = NumbaMTPEngine(dst_dat, mode="run")
+    src_mtp = NumbaMTPEngine(src_dat)
+    dst_mtp = NumbaMTPEngine(dst_dat)
     atoms = read_cfg(src_path / "out.cfg")
-    src_energy = src_mtp.calculate(atoms)["energy"]
-    dst_energy = dst_mtp.calculate(atoms)["energy"]
+    src_energy = src_mtp.efs(atoms)["energy"]
+    dst_energy = dst_mtp.efs(atoms)["energy"]
     assert dst_energy == pytest.approx(src_energy)

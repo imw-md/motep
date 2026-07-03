@@ -29,12 +29,8 @@ class NumbaMTPEngine(EngineBase):
         """Intialize the engine."""
         super().__init__(*args, **kwargs)
 
-    def _calculate(self, atoms: Atoms) -> tuple:
-        if self.mode == "run":
-            return self._calc_run(atoms)
-        if self.mode == "train":
-            return self._calc_train(atoms)
-        raise NotImplementedError(self.mode)
+    def _calculate(self, atoms: Atoms, *, jac: bool) -> tuple:
+        return self._calc_train(atoms) if jac else self._calc_run(atoms)
 
     def _calc_run(self, atoms: Atoms) -> tuple:
         mtp_data = self.mtp_data
@@ -45,8 +41,8 @@ class NumbaMTPEngine(EngineBase):
         itypes = get_types(atoms, mtp_data.species)
         jtypes = itypes[js]
 
-        self.mbd.clean()
-        self.rbd.clean()
+        self.mbd.clean(jac=False)
+        self.rbd.clean(jac=False)
 
         energies, gradient = _calc_run(
             rs,
@@ -79,8 +75,8 @@ class NumbaMTPEngine(EngineBase):
         itypes = get_types(atoms, mtp_data.species)
         jtypes = itypes[js]
 
-        self.mbd.clean()
-        self.rbd.clean()
+        self.mbd.clean(jac=True)
+        self.rbd.clean(jac=True)
 
         energies = _calc_train(
             js,

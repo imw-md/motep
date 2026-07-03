@@ -1,7 +1,6 @@
 import logging
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from typing import ClassVar
 
 import numpy as np
 import numpy.typing as npt
@@ -27,25 +26,8 @@ def _warn_if_neighbors_below_min_dist(
         )
 
 
-class ModeBase:
-    """Base class for operating modes."""
-
-    all_modes: ClassVar[list[str]] = ["run", "train"]
-
-    @property
-    def mode(self) -> str:
-        """Get the current operating mode."""
-        return self._mode
-
-    @mode.setter
-    def mode(self, mode: str) -> None:
-        if mode not in self.all_modes:
-            raise NotImplementedError(mode)
-        self._mode = mode
-
-
 @dataclass
-class MomentBasisData(ModeBase):
+class MomentBasisData:
     """Data related to the moment basis.
 
     Attributes
@@ -70,8 +52,6 @@ class MomentBasisData(ModeBase):
 
     """
 
-    mode: str = field(default="run")
-
     vatoms: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
     dbdris: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
     dbdeps: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
@@ -89,25 +69,23 @@ class MomentBasisData(ModeBase):
         """Derivatives of local energies with respect to the radial coefficients."""
         return self.dvdcs.sum(axis=-1)
 
-    def initialize(self, natoms: int, mtp_data: MTPData) -> None:
-        """Initialize moment basis properties."""
+    def initialize(self, natoms: int, mtp_data: MTPData, *, jac: bool) -> None:
         spc = mtp_data.species_count
         rfc = mtp_data.radial_funcs_count
         rbs = mtp_data.radial_basis.size
         asm = mtp_data.alpha_scalar_moments
 
         self.vatoms = np.full((asm, natoms), np.nan)
-        if "train" in self.mode:
+        if jac:
             self.dbdris = np.full((asm, natoms, 3), np.nan)
             self.dbdeps = np.full((asm, 3, 3), np.nan)
             self.dvdcs = np.full((spc, spc, rfc, rbs, natoms), np.nan)
             self.dgdcs = np.full((spc, spc, rfc, rbs, natoms, 3), np.nan)
             self.dsdcs = np.full((spc, spc, rfc, rbs, 3, 3), np.nan)
 
-    def clean(self) -> None:
-        """Clean up moment basis properties."""
+    def clean(self, *, jac: bool) -> None:
         self.vatoms[...] = 0.0
-        if "train" in self.mode:
+        if jac:
             self.dbdris[...] = 0.0
             self.dbdeps[...] = 0.0
             self.dvdcs[...] = 0.0
@@ -116,7 +94,7 @@ class MomentBasisData(ModeBase):
 
 
 @dataclass
-class RadialBasisData(ModeBase):
+class RadialBasisData:
     """Data related to the radial basis.
 
     Attributes
@@ -128,25 +106,21 @@ class RadialBasisData(ModeBase):
 
     """
 
-    mode: str = field(default="run")
-
     values: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
     dqdris: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
     dqdeps: npt.NDArray[np.float64] = field(default_factory=lambda: np.array(np.nan))
 
-    def initialize(self, natoms: int, mtp_data: MTPData) -> None:
-        """Initialize radial basis properties."""
+    def initialize(self, natoms: int, mtp_data: MTPData, *, jac: bool) -> None:
         spc = mtp_data.species_count
         rbs = mtp_data.radial_basis.size
 
-        if "train" in self.mode:
+        if jac:
             self.values = np.full((spc, spc, rbs), np.nan)
             self.dqdris = np.full((spc, spc, rbs, natoms, 3), np.nan)
             self.dqdeps = np.full((spc, spc, rbs, 3, 3), np.nan)
 
-    def clean(self) -> None:
-        """Clean up radial basis properties."""
-        if "train" in self.mode:
+    def clean(self, *, jac: bool) -> None:
+        if jac:
             self.values[...] = 0.0
             self.dqdris[...] = 0.0
             self.dqdeps[...] = 0.0
@@ -178,8 +152,10 @@ class Jacobian:
         return np.concatenate(tmp)
 
 
-class EngineWithNeighborlist(ModeBase):
+class EngineWithNeighborlist:
     """Class for getting interatomic vectors and hanling neighbor list."""
+
+    static_geometry: bool = False
 
     def __init__(self) -> None:
         self.neighbor_list: PrimitiveNeighborList | None = None
@@ -201,12 +177,11 @@ class EngineWithNeighborlist(ModeBase):
 
         Notes
         -----
-        If in training mode, only the interatomic vectors are computed once, and
+        With ``static_geometry`` the interatomic vectors are computed once and
         the neighborlist then discarded.
 
         """
-        # Special handling if in train mode
-        if "train" in self.mode:
+        if self.static_geometry:
             if not hasattr(self, "_interatomic_vectors"):
                 self._initiate_neighbor_list(atoms)
                 self._interatomic_vectors = self._get_interatomic_vectors(atoms)
@@ -224,7 +199,7 @@ class EngineWithNeighborlist(ModeBase):
         return False
 
     def _get_interatomic_vectors(self, atoms: Atoms) -> np.ndarray:
-        if "train" in self.mode and hasattr(self, "_interatomic_vectors"):
+        if self.static_geometry and hasattr(self, "_interatomic_vectors"):
             return self._interatomic_vectors
         max_dist = self.mtp_data.radial_basis.max
         positions = atoms.positions
@@ -272,7 +247,7 @@ class EngineBase(EngineWithNeighborlist):
         self,
         mtp_data: MTPData,
         *,
-        mode: str = "run",
+        static_geometry: bool = False,
     ) -> None:
         """MLIP-2 MTP.
 
@@ -280,22 +255,21 @@ class EngineBase(EngineWithNeighborlist):
         ----------
         mtp_data : :class:`motep.potentials.mtp.data.MTPData`
             Parameters in the MLIP .mtp file.
-        mode : {'run', 'train'}, default 'run'
-            Mode of operation. `'train'` computes and stores basis data for
-            training; `'run'` is the default mode suitable for MD.
+        static_geometry : bool, default False
+            If True, the atomic geometry is assumed fixed across calls and the
+            interatomic vectors are cached once (suitable for training, where
+            only parameters change).
 
         """
         self._last_state: tuple | None = None
         self.update(mtp_data)
         self.results = {}
         self.neighbor_list = None
-        self.mode = mode
+        self.static_geometry = static_geometry
+        self._jac_ready = False
 
-        # moment basis data
-        self.mbd = MomentBasisData(mode=mode)
-
-        # used for `Level2MTPOptimizer`
-        self.rbd = RadialBasisData(mode=mode)
+        self.mbd = MomentBasisData()
+        self.rbd = RadialBasisData()
 
     def update(self, mtp_data: MTPData) -> bool:
         """Update MTP parameters.
@@ -324,48 +298,52 @@ class EngineBase(EngineWithNeighborlist):
         ------
         ValueError
             If the unique `atoms.numbers` is larger than `species_count`, or if
-            they are not present in `mtp_data.species` (only when not in
-            `'train'` mode).
+            they are not all present in `mtp_data.species`.
 
         """
-        if np.unique(atoms.numbers).size > self.mtp_data.species_count:
+        unique_species = np.unique(atoms.numbers)
+        if unique_species.size > self.mtp_data.species_count:
             msg = "The number of species in input atoms is larger than species_count."
             raise ValueError(msg)
-        if self.mode != "train":
-            unique_species = np.unique(atoms.numbers)
-            if not all(_ in self.mtp_data.species for _ in unique_species):
-                msg = (
-                    "All species in input atoms are not in mtp_data.species.\n"
-                    f"  species in atoms: {unique_species}\n"
-                    f"  species in mtp_data: {self.mtp_data.species}"
-                )
-                raise ValueError(msg)
+        if not all(_ in self.mtp_data.species for _ in unique_species):
+            msg = (
+                "All species in input atoms are not in mtp_data.species.\n"
+                f"  species in atoms: {unique_species}\n"
+                f"  species in mtp_data: {self.mtp_data.species}"
+            )
+            raise ValueError(msg)
 
-    def initialize_basis_data(self, atoms: Atoms) -> None:
+    def initialize_basis_data(self, atoms: Atoms, *, jac: bool) -> None:
         """(Re)initialize moment and radial basis data."""
         natoms = len(atoms)
-        self.mbd.initialize(natoms, self.mtp_data)
-        self.rbd.initialize(natoms, self.mtp_data)
+        self.mbd.initialize(natoms, self.mtp_data, jac=jac)
+        self.rbd.initialize(natoms, self.mtp_data, jac=jac)
+        self._jac_ready = jac
 
     @abstractmethod
-    def _calculate(self, atoms: Atoms) -> tuple: ...
+    def _calculate(self, atoms: Atoms, *, jac: bool) -> tuple: ...
 
-    def calculate(self, atoms: Atoms) -> dict:
-        """Calculate properties of the given system.
+    def efs(self, atoms: Atoms) -> dict:
+        """Compute energies, forces, and stress."""
+        return self._run(atoms, jac=False)
 
-        Returns
-        -------
-        Dictionary with energies, energy, forces and stress.
+    def jac(self, atoms: Atoms) -> dict:
+        """Compute energies, forces, stress and populate the parameter Jacobian.
 
+        The per-target Jacobians are then available via ``jac_energy`` etc.
         """
+        return self._run(atoms, jac=True)
+
+    def _run(self, atoms: Atoms, *, jac: bool) -> dict:
         self.check_species(atoms)
-        if self.update_neighbor_list(atoms):
-            self.initialize_basis_data(atoms)
+        if self.update_neighbor_list(atoms) or (jac and not self._jac_ready):
+            self.initialize_basis_data(atoms, jac=jac)
 
-        energies, forces, stress = self._calculate(atoms)
+        energies, forces, stress = self._calculate(atoms, jac=jac)
 
-        self._symmetrize_stress(atoms, stress)
+        self._symmetrize_stress(atoms, stress, jac=jac)
 
+        self.results = {}
         self.results["energies"] = energies
         self.results["energy"] = self.results["energies"].sum()
         self.results["forces"] = forces
@@ -373,12 +351,12 @@ class EngineBase(EngineWithNeighborlist):
 
         return self.results
 
-    def _symmetrize_stress(self, atoms: Atoms, stress: np.ndarray) -> None:
+    def _symmetrize_stress(self, atoms: Atoms, stress: np.ndarray, *, jac: bool) -> None:
         if atoms.cell.rank == 3:  # noqa: PLR2004
             volume = atoms.get_volume()
             stress += stress.T
             stress *= 0.5 / volume
-            if "train" in self.mode:
+            if jac:
                 self.mbd.dbdeps += self.mbd.dbdeps.transpose(0, 2, 1)
                 self.mbd.dbdeps *= 0.5 / volume
                 self.mbd.dsdcs += self.mbd.dsdcs.swapaxes(-2, -1)
@@ -388,7 +366,7 @@ class EngineBase(EngineWithNeighborlist):
                 self.rbd.dqdeps *= 0.5 / volume
         else:
             stress[:, :] = np.nan
-            if "train" in self.mode:
+            if jac:
                 self.mbd.dbdeps[:, :, :] = np.nan
                 self.rbd.dqdeps[:, :, :] = np.nan
 

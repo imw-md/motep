@@ -27,22 +27,10 @@ class CExtMTPEngine(EngineBase):
         """Initialize the engine."""
         super().__init__(*args, **kwargs)
 
-    def _calculate(self, atoms: Atoms) -> tuple[np.ndarray, ...]:
-        """Main calculation dispatch."""
-        if self.mode == "run":
-            return self._calc_run(atoms)
-        if self.mode == "train":
-            return self._calc_train(atoms)
-        raise NotImplementedError(self.mode)
+    def _calculate(self, atoms: Atoms, *, jac: bool) -> tuple[np.ndarray, ...]:
+        return self._calc_train(atoms) if jac else self._calc_run(atoms)
 
     def _calc_run(self, atoms: Atoms) -> tuple[np.ndarray, ...]:
-        """Calculate energies, forces, and stress for run mode.
-
-        Returns
-        -------
-        tuple[np.ndarray, ...]
-
-        """
         mtp_data = self.mtp_data
 
         all_js = self._neighbors
@@ -51,8 +39,8 @@ class CExtMTPEngine(EngineBase):
         itypes = get_types(atoms, mtp_data.species)
         all_jtypes = itypes[all_js]
 
-        self.mbd.clean()
-        self.rbd.clean()
+        self.mbd.clean(jac=False)
+        self.rbd.clean(jac=False)
 
         energies, gradient = _mtp_cext.calc_run(
             all_js,
@@ -69,13 +57,6 @@ class CExtMTPEngine(EngineBase):
         return energies, forces, stress
 
     def _calc_train(self, atoms: Atoms) -> tuple[np.ndarray, ...]:
-        """Calculate energies, forces, and stress for training mode.
-
-        Returns
-        -------
-        tuple[np.ndarray, ...]
-
-        """
         mtp_data = self.mtp_data
 
         js = self._neighbors
@@ -84,8 +65,8 @@ class CExtMTPEngine(EngineBase):
         itypes = get_types(atoms, mtp_data.species)
         jtypes = itypes[js]
 
-        self.rbd.clean()
-        self.mbd.clean()
+        self.rbd.clean(jac=True)
+        self.mbd.clean(jac=True)
 
         energies = _mtp_cext.calc_train(
             js,

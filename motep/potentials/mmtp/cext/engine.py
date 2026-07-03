@@ -25,15 +25,14 @@ class CExtMagMTPEngine(MagEngineBase):
     but uses compiled C code for better performance in some scenarios.
     """
 
-    def _calculate(self, atoms: Atoms, magmoms: np.ndarray) -> tuple:
-        """Main calculation dispatch."""
-        if self.mode == "run":
+    def _calculate(
+        self, atoms: Atoms, magmoms: np.ndarray, *, jac: bool, mgrad: bool
+    ) -> tuple:
+        if not jac:
             return self._calc_mag_run(atoms, magmoms)
-        if self.mode == "train":
-            return self._calc_mag_train(atoms, magmoms)
-        if self.mode == "train_mgrad":
+        if mgrad:
             return self._calc_mag_train_mgrad(atoms, magmoms)
-        raise NotImplementedError(self.mode)
+        return self._calc_mag_train(atoms, magmoms)
 
     def _calc_mag_run(self, atoms: Atoms, magmoms: np.ndarray) -> tuple:
         """Calculate energies, forces, stress, and magnetic gradients for run mode."""
@@ -46,8 +45,8 @@ class CExtMagMTPEngine(MagEngineBase):
         itypes = get_types(atoms, mtp_data.species)
         jtypes = itypes[js]
 
-        self.mbd.clean()
-        self.rbd.clean()
+        self.mbd.clean(jac=False, mgrad=False)
+        self.rbd.clean(jac=False, mgrad=False)
 
         energies, gradient, grad_mag_i, grad_mag_j = _mmtp_cext.calc_mag_run(
             js,
@@ -76,8 +75,8 @@ class CExtMagMTPEngine(MagEngineBase):
         itypes = get_types(atoms, mtp_data.species)
         jtypes = itypes[js]
 
-        self.mbd.clean()
-        self.rbd.clean()
+        self.mbd.clean(jac=True, mgrad=False)
+        self.rbd.clean(jac=True, mgrad=False)
 
         energies = _mmtp_cext.calc_mag_train(
             js,
@@ -123,8 +122,8 @@ class CExtMagMTPEngine(MagEngineBase):
         itypes = get_types(atoms, mtp_data.species)
         jtypes = itypes[js]
 
-        self.rbd.clean()
-        self.mbd.clean()
+        self.rbd.clean(jac=True, mgrad=True)
+        self.mbd.clean(jac=True, mgrad=True)
 
         energies = _mmtp_cext.calc_mag_train_mgrad(
             js,

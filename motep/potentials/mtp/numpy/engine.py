@@ -20,9 +20,12 @@ class NumpyMTPEngine(EngineBase):
     def __init__(self, mtp_data: MTPData, **kwargs: dict) -> None:
         """Intialize the engine."""
         self.rb = ChebyshevArrayRadialBasis(mtp_data)
-        # Always initialize with train mode to allocate buffers for basis data
-        super().__init__(mtp_data, **{**kwargs, "mode": "train"})
-        self.mode = kwargs.get("mode", "run")
+        super().__init__(mtp_data, **kwargs)
+
+    def initialize_basis_data(self, atoms: Atoms, *, jac: bool) -> None:
+        # The NumPy engine always computes the full basis data, so it always
+        # allocates the Jacobian buffers regardless of the requested pass.
+        super().initialize_basis_data(atoms, jac=True)
 
     def update(self, mtp_data: MTPData) -> bool:
         """Update MTP parameters."""
@@ -52,12 +55,12 @@ class NumpyMTPEngine(EngineBase):
         moment_basis = MomentBasis(self.mtp_data)
         return moment_basis.calculate(itype, jtypes, r_ijs, r_abs, self.rb)
 
-    def _calculate(self, atoms: Atoms) -> tuple:
+    def _calculate(self, atoms: Atoms, *, jac: bool) -> tuple:
         itypes = get_types(atoms, self.mtp_data.species)
         energies = self.mtp_data.species_coeffs[itypes]
 
-        self.mbd.clean()
-        self.rbd.clean()
+        self.mbd.clean(jac=True)
+        self.rbd.clean(jac=True)
 
         moment_coeffs = self.mtp_data.moment_coeffs
 

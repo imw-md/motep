@@ -28,6 +28,14 @@ _numba_mag_param = pytest.param(
 )
 
 
+def _run(engine, atoms, method):
+    if method == "efs":
+        return engine.efs(atoms)
+    if method == "jac":
+        return engine.jac(atoms)
+    return engine.jac(atoms, mgrad=True)  # "jac_mgrad"
+
+
 @pytest.fixture
 def mag_engine_and_atoms(data_path: pathlib.Path):
     if not _numba_available:
@@ -47,7 +55,7 @@ class TestCollinearMagmoms:
     def test_2d_all_zero_columns_accepted(self, mag_engine_and_atoms) -> None:
         engine, atoms = mag_engine_and_atoms
         magmoms_2d = np.zeros((len(atoms), 3))
-        result = engine.calculate(atoms, magmoms=magmoms_2d)
+        result = engine.efs(atoms, magmoms=magmoms_2d)
         assert "energy" in result
 
     def test_2d_noncollinear_raises(self, mag_engine_and_atoms) -> None:
@@ -56,15 +64,15 @@ class TestCollinearMagmoms:
         magmoms_2d[:, 0] = 1.0
         magmoms_2d[:, 2] = 1.0
         with pytest.raises(ValueError, match="Non-collinear"):
-            engine.calculate(atoms, magmoms=magmoms_2d)
+            engine.efs(atoms, magmoms=magmoms_2d)
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("mode", ["run", "train", "train_mgrad"])
+@pytest.mark.parametrize("method", ["efs", "jac", "jac_mgrad"])
 @pytest.mark.parametrize("engine_class", [CExtMagMTPEngine])
 def test_mmtp_energies_forces_stress(
     level: int,
-    mode: str,
+    method: str,
     engine_class: type[MagEngineBase],
     data_path: pathlib.Path,
 ) -> None:
@@ -81,24 +89,18 @@ def test_mmtp_energies_forces_stress(
     mtp_data = read_mmtp(mtp_path)
 
     # Create engines with both implementations
-    try:
-        engine = engine_class(mtp_data, mode=mode)
-    except NotImplementedError as e:
-        pytest.skip(f"Engine does not support this configuration: {e}")
+    engine = engine_class(mtp_data)
 
     if not _numba_available:
         pytest.skip("numba not available")
-    try:
-        ref_engine = NumbaMagMTPEngine(mtp_data, mode=mode)
-    except NotImplementedError as e:
-        pytest.skip(f"Reference engine does not support this configuration: {e}")
+    ref_engine = NumbaMagMTPEngine(mtp_data)
 
     atoms = read_cfg(path / "mag.cfg", index=-1)
     atoms.set_initial_magnetic_moments(atoms.get_magnetic_moments())
 
     # Calculate with both engines
-    result = engine.calculate(atoms)
-    ref_result = ref_engine.calculate(atoms)
+    result = _run(engine, atoms, method)
+    ref_result = _run(ref_engine, atoms, method)
 
     # Compare energies
     np.testing.assert_allclose(
@@ -106,7 +108,7 @@ def test_mmtp_energies_forces_stress(
         ref_result["energy"],
         rtol=1e-10,
         atol=1e-12,
-        err_msg=f"Energies differ at level {level}, mode {mode}, engine {engine_class}",
+        err_msg=f"Energies differ at level {level}, method {method}, engine {engine_class}",
     )
 
     # Compare forces
@@ -115,7 +117,7 @@ def test_mmtp_energies_forces_stress(
         ref_result["forces"],
         rtol=1e-10,
         atol=1e-12,
-        err_msg=f"Forces differ at level {level}, mode {mode}, engine {engine_class}",
+        err_msg=f"Forces differ at level {level}, method {method}, engine {engine_class}",
     )
 
     # Compare stress
@@ -124,7 +126,7 @@ def test_mmtp_energies_forces_stress(
         ref_result["stress"],
         rtol=1e-10,
         atol=1e-12,
-        err_msg=f"Stress differs at level {level}, mode {mode}, engine {engine_class}",
+        err_msg=f"Stress differs at level {level}, method {method}, engine {engine_class}",
     )
 
     # Compare magnetic gradients
@@ -133,17 +135,17 @@ def test_mmtp_energies_forces_stress(
         ref_result["mgrad"],
         rtol=1e-10,
         atol=1e-12,
-        err_msg=f"Mgrad differs at level {level}, mode {mode}, engine {engine_class}",
+        err_msg=f"Mgrad differs at level {level}, method {method}, engine {engine_class}",
     )
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("mode", ["run", "train", "train_mgrad"])
+@pytest.mark.parametrize("method", ["efs", "jac", "jac_mgrad"])
 @pytest.mark.parametrize("engine_class", [CExtMagMTPEngine, _numba_mag_param])
 def test_mgrad(
     engine_class: type[MagEngineBase],
     level: int,
-    mode: str,
+    method: str,
     data_path: pathlib.Path,
 ) -> None:
     """Test if magnetic gradients are consistent with finite-difference values."""
@@ -154,25 +156,22 @@ def test_mgrad(
 
     mtp_data = read_mmtp(mtp_path)
 
-    try:
-        engine = engine_class(mtp_data, mode=mode)
-    except NotImplementedError as e:
-        pytest.skip(f"Engine does not support this configuration: {e}")
+    engine = engine_class(mtp_data)
 
     atoms_ref = read_cfg(path / "mag.cfg", index=-1)
     atoms_ref.set_initial_magnetic_moments(atoms_ref.get_magnetic_moments())
 
-    mag_grad_ref = engine.calculate(atoms_ref)["mgrad"]
+    mag_grad_ref = _run(engine, atoms_ref, method)["mgrad"]
 
     dx = 1e-6
 
     atoms = atoms_ref.copy()
     atoms.arrays["initial_magmoms"][0] += dx
-    ep = engine.calculate(atoms)["energy"]
+    ep = engine.efs(atoms)["energy"]
 
     atoms = atoms_ref.copy()
     atoms.arrays["initial_magmoms"][0] -= dx
-    em = engine.calculate(atoms)["energy"]
+    em = engine.efs(atoms)["energy"]
 
     t = +1.0 * (ep - em) / (2.0 * dx)
 
@@ -202,17 +201,17 @@ def test_forces(
     atoms_ref = read_cfg(path / "mag.cfg", index=-1)
     atoms_ref.set_initial_magnetic_moments(atoms_ref.get_magnetic_moments())
 
-    forces_ref = engine.calculate(atoms_ref)["forces"]
+    forces_ref = engine.efs(atoms_ref)["forces"]
 
     dx = 1e-6
 
     atoms = atoms_ref.copy()
     atoms.positions[0, 0] += dx
-    ep = engine.calculate(atoms)["energy"]
+    ep = engine.efs(atoms)["energy"]
 
     atoms = atoms_ref.copy()
     atoms.positions[0, 0] -= dx
-    em = engine.calculate(atoms)["energy"]
+    em = engine.efs(atoms)["energy"]
 
     f = -1.0 * (ep - em) / (2.0 * dx)
 
@@ -243,7 +242,7 @@ def test_stress(
     magmoms = atoms_ref.get_magnetic_moments().copy()
     atoms_ref.set_initial_magnetic_moments(magmoms)
 
-    stress_ref = mtp.calculate(atoms_ref)["stress"]
+    stress_ref = mtp.efs(atoms_ref)["stress"]
 
     stress = np.zeros((3, 3), dtype=float)
     eps = 1e-6
@@ -255,13 +254,13 @@ def test_stress(
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
         atoms.set_initial_magnetic_moments(magmoms)
-        eplus = mtp.calculate(atoms)["energy"]
+        eplus = mtp.efs(atoms)["energy"]
 
         x[i, i] = 1.0 - eps
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
         atoms.set_initial_magnetic_moments(magmoms)
-        eminus = mtp.calculate(atoms)["energy"]
+        eminus = mtp.efs(atoms)["energy"]
 
         stress[i, i] = (eplus - eminus) / (2.0 * eps * volume)
         x[i, i] = 1.0
@@ -271,13 +270,13 @@ def test_stress(
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
         atoms.set_initial_magnetic_moments(magmoms)
-        eplus = mtp.calculate(atoms)["energy"]
+        eplus = mtp.efs(atoms)["energy"]
 
         x[i, j] = x[j, i] = -0.5 * eps
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
         atoms.set_initial_magnetic_moments(magmoms)
-        eminus = mtp.calculate(atoms)["energy"]
+        eminus = mtp.efs(atoms)["energy"]
 
         stress[i, j] = stress[j, i] = (eplus - eminus) / (2 * eps * volume)
 
@@ -286,9 +285,9 @@ def test_stress(
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
-@pytest.mark.parametrize("mode", ["run", "train", "train_mgrad"])
+@pytest.mark.parametrize("method", ["efs", "jac", "jac_mgrad"])
 def test_basis_data(
-    mode: str,
+    method: str,
     level: int,
     data_path: pathlib.Path,
 ) -> None:
@@ -302,27 +301,20 @@ def test_basis_data(
 
     mtp_data = read_mmtp(mtp_path)
 
-    try:
-        ref = NumbaMagMTPEngine(mtp_data, mode=mode)
-    except NotImplementedError as e:
-        pytest.skip(f"Reference engine does not support this configuration: {e}")
-
-    try:
-        mtp = CExtMagMTPEngine(mtp_data, mode=mode)
-    except NotImplementedError as e:
-        pytest.skip(f"Engine does not support this configuration: {e}")
+    ref = NumbaMagMTPEngine(mtp_data)
+    mtp = CExtMagMTPEngine(mtp_data)
 
     atoms = read_cfg(path / "mag.cfg", index=-1)
     atoms.set_initial_magnetic_moments(atoms.get_magnetic_moments())
 
-    ref.calculate(atoms)
-    mtp.calculate(atoms)
+    _run(ref, atoms, method)
+    _run(mtp, atoms, method)
 
     mbd = mtp.mbd
     mbd_ref = ref.mbd
     np.testing.assert_allclose(mbd.vatoms, mbd_ref.vatoms, rtol=0.0, atol=1e-6)
 
-    if "train" in mode:
+    if method in ("jac", "jac_mgrad"):
         np.testing.assert_allclose(mbd.dbdris, mbd_ref.dbdris, rtol=0.0, atol=1e-6)
         np.testing.assert_allclose(mbd.dbdeps, mbd_ref.dbdeps, rtol=0.0, atol=1e-6)
         np.testing.assert_allclose(mbd.dedcs, mbd_ref.dedcs, rtol=0.0, atol=1e-6)
@@ -335,7 +327,7 @@ def test_basis_data(
         np.testing.assert_allclose(rbd.dqdris, rbd_ref.dqdris, rtol=0.0, atol=1e-6)
         np.testing.assert_allclose(rbd.dqdeps, rbd_ref.dqdeps, rtol=0.0, atol=1e-6)
 
-    if mode == "train_mgrad":
+    if method == "jac_mgrad":
         np.testing.assert_allclose(mbd.dbdmis, mbd_ref.dbdmis, rtol=0.0, atol=1e-6)
         np.testing.assert_allclose(mbd.dgmdcs, mbd_ref.dgmdcs, rtol=0.0, atol=1e-6)
         np.testing.assert_allclose(rbd.dqdmis, rbd_ref.dqdmis, rtol=0.0, atol=1e-6)

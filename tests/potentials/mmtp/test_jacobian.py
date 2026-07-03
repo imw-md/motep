@@ -29,7 +29,7 @@ def make_mag_atoms(
     mtp_data = read_mmtp(mtp_path)
     atoms = read_cfg(path / "mag.cfg", index=-1)
     atoms.set_initial_magnetic_moments(atoms.get_magnetic_moments())
-    atoms.calc = MMTP(mtp_data, engine=engine, mode="train", relax_magmoms=False)
+    atoms.calc = MMTP(mtp_data, engine=engine, relax_magmoms=False)
     return atoms
 
 
@@ -45,7 +45,7 @@ def test_jac_energy(
     """Test analytical energy Jacobian against finite differences for MMTP."""
     atoms = make_mag_atoms(engine, level, data_path)
 
-    atoms.get_potential_energy()
+    atoms.calc.compute_jacobian(atoms)
     jac_anl = atoms.calc.engine.jac_energy(atoms)
 
     dx = 1e-6
@@ -91,7 +91,7 @@ def test_jac_forces(
     """
     atoms = make_mag_atoms(engine, level, data_path)
 
-    atoms.get_potential_energy()
+    atoms.calc.compute_jacobian(atoms)
     jac_anl = atoms.calc.engine.jac_forces(atoms)
 
     dx = 1e-6

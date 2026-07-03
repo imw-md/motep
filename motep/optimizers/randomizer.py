@@ -40,9 +40,7 @@ class Randomizer(ParallelOptimizerBase):
         callback = Callback(self.loss)
         rng: np.random.Generator = self.loss.setting["rng"]
 
-        # Calculate basis functions of `loss.images`
         loss_value = self.rank0_loss(parameters)
-        self.rank0_gather_data()
 
         # Print the value of the loss function.
         callback(OptimizeResult(x=parameters, fun=loss_value))

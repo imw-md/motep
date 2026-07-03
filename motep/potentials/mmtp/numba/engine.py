@@ -37,14 +37,14 @@ from .moment import (
 class NumbaMagMTPEngine(MagEngineBase):
     """MTP Engine based on Numba."""
 
-    def _calculate(self, atoms: Atoms, magmoms: np.ndarray) -> tuple:
-        if self.mode == "run":
+    def _calculate(
+        self, atoms: Atoms, magmoms: np.ndarray, *, jac: bool, mgrad: bool
+    ) -> tuple:
+        if not jac:
             return self._calc_mag_run(atoms, magmoms)
-        if self.mode == "train":
-            return self._calc_mag_train(atoms, magmoms)
-        if self.mode == "train_mgrad":
+        if mgrad:
             return self._calc_mag_train_mgrad(atoms, magmoms)
-        raise NotImplementedError(self.mode)
+        return self._calc_mag_train(atoms, magmoms)
 
     def _calc_mag_run(self, atoms: Atoms, magmoms: np.ndarray) -> tuple:
         mtp_data = self.mtp_data
@@ -57,8 +57,8 @@ class NumbaMagMTPEngine(MagEngineBase):
         itypes = get_types(atoms, mtp_data.species)
         jtypes = itypes[js]
 
-        self.mbd.clean()
-        self.rbd.clean()
+        self.mbd.clean(jac=False, mgrad=False)
+        self.rbd.clean(jac=False, mgrad=False)
 
         energies, lgrads, mgrad_i, mgrad_j = _calc_mag_run(
             js,
@@ -100,8 +100,8 @@ class NumbaMagMTPEngine(MagEngineBase):
         itypes = get_types(atoms, mtp_data.species)
         jtypes = itypes[js]
 
-        self.mbd.clean()
-        self.rbd.clean()
+        self.mbd.clean(jac=True, mgrad=False)
+        self.rbd.clean(jac=True, mgrad=False)
 
         energies = _calc_mag_train(
             js,
@@ -178,8 +178,8 @@ class NumbaMagMTPEngine(MagEngineBase):
         itypes = get_types(atoms, mtp_data.species)
         jtypes = itypes[js]
 
-        self.mbd.clean()
-        self.rbd.clean()
+        self.mbd.clean(jac=True, mgrad=True)
+        self.rbd.clean(jac=True, mgrad=True)
 
         energies = _calc_mag_train_mgrad(
             js,

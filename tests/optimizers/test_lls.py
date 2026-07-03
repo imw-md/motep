@@ -431,7 +431,7 @@ def test_mmtp_illconditioned(
     optimizer = LLSOptimizer(loss, optimized=optimized, minimized=minimized)
 
     # Verify the matrix is actually ill-conditioned before scaling.
-    optimizer.rank0_loss(mtp_data.parameters)
+    optimizer.rank0_basis(mtp_data.parameters)
     optimizer.rank0_gather_data()
     matrix = optimizer._calc_matrix()
     cond = np.linalg.cond(matrix)

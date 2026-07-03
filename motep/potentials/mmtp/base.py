@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import ClassVar
 
 import numpy as np
 import numpy.typing as npt
@@ -9,7 +8,6 @@ from scipy.optimize import Bounds, minimize
 from motep.potentials.mtp.base import (
     EngineBase,
     Jacobian,
-    ModeBase,
     MomentBasisData,
     RadialBasisData,
 )
@@ -58,47 +56,46 @@ def _ensure_collinear_magmoms(
     return np.asarray(magmoms, dtype=np.float64)
 
 
-class MagModeBase(ModeBase):
-    """Base mode class for magnetic MTPs defining available operation modes."""
-
-    all_modes: ClassVar[list[str]] = ["run", "train", "train_mgrad"]
-
-
 @dataclass
-class MagMomentBasisData(MagModeBase, MomentBasisData):
+class MagMomentBasisData(MomentBasisData):
     """Data related to the moment basis."""
 
     dgmdcs: npt.NDArray[np.float64] | None = None
 
-    def initialize(self, natoms: int, mtp_data: MagMTPData) -> None:
-        """Initialize moment basis properties."""
+    def initialize(
+        self,
+        natoms: int,
+        mtp_data: MagMTPData,
+        *,
+        jac: bool,
+        mgrad: bool,
+    ) -> None:
         spc = mtp_data.species_count
         rfc = mtp_data.radial_funcs_count
         nrb = mtp_data.radial_basis.size * mtp_data.magnetic_basis.size**2
         asm = mtp_data.alpha_scalar_moments
 
         self.vatoms = np.full((asm, natoms), np.nan)
-        if "train" in self.mode:
+        if jac:
             self.dbdris = np.full((asm, natoms, 3), np.nan)
             self.dbdeps = np.full((asm, 3, 3), np.nan)
             self.dvdcs = np.full((spc, spc, rfc, nrb, natoms), np.nan)
             self.dgdcs = np.full((spc, spc, rfc, nrb, natoms, 3), np.nan)
             self.dsdcs = np.full((spc, spc, rfc, nrb, 3, 3), np.nan)
 
-        if self.mode == "train_mgrad":
+        if mgrad:
             self.dbdmis = np.full((asm, natoms), np.nan)
             self.dgmdcs = np.full((spc, spc, rfc, nrb, natoms), np.nan)
 
-    def clean(self) -> None:
-        """Clean up moment basis properties."""
-        super().clean()
-        if self.mode == "train_mgrad":
+    def clean(self, *, jac: bool, mgrad: bool) -> None:
+        super().clean(jac=jac)
+        if mgrad:
             self.dbdmis[...] = 0.0
             self.dgmdcs[...] = 0.0
 
 
 @dataclass
-class MagRadialBasisData(MagModeBase, RadialBasisData):
+class MagRadialBasisData(RadialBasisData):
     """Data related to the radial basis.
 
     Attributes
@@ -116,34 +113,34 @@ class MagRadialBasisData(MagModeBase, RadialBasisData):
 
     dqdmis: npt.NDArray[np.float64] | None = None
 
-    def initialize(self, natoms: int, mtp_data: MagMTPData) -> None:
-        """Initialize radial basis properties."""
+    def initialize(
+        self, natoms: int, mtp_data: MagMTPData, *, jac: bool, mgrad: bool
+    ) -> None:
         spc = mtp_data.species_count
         nrb = mtp_data.radial_basis.size * mtp_data.magnetic_basis.size**2
 
-        if "train" in self.mode:
+        if jac:
             self.values = np.full((spc, spc, nrb), np.nan)
             self.dqdris = np.full((spc, spc, nrb, natoms, 3), np.nan)
             self.dqdeps = np.full((spc, spc, nrb, 3, 3), np.nan)
 
-        if self.mode == "train_mgrad":
+        if mgrad:
             self.dqdmis = np.full((spc, spc, nrb, natoms), np.nan)
 
-    def clean(self) -> None:
-        """Clean up radial basis properties."""
-        super().clean()
-        if self.mode == "train_mgrad":
+    def clean(self, *, jac: bool, mgrad: bool) -> None:
+        super().clean(jac=jac)
+        if mgrad:
             self.dqdmis[...] = 0.0
 
 
-class MagEngineBase(MagModeBase, EngineBase):
+class MagEngineBase(EngineBase):
     """Engine to compute an MTP."""
 
     def __init__(
         self,
         mtp_data: MagMTPData,
         *,
-        mode: str = "run",
+        static_geometry: bool = False,
     ) -> None:
         """Magnetic MTP as described in [Novikov_nCM_2022_Magnetic]_.
 
@@ -151,10 +148,8 @@ class MagEngineBase(MagModeBase, EngineBase):
         ----------
         mtp_data : :class:`motep.potentials.mtp.data.MTPData`
             Parameters in the MLIP .mtp file.
-        mode : {'run', 'train', 'train_mgrad'}, default 'run'
-            Mode of operation. 'train' computes and stores basis data for
-            training; 'train_mgrad' additionally computes basis data for
-            training to magnetic gradients; 'run' is the default runtime mode.
+        static_geometry : bool, default False
+            If True, the atomic geometry is assumed fixed across calls.
 
         .. [Novikov_nCM_2022_Magnetic]
             I. Novikov, Blazej Grabowski, Fritz Körmann and A. V. Shapeev, npj Comput. Mater. 8, 13 (2022).
@@ -164,13 +159,12 @@ class MagEngineBase(MagModeBase, EngineBase):
         self.update(MagMTPData.from_base(mtp_data))
         self.results = {}
         self.neighbor_list = None
-        self.mode = mode
+        self.static_geometry = static_geometry
+        self._jac_ready = False
+        self._mgrad_ready = False
 
-        # moment basis data
-        self.mbd = MagMomentBasisData(mode=mode)
-
-        # used for `Level2MTPOptimizer`
-        self.rbd = MagRadialBasisData(mode=mode)
+        self.mbd = MagMomentBasisData()
+        self.rbd = MagRadialBasisData()
 
     def update(self, mtp_data: MagMTPData) -> bool:
         """Update MTP parameters.
@@ -184,39 +178,63 @@ class MagEngineBase(MagModeBase, EngineBase):
         self.mtp_data: MagMTPData = mtp_data
         return super().update(mtp_data)
 
-    def calculate(
-        self, atoms: Atoms, magmoms: npt.NDArray[np.float64] | None = None
+    def initialize_basis_data(
+        self, atoms: Atoms, *, jac: bool, mgrad: bool = False
+    ) -> None:
+        """(Re)initialize moment and radial basis data."""
+        natoms = len(atoms)
+        self.mbd.initialize(natoms, self.mtp_data, jac=jac, mgrad=mgrad)
+        self.rbd.initialize(natoms, self.mtp_data, jac=jac, mgrad=mgrad)
+        self._jac_ready = jac
+        self._mgrad_ready = mgrad
+
+    def efs(self, atoms: Atoms, magmoms: npt.NDArray[np.float64] | None = None) -> dict:
+        """Compute energies, forces, stress and the magnetic gradient."""
+        return self._run_mag(atoms, magmoms, jac=False, mgrad=False)
+
+    def jac(
+        self,
+        atoms: Atoms,
+        magmoms: npt.NDArray[np.float64] | None = None,
+        *,
+        mgrad: bool = False,
     ) -> dict:
-        """Calculate properties of the given system.
+        """Compute results and populate the parameter Jacobian.
 
-        Parameters
-        ----------
-        atoms : Atoms
-            The atomic structure.
-        magmoms : np.ndarray or None
-            Magnetic moments to use. If None, reads from
-            ``atoms.get_initial_magnetic_moments()``.
-
-        Returns
-        -------
-        Dictionary with energies, energy, forces and stress.
-
+        With ``mgrad`` the magnetic-gradient Jacobian is populated as well.
         """
+        return self._run_mag(atoms, magmoms, jac=True, mgrad=mgrad)
+
+    def _run_mag(
+        self,
+        atoms: Atoms,
+        magmoms: npt.NDArray[np.float64] | None,
+        *,
+        jac: bool,
+        mgrad: bool,
+    ) -> dict:
         self.check_species(atoms)
-        if self.update_neighbor_list(atoms):
-            self.initialize_basis_data(atoms)
+        if (
+            self.update_neighbor_list(atoms)
+            or (jac and not self._jac_ready)
+            or (mgrad and not self._mgrad_ready)
+        ):
+            self.initialize_basis_data(atoms, jac=jac, mgrad=mgrad)
 
         magmoms = _ensure_collinear_magmoms(atoms, magmoms)
 
-        energies, forces, stress, mgrad = self._calculate(atoms, magmoms=magmoms)
+        energies, forces, stress, mg = self._calculate(
+            atoms, magmoms, jac=jac, mgrad=mgrad
+        )
 
-        self._symmetrize_stress(atoms, stress)
+        self._symmetrize_stress(atoms, stress, jac=jac)
 
+        self.results = {}
         self.results["energies"] = energies
         self.results["energy"] = self.results["energies"].sum()
         self.results["forces"] = forces
         self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
-        self.results["mgrad"] = mgrad
+        self.results["mgrad"] = mg
 
         return self.results
 
@@ -264,10 +282,10 @@ class MagEngineBase(MagModeBase, EngineBase):
 
         self.check_species(atoms)
         if self.update_neighbor_list(atoms):
-            self.initialize_basis_data(atoms)
+            self.initialize_basis_data(atoms, jac=False, mgrad=False)
 
         def objective_and_grad(moms: np.ndarray) -> tuple[float, np.ndarray]:
-            energies, _, _, mgrad = self._calculate(atoms, magmoms=moms)
+            energies, _, _, mgrad = self._calculate(atoms, moms, jac=False, mgrad=False)
             return float(energies.sum()), mgrad
 
         min_mag = mtp_data.magnetic_basis.min
@@ -281,7 +299,7 @@ class MagEngineBase(MagModeBase, EngineBase):
             bounds=bounds,
         )
         relaxed_magmoms = result.x
-        results = self.calculate(atoms, magmoms=relaxed_magmoms)
+        results = self.efs(atoms, relaxed_magmoms)
         results["magmoms"] = relaxed_magmoms
         results["magmom"] = relaxed_magmoms.sum()
         return results

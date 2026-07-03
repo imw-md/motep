@@ -39,27 +39,29 @@ _jax_param = pytest.param(
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("molecule", [762, 291, 14214, 23208])
-@pytest.mark.parametrize("mode", ["run", "train"])
+@pytest.mark.parametrize("method", ["efs", "jac"])
 @pytest.mark.parametrize(
     "engine", [NumpyMTPEngine, _numba_param, _jax_param, CExtMTPEngine]
 )
 # @pytest.mark.parametrize("molecule", [762])
 def test_molecules(
     engine: type[EngineBase],
-    mode: str,
+    method: str,
     molecule: int,
     level: int,
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
+    if method == "jac" and engine is JaxMTPEngine:
+        pytest.skip("jax has no Jacobian pass")
     path = data_path / f"fitting/molecules/{molecule}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip("Test data not available")
     mtp_data = read_mtp(path / "pot.mtp")
-    mtp = engine(mtp_data, mode=mode)
+    mtp = engine(mtp_data)
     images = [read_cfg(path / "out.cfg", index=0)]
 
-    results_all = [mtp.calculate(atoms) for atoms in images]
+    results_all = [getattr(mtp, method)(atoms) for atoms in images]
 
     energies_ref = np.array([_.get_potential_energy() for _ in images])
     energies = np.array([_["energy"] for _ in results_all]).reshape(-1)
@@ -73,25 +75,27 @@ def test_molecules(
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 # @pytest.mark.parametrize("crystal", ["cubic", "noncubic"])
 @pytest.mark.parametrize("crystal", ["multi"])
-@pytest.mark.parametrize("mode", ["run", "train"])
+@pytest.mark.parametrize("method", ["efs", "jac"])
 # @pytest.mark.parametrize("engine", [NumpyMTPEngine, NumbaMTPEngine])
 @pytest.mark.parametrize("engine", [_numba_param, _jax_param, CExtMTPEngine])
 def test_crystals(
     engine: type[EngineBase],
-    mode: str,
+    method: str,
     crystal: int,
     level: int,
     data_path: pathlib.Path,
 ) -> None:
     """Test PyMTP."""
+    if method == "jac" and engine is JaxMTPEngine:
+        pytest.skip("jax has no Jacobian pass")
     path = data_path / f"fitting/crystals/{crystal}/{level:02d}"
     if not (path / "pot.mtp").exists():
         pytest.skip("Test data not available")
     mtp_data = read_mtp(path / "pot.mtp")
-    mtp = engine(mtp_data, mode=mode)
+    mtp = engine(mtp_data)
     images = [read_cfg(path / "out.cfg", index=-1)]
 
-    results_all = [mtp.calculate(atoms) for atoms in images]
+    results_all = [getattr(mtp, method)(atoms) for atoms in images]
 
     energies_ref = np.array([_.get_potential_energy() for _ in images])
     energies = np.array([_["energy"] for _ in results_all]).reshape(-1)
@@ -126,17 +130,17 @@ def test_forces(
     mtp = engine(mtp_data)
     atoms_ref = read_cfg(path / "out.cfg", index=-1)
 
-    forces_ref = mtp.calculate(atoms_ref)["forces"]
+    forces_ref = mtp.efs(atoms_ref)["forces"]
 
     dx = 1e-6
 
     atoms = atoms_ref.copy()
     atoms.positions[0, 0] += dx
-    ep = mtp.calculate(atoms)["energy"]
+    ep = mtp.efs(atoms)["energy"]
 
     atoms = atoms_ref.copy()
     atoms.positions[0, 0] -= dx
-    em = mtp.calculate(atoms)["energy"]
+    em = mtp.efs(atoms)["energy"]
 
     f = -1.0 * (ep - em) / (2.0 * dx)
 
@@ -169,7 +173,7 @@ def test_stress(
     mtp_data = read_mtp(path / "pot.mtp")
     mtp = engine(mtp_data)
     atoms_ref = read_cfg(path / "out.cfg", index=-1)
-    stress_ref = mtp.calculate(atoms_ref)["stress"]
+    stress_ref = mtp.efs(atoms_ref)["stress"]
 
     stress = np.zeros((3, 3), dtype=float)
     eps = 1e-6
@@ -180,12 +184,12 @@ def test_stress(
         x[i, i] = 1.0 + eps
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
-        eplus = mtp.calculate(atoms)["energy"]
+        eplus = mtp.efs(atoms)["energy"]
 
         x[i, i] = 1.0 - eps
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
-        eminus = mtp.calculate(atoms)["energy"]
+        eminus = mtp.efs(atoms)["energy"]
 
         stress[i, i] = (eplus - eminus) / (2.0 * eps * volume)
         x[i, i] = 1.0
@@ -194,12 +198,12 @@ def test_stress(
         x[i, j] = x[j, i] = +0.5 * eps
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
-        eplus = mtp.calculate(atoms)["energy"]
+        eplus = mtp.efs(atoms)["energy"]
 
         x[i, j] = x[j, i] = -0.5 * eps
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
-        eminus = mtp.calculate(atoms)["energy"]
+        eminus = mtp.efs(atoms)["energy"]
 
         stress[i, j] = stress[j, i] = (eplus - eminus) / (2 * eps * volume)
 
@@ -209,11 +213,11 @@ def test_stress(
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
 @pytest.mark.parametrize("crystal", ["multi"])
-@pytest.mark.parametrize("mode", ["run", "train"])
+@pytest.mark.parametrize("method", ["efs", "jac"])
 @pytest.mark.parametrize("engine", [_numba_param, CExtMTPEngine])
 def test_basis_data(
     engine: type[EngineBase],
-    mode: str,
+    method: str,
     crystal: int,
     level: int,
     data_path: pathlib.Path,
@@ -224,19 +228,19 @@ def test_basis_data(
         pytest.skip()
     mtp_data = read_mtp(path / "pot.mtp")
     # Assume NumpyMTPEngine as reference
-    ref = NumpyMTPEngine(mtp_data, mode=mode)
-    mtp = engine(mtp_data, mode=mode)
+    ref = NumpyMTPEngine(mtp_data)
+    mtp = engine(mtp_data)
     images = [read_cfg(path / "out.cfg", index=-1)]
 
     for atoms in images:
-        ref.calculate(atoms)
-        mtp.calculate(atoms)
+        getattr(ref, method)(atoms)
+        getattr(mtp, method)(atoms)
 
         mbd = mtp.mbd
         mbd_ref = ref.mbd
         np.testing.assert_allclose(mbd.vatoms, mbd_ref.vatoms, rtol=0.0, atol=1e-6)
 
-        if mode == "train":
+        if method == "jac":
             np.testing.assert_allclose(mbd.dbdris, mbd_ref.dbdris, rtol=0.0, atol=1e-6)
             np.testing.assert_allclose(mbd.dbdeps, mbd_ref.dbdeps, rtol=0.0, atol=1e-6)
             np.testing.assert_allclose(mbd.dedcs, mbd_ref.dedcs, rtol=0.0, atol=1e-6)
@@ -248,3 +252,21 @@ def test_basis_data(
             np.testing.assert_allclose(rbd.values, rbd_ref.values, rtol=0.0, atol=1e-6)
             np.testing.assert_allclose(rbd.dqdris, rbd_ref.dqdris, rtol=0.0, atol=1e-6)
             np.testing.assert_allclose(rbd.dqdeps, rbd_ref.dqdeps, rtol=0.0, atol=1e-6)
+
+
+@pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
+def test_efs_skips_jacobian(level: int, data_path: pathlib.Path) -> None:
+    """``efs`` must not allocate/fill the parameter-Jacobian arrays; ``jac`` must."""
+    path = data_path / f"fitting/crystals/multi/{level:02d}"
+    if not (path / "pot.mtp").exists():
+        pytest.skip()
+    mtp_data = read_mtp(path / "pot.mtp")
+    atoms = read_cfg(path / "out.cfg", index=-1)
+
+    engine = CExtMTPEngine(mtp_data)
+    engine.efs(atoms)
+    assert engine.mbd.dvdcs.ndim == 0  # placeholder, not allocated
+
+    engine.jac(atoms)
+    assert engine.mbd.dvdcs.ndim > 0
+    assert np.isfinite(engine.mbd.dvdcs).all()

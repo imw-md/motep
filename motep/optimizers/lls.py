@@ -285,7 +285,7 @@ class LLSOptimizer(LLSOptimizerBase):
         callback = self.callback = Callback(self.loss)
 
         # Calculate basis functions of `loss.images`
-        loss_value = self.rank0_loss(parameters)
+        loss_value = self.rank0_basis(parameters)
         self.rank0_gather_data()
 
         # Print the value of the loss function.

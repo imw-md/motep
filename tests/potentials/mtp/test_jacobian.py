@@ -23,7 +23,7 @@ def make_atoms(engine: str, level: int, data_path: pathlib.Path) -> Atoms:
         pytest.skip()
     atoms = read_cfg(path / "out.cfg", index=-1)
     mtp_data_ref = read_mtp(path / "pot.mtp")
-    atoms.calc = MTP(mtp_data=mtp_data_ref, engine=engine, mode="train")
+    atoms.calc = MTP(mtp_data=mtp_data_ref, engine=engine)
     return atoms
 
 
@@ -39,7 +39,7 @@ def test_jac_energy(
     """Test the Jacobian for the energy with respect to the parameters."""
     atoms = make_atoms(engine, level, data_path)
 
-    atoms.get_potential_energy()
+    atoms.calc.compute_jacobian(atoms)
     jac_anl = atoms.calc.engine.jac_energy(atoms)
 
     dx = 1e-6
@@ -82,7 +82,7 @@ def test_jac_forces(
     """Test the Jacobian for the forces with respect to the parameters."""
     atoms = make_atoms(engine, level, data_path)
 
-    atoms.get_potential_energy()
+    atoms.calc.compute_jacobian(atoms)
     jac_anl = atoms.calc.engine.jac_forces(atoms)
 
     dx = 1e-6
@@ -123,7 +123,7 @@ def test_jac_stress(
     """Test the Jacobian for the forces with respect to the parameters."""
     atoms = make_atoms(engine, level, data_path)
 
-    atoms.get_potential_energy()
+    atoms.calc.compute_jacobian(atoms)
     jac_anl = atoms.calc.engine.jac_stress(atoms)
 
     dx = 1e-6
