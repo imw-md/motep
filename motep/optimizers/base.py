@@ -145,7 +145,7 @@ class ParallelOptimizerBase(OptimizerBase):
             op = self.loss.comm.bcast(None, root=0)
             if op == self._OP_STOP:
                 break
-            elif op == self._OP_LOSS:
+            if op == self._OP_LOSS:
                 self.loss(None)
             elif op == self._OP_JAC:
                 self.loss.jac(None)
@@ -165,8 +165,7 @@ class ParallelOptimizerBase(OptimizerBase):
         else:
             self._worker_loop()
             result_x = None
-        result_x = self.loss.comm.bcast(result_x, root=0)
-        self.loss.mtp_data.parameters = result_x
+        self.loss(result_x)  # also broadcasts optimized parameters to all ranks
 
     @abstractmethod
     def _optimize(self, **kwargs: dict[str, Any]) -> npt.NDArray[np.float64]:

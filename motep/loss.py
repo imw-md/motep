@@ -248,9 +248,9 @@ class LossFunctionStress:
         )
 
         self.volumes = np.fromiter(
-            (images[i].cell.volume for i in self.idcs_str),
+            (atoms.cell.volume for atoms in images),
             dtype=float,
-            count=self.idcs_str.size,
+            count=len(images),
         )
 
         numbers_of_atoms = np.fromiter(
