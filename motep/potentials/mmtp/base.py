@@ -160,6 +160,7 @@ class MagEngineBase(MagModeBase, EngineBase):
             I. Novikov, Blazej Grabowski, Fritz Körmann and A. V. Shapeev, npj Comput. Mater. 8, 13 (2022).
 
         """
+        self._last_state: tuple | None = None
         self.update(MagMTPData.from_base(mtp_data))
         self.results = {}
         self.neighbor_list = None
@@ -171,11 +172,17 @@ class MagEngineBase(MagModeBase, EngineBase):
         # used for `Level2MTPOptimizer`
         self.rbd = MagRadialBasisData(mode=mode)
 
-    def update(self, mtp_data: MagMTPData) -> None:
-        """Update MTP parameters."""
+    def update(self, mtp_data: MagMTPData) -> bool:
+        """Update MTP parameters.
+
+        Returns
+        -------
+        bool
+            Whether the coefficients changed since the previous update.
+
+        """
         self.mtp_data: MagMTPData = mtp_data
-        if self.mtp_data.species.size == 0:
-            self.mtp_data.species = list(range(self.mtp_data.species_count))
+        return super().update(mtp_data)
 
     def calculate(
         self, atoms: Atoms, magmoms: npt.NDArray[np.float64] | None = None

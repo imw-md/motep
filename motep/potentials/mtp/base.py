@@ -285,6 +285,7 @@ class EngineBase(EngineWithNeighborlist):
             training; `'run'` is the default mode suitable for MD.
 
         """
+        self._last_state: tuple | None = None
         self.update(mtp_data)
         self.results = {}
         self.neighbor_list = None
@@ -296,11 +297,25 @@ class EngineBase(EngineWithNeighborlist):
         # used for `Level2MTPOptimizer`
         self.rbd = RadialBasisData(mode=mode)
 
-    def update(self, mtp_data: MTPData) -> None:
-        """Update MTP parameters."""
+    def update(self, mtp_data: MTPData) -> bool:
+        """Update MTP parameters.
+
+        Returns
+        -------
+        bool
+            Whether any input that determines the computed energy/forces
+            changed since the previous update (see
+            :meth:`MTPData.basis_state`). When ``False``, the cached results may
+            be reused without recomputing the basis.
+
+        """
         self.mtp_data = mtp_data
         if self.mtp_data.species.size == 0:
             self.mtp_data.species = list(range(self.mtp_data.species_count))
+        state = mtp_data.basis_state()
+        changed = not mtp_data.basis_state_equal(state, self._last_state)
+        self._last_state = state
+        return changed
 
     def check_species(self, atoms: Atoms) -> None:
         """Check if `atoms` comply with the `mtp_data.species`.

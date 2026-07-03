@@ -26,7 +26,7 @@ class JaxMTPEngine(EngineBase):
         self.basis_converter = None
         super().__init__(*args, **kwargs)
 
-    def update(self, mtp_data: MTPData) -> None:
+    def update(self, mtp_data: MTPData) -> bool:
         """Update MTP parameters.
 
         Raises
@@ -34,7 +34,7 @@ class JaxMTPEngine(EngineBase):
         ValueError: If `level` is updated after initialization.
 
         """
-        super().update(mtp_data)
+        changed = super().update(mtp_data)
         if self.mtp_data.alpha_moments_count is not None:
             level = moments_count_to_level_map[mtp_data.alpha_moments_count]
             if self.moment_basis is None:
@@ -45,6 +45,7 @@ class JaxMTPEngine(EngineBase):
                 msg = "Changing level is not allowed, use a new instance instead."
                 raise ValueError(msg)
             self.basis_converter.remap_mlip_moment_coeffs(self.mtp_data)
+        return changed
 
     def _calculate(self, atoms: Atoms) -> tuple:
         mtp_data = self.mtp_data
