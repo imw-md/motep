@@ -172,7 +172,7 @@ class EngineWithNeighborlist:
         self.neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
         self._neighbors, self._offsets = self._get_neighbors_and_offsets(atoms)
 
-    def update_neighbor_list(self, atoms: Atoms) -> None:
+    def update_neighbor_list(self, atoms: Atoms) -> bool:
         """Update the ASE `PrimitiveNeighborList` object.
 
         Notes
@@ -351,7 +351,9 @@ class EngineBase(EngineWithNeighborlist):
 
         return self.results
 
-    def _symmetrize_stress(self, atoms: Atoms, stress: np.ndarray, *, jac: bool) -> None:
+    def _symmetrize_stress(
+        self, atoms: Atoms, stress: np.ndarray, *, jac: bool
+    ) -> None:
         if atoms.cell.rank == 3:  # noqa: PLR2004
             volume = atoms.get_volume()
             stress += stress.T
