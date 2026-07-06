@@ -101,9 +101,10 @@ class ParallelOptimizerBase(OptimizerBase):
 
     _OP_LOSS = 0
     _OP_JAC = 1
-    _OP_GATHER = 2
-    _OP_STOP = 3
-    _OP_BASIS = 4
+    _OP_LOSS_JAC = 2
+    _OP_BASIS = 3
+    _OP_GATHER = 4
+    _OP_STOP = 5
 
     def rank0_loss(self, parameters: npt.NDArray[np.float64]) -> float:
         """Evaluate the loss function, signaling workers first.
@@ -129,6 +130,20 @@ class ParallelOptimizerBase(OptimizerBase):
         """
         self.loss.comm.bcast(self._OP_JAC, root=0)
         return self.loss.jac(parameters)
+
+    def rank0_loss_and_jac(
+        self,
+        parameters: npt.NDArray[np.float64],
+    ) -> tuple[float, npt.NDArray[np.float64]]:
+        """Evaluate loss and Jacobian in one pass, signaling workers first.
+
+        Returns
+        -------
+        tuple[float, npt.NDArray[np.float64]]
+
+        """
+        self.loss.comm.bcast(self._OP_LOSS_JAC, root=0)
+        return self.loss.loss_and_jac(parameters)
 
     def rank0_basis(self, parameters: npt.NDArray[np.float64]) -> float:
         """Populate engine basis data, signaling workers first.
@@ -158,6 +173,8 @@ class ParallelOptimizerBase(OptimizerBase):
                 self.loss(None)
             elif op == self._OP_JAC:
                 self.loss.jac(None)
+            elif op == self._OP_LOSS_JAC:
+                self.loss.loss_and_jac(None)
             elif op == self._OP_BASIS:
                 self.loss.calc_basis(None)
             elif op == self._OP_GATHER:

@@ -741,19 +741,26 @@ class LossFunction(LossFunctionBase):
             atoms.calc.update_parameters(self.mtp_data)
         return self.calc_loss_function()
 
-    def _jacobian_pass(self, parameters: list[float]) -> None:
-        parameters = self.comm.bcast(parameters, root=0)
-        self.mtp_data.parameters = parameters
-        for atoms in self.images:
-            atoms.calc.update_parameters(self.mtp_data)
-        self._run_jac_calculations()
+    def jac(self, parameters: list[float]) -> npt.NDArray[np.float64]:
+        """Populate basis data at ``parameters`` and return the loss Jacobian."""
+        self._jacobian_pass(parameters)
+        return self._sum_jac()
+
+    def loss_and_jac(
+        self, parameters: list[float]
+    ) -> tuple[float, npt.NDArray[np.float64]]:
+        """Return ``(loss, jac)`` from a single Jacobian pass (SciPy ``jac=True``)."""
+        self._jacobian_pass(parameters)
+        return self._sum_loss(), self._sum_jac()
 
     def calc_basis(self, parameters: list[float]) -> float:
         """Populate engine basis data and return the loss value."""
         self._jacobian_pass(parameters)
         return self._sum_loss()
 
-    def jac(self, parameters: list[float]) -> npt.NDArray[np.float64]:
-        """Populate basis data at ``parameters`` and return the loss Jacobian."""
-        self._jacobian_pass(parameters)
-        return self._sum_jac()
+    def _jacobian_pass(self, parameters: list[float]) -> None:
+        parameters = self.comm.bcast(parameters, root=0)
+        self.mtp_data.parameters = parameters
+        for atoms in self.images:
+            atoms.calc.update_parameters(self.mtp_data)
+        self._run_jac_calculations()
