@@ -1,18 +1,19 @@
 """Benchmark the ``efs``/``jac`` passes an optimizer performs.
 
-Instruments the loss's ``efs`` (energies/forces/stress) and ``jac`` (parameter
-Jacobian) passes during an optimization and reports how many of each the
-optimizer triggers, their per-call cost, and the totals.
+For ``--optimizer minimize`` with a gradient it runs a warm A/B of two schemes:
 
-The jac/efs cost ratio grows strongly with the MTP level, so sweep ``--level``:
+* ``split`` — ``fun`` is an ``efs`` (E/F/S) pass, ``jac`` a separate parameter-
+  Jacobian pass.
+* ``fused`` — ``fun`` returns ``(loss, jac)`` from a single Jacobian pass
+  (SciPy ``jac=True``), so the gradient is free and no redundant ``efs`` runs.
+
+Both paths are warmed first (geometry caches, basis-array allocation, etc), so
+the reported per-call costs exclude first-call overhead.
 
     python benchmarks/optimize.py --level 2
     python benchmarks/optimize.py --level 10 --stride 50
-    python benchmarks/optimize.py --level 6 --no-jac   # finite-diff, efs-only
 
-With ``jac=True`` (default) BFGS pairs each gradient (``jac``) with line-search
-``efs`` evals. With ``--no-jac`` the gradient is finite-differenced, so every
-eval is ``efs``.
+Any other ``--optimizer`` (DE, DA, LLS, ...) is run once and instrumented.
 """
 
 import argparse
@@ -20,12 +21,23 @@ import pathlib
 import time
 
 import numpy as np
+from scipy.optimize import minimize
 
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.loss import LossFunction, LossSetting
 from motep.optimizers import make_optimizer
 from motep.parallel import world
+
+_UNBOUNDED = {
+    "cg",
+    "bfgs",
+    "newton-cg",
+    "dogleg",
+    "trust-ncg",
+    "trust-exact",
+    "trust-krylov",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,8 +59,8 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
+def build(args: argparse.Namespace) -> tuple:
+    """Build a fresh, warmed loss + optimizer (identical start across runs)."""
     fitting = args.data_path / f"fitting/crystals/{args.crystal}/{args.level:02d}"
     training = args.data_path / f"original/crystals/{args.crystal}/training.cfg"
     if not (fitting / "initial.mtp").exists():
@@ -56,22 +68,26 @@ def main() -> None:
 
     images = read_cfg(training, index=":")[:: args.stride]
     mtp_data = read_mtp(fitting / "initial.mtp")
-
     setting = LossSetting(energy_weight=1.0, forces_weight=0.01, stress_weight=0.001)
     loss = LossFunction(
         images, mtp_data=mtp_data, setting=setting, comm=world, engine=args.engine
     )
-
-    # Construct the optimizer first: it sets ``mtp_data.optimized`` to its
-    # allowed parameter set, which must be in place before ``initialize``.
-    optimizer = make_optimizer(args.optimizer)(loss)
+    optimizer = make_optimizer(args.optimizer)(loss)  # sets ``mtp_data.optimized``
     mtp_data.initialize(rng=np.random.default_rng(args.seed))
 
-    stats = {"efs_n": 0, "efs_t": 0.0, "jac_n": 0, "jac_t": 0.0}
-    _run, _jac = loss._run_calculations, loss._run_jac_calculations
+    # Warm up both engine paths: geometry caches, basis-array allocation, JIT.
+    loss.loss_and_jac(mtp_data.parameters)
+    loss(mtp_data.parameters)
+    return loss, optimizer, mtp_data, len(images)
 
-    def timed(key: str, fn):
-        def wrapper() -> None:
+
+def instrument(loss) -> dict:
+    """Wrap the forward/jac passes to count and time them; returns the stats."""
+    stats = {"efs_n": 0, "efs_t": 0.0, "jac_n": 0, "jac_t": 0.0}
+    run, jac = loss._run_calculations, loss._run_jac_calculations
+
+    def timed(key, fn):
+        def wrapper():
             t0 = time.perf_counter()
             fn()
             stats[f"{key}_t"] += time.perf_counter() - t0
@@ -79,50 +95,83 @@ def main() -> None:
 
         return wrapper
 
-    loss._run_calculations = timed("efs", _run)
-    loss._run_jac_calculations = timed("jac", _jac)
+    loss._run_calculations = timed("efs", run)
+    loss._run_jac_calculations = timed("jac", jac)
+    return stats
 
-    if args.optimizer == "minimize":
-        opt_kwargs = {
-            "method": args.method,
-            "jac": not args.no_jac,
-            "options": {"maxiter": args.maxiter},
-        }
-    else:
-        opt_kwargs = {}
+
+def run_minimize(args: argparse.Namespace, scheme: str) -> dict:
+    """Run ``scipy.minimize`` in the ``split`` or ``fused`` scheme (serial)."""
+    loss, _, mtp_data, _ = build(args)
+    stats = instrument(loss)
+    x0 = mtp_data.parameters
+    bounds = None if args.method.lower() in _UNBOUNDED else mtp_data.get_bounds()
+    opts = {"maxiter": args.maxiter}
     t0 = time.perf_counter()
-    optimizer.optimize(**opt_kwargs)
-    wall = time.perf_counter() - t0
+    if scheme == "split":
+        minimize(
+            loss,
+            x0,
+            jac=loss.jac,
+            method=args.method,
+            bounds=bounds,
+            options=opts,
+        )
+    else:
+        minimize(
+            loss.loss_and_jac,
+            x0,
+            jac=True,
+            method=args.method,
+            bounds=bounds,
+            options=opts,
+        )
+    stats["wall"] = time.perf_counter() - t0
+    return stats
 
-    efs_avg = stats["efs_t"] / max(stats["efs_n"], 1)
-    jac_avg = stats["jac_t"] / max(stats["jac_n"], 1)
-    engine = stats["efs_t"] + stats["jac_t"]
 
-    detail = (
-        f"method={args.method} jac={not args.no_jac}"
-        if args.optimizer == "minimize"
-        else ""
-    )
+def report(name: str, s: dict) -> None:
+    ef = s["efs_t"] / max(s["efs_n"], 1)
+    jf = s["jac_t"] / max(s["jac_n"], 1)
+    print(f"[{name}]")
+    print(f"  efs : {s['efs_n']:3d} calls  {ef * 1e3:7.2f} ms  {s['efs_t']:7.3f}s")
+    print(f"  jac : {s['jac_n']:3d} calls  {jf * 1e3:7.2f} ms  {s['jac_t']:7.3f}s")
+    print(f"  wall: {s['wall']:7.3f}s")
+
+
+def main() -> None:
+    args = parse_args()
+    _, _, _, n_img = build(args)
     print(
         f"\ncrystal={args.crystal} level={args.level} engine={args.engine} "
-        f"images={len(images)} optimizer={args.optimizer} {detail}"
+        f"images={n_img} optimizer={args.optimizer}"
     )
-    print(
-        f"efs (E/F/S)     : {stats['efs_n']:4d} calls  {efs_avg * 1e3:8.2f} ms/call"
-        f"  {stats['efs_t']:8.3f}s"
+
+    if args.optimizer == "minimize" and not args.no_jac:
+        print(f"method={args.method}  (warm split vs fused)\n")
+        split = run_minimize(args, "split")
+        fused = run_minimize(args, "fused")
+        report("split", split)
+        report("fused", fused)
+        dw = split["wall"] - fused["wall"]
+        print(
+            f"\nwall  split - fused : {dw:+.3f}s "
+            f"({100 * dw / max(fused['wall'], 1e-12):+.1f}%)"
+        )
+        return
+
+    loss, optimizer, _, _ = build(args)
+    stats = instrument(loss)
+    opt_kwargs = (
+        {"jac": False, "options": {"maxiter": args.maxiter}}
+        if args.optimizer == "minimize"
+        else {}
     )
-    print(
-        f"jac (d/dparams) : {stats['jac_n']:4d} calls  {jac_avg * 1e3:8.2f} ms/call"
-        f"  {stats['jac_t']:8.3f}s"
-    )
-    if stats["jac_n"]:
-        print(f"efs:jac ratio   = {stats['efs_n'] / stats['jac_n']:.2f}")
-        print(f"jac/efs cost    = {jac_avg / max(efs_avg, 1e-12):.1f}x")
-    print(f"engine total    : {engine:8.3f}s")
-    if stats["jac_n"]:
-        # each eval served by one jac pass (E/F/S + basis), gradient read free
-        print(f"single-pass jac : {stats['efs_n'] * jac_avg:8.3f}s  (for comparison)")
-    print(f"optimize() wall : {wall:8.3f}s")
+    t0 = time.perf_counter()
+    optimizer.optimize(**opt_kwargs)
+    stats["wall"] = time.perf_counter() - t0
+    print()
+    report(args.optimizer, stats)
 
 
 if __name__ == "__main__":
