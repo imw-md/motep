@@ -11,7 +11,7 @@ from ase import Atoms
 from ase.stress import voigt_6_to_full_3x3_stress
 from scipy.constants import eV
 
-from motep.calculator import make_calculator
+from motep.calculator import MMTP, make_calculator
 from motep.parallel import DummyMPIComm, world
 from motep.potentials.mmtp.data import MagMTPData
 from motep.potentials.mtp.data import MTPData
@@ -481,10 +481,21 @@ class LossFunctionBase(ABC):
         """Evaluate the loss function."""
 
     def _run_calculations(self) -> None:
-        """Run calculations of the properties."""
+        """Run energies/forces/stress calculations."""
         ncnf = len(self.images)
         for i in range(self.comm.rank, ncnf, self.comm.size):
             self.images[i].get_potential_energy()
+
+    def _run_jac_calculations(self) -> None:
+        """Run Jacobian passes, populating engine basis data on each image."""
+        ncnf = len(self.images)
+        for i in range(self.comm.rank, ncnf, self.comm.size):
+            atoms = self.images[i]
+            calc = atoms.calc
+            if isinstance(calc, MMTP):
+                calc.compute_jacobian(atoms, mgrad="mgrad" in calc.targets)
+            else:
+                calc.compute_jacobian(atoms)
 
     def broadcast_results(self) -> None:
         """Broadcast data."""
@@ -503,10 +514,13 @@ class LossFunctionBase(ABC):
             for i in range(ncnf):
                 root = i % size
                 if root != 0 and hasattr(self.images[i].calc, "engine"):
-                    mbd = self.comm.recv(source=root, tag=i + ncnf)
-                    self.images[i].calc.engine.mbd = mbd
-                    rbd = self.comm.recv(source=root, tag=i + 2 * ncnf)
-                    self.images[i].calc.engine.rbd = rbd
+                    engine = self.images[i].calc.engine
+                    engine.mbd = self.comm.recv(source=root, tag=i + ncnf)
+                    engine.rbd = self.comm.recv(source=root, tag=i + 2 * ncnf)
+                    # received data were produced by a jac pass on ``root``
+                    engine._jac_valid = True
+                    if isinstance(self.images[i].calc, MMTP):
+                        engine._mgrad_valid = True
         else:
             for i in range(rank, ncnf, size):
                 if hasattr(self.images[i].calc, "engine"):
@@ -514,6 +528,14 @@ class LossFunctionBase(ABC):
                     self.comm.send(
                         self.images[i].calc.engine.rbd, dest=0, tag=i + 2 * ncnf
                     )
+
+    def _sum_loss(self) -> float:
+        return (
+            self.setting.energy_weight * self.loss_energy.calculate()
+            + self.setting.forces_weight * self.loss_forces.calculate()
+            + self.setting.stress_weight * self.loss_stress.calculate()
+            + self.setting.mgrad_weight * self.loss_mgrad.calculate()
+        )
 
     def calc_loss_function(self) -> float:
         """Calculate the value of the loss function.
@@ -524,21 +546,10 @@ class LossFunctionBase(ABC):
 
         """
         self._run_calculations()
-        return (
-            self.setting.energy_weight * self.loss_energy.calculate()
-            + self.setting.forces_weight * self.loss_forces.calculate()
-            + self.setting.stress_weight * self.loss_stress.calculate()
-            + self.setting.mgrad_weight * self.loss_mgrad.calculate()
-        )
+        return self._sum_loss()
 
-    def jac(self, parameters: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-        """Calculate the Jacobian of the loss function.
-
-        Returns
-        -------
-        npt.NDArray[np.float64]
-
-        """
+    def _sum_jac(self) -> npt.NDArray[np.float64]:
+        """Weighted sum of the per-property Jacobians (basis data must be current)."""
         jac = self.setting.energy_weight * self.loss_energy.jac()
         if self.loss_forces.idcs_frc.size and self.setting.forces_weight:
             jac += self.setting.forces_weight * self.loss_forces.jac()
@@ -723,6 +734,7 @@ class LossFunction(LossFunctionBase):
                 engine=self.engine,
                 mode=mode,
                 relax_magmoms=relax_magmoms,
+                static_geometry=True,
             )
             atoms.calc.targets = targets
             # Special handling of magmoms, since they can be both results and input
@@ -730,8 +742,33 @@ class LossFunction(LossFunctionBase):
                 atoms.set_initial_magnetic_moments(targets["magmoms"])
 
     def __call__(self, parameters: list[float]) -> float:
+        """Evaluate the loss function."""
         parameters = self.comm.bcast(parameters, root=0)
         self.mtp_data.parameters = parameters
         for atoms in self.images:
             atoms.calc.update_parameters(self.mtp_data)
         return self.calc_loss_function()
+
+    def _jacobian_pass(self, parameters: list[float]) -> None:
+        parameters = self.comm.bcast(parameters, root=0)
+        self.mtp_data.parameters = parameters
+        for atoms in self.images:
+            atoms.calc.update_parameters(self.mtp_data)
+        self._run_jac_calculations()
+
+    def calc_basis(self, parameters: list[float]) -> float:
+        """Populate engine basis data and return the loss value."""
+        self._jacobian_pass(parameters)
+        return self._sum_loss()
+
+    def jac(self, parameters: list[float]) -> npt.NDArray[np.float64]:
+        """Populate engine basis data and return the summed loss Jacobian."""
+        self._jacobian_pass(parameters)
+        return self._sum_jac()
+
+    def loss_and_jac(
+        self, parameters: list[float]
+    ) -> tuple[float, npt.NDArray[np.float64]]:
+        """Return ``(loss, jac)`` from a single Jacobian pass."""
+        self._jacobian_pass(parameters)
+        return self._sum_loss(), self._sum_jac()

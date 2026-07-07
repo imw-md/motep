@@ -47,7 +47,10 @@ class JaxMTPEngine(EngineBase):
             self.basis_converter.remap_mlip_moment_coeffs(self.mtp_data)
         return changed
 
-    def _calculate(self, atoms: Atoms) -> tuple:
+    def _calculate(self, atoms: Atoms, *, jac: bool) -> tuple:
+        if jac:
+            msg = "The jax engine does not support the parameter Jacobian."
+            raise NotImplementedError(msg)
         mtp_data = self.mtp_data
         itypes = jnp.array(get_types(atoms, mtp_data.species))
         js = jnp.array(self._neighbors)

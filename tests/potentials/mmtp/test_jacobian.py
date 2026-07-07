@@ -45,7 +45,7 @@ def test_jac_energy(
     """Test analytical energy Jacobian against finite differences for MMTP."""
     atoms = make_mag_atoms(engine, level, data_path)
 
-    atoms.get_potential_energy()
+    atoms.calc.compute_jacobian(atoms)
     jac_anl = atoms.calc.engine.jac_energy(atoms)
 
     dx = 1e-6
@@ -91,7 +91,7 @@ def test_jac_forces(
     """
     atoms = make_mag_atoms(engine, level, data_path)
 
-    atoms.get_potential_energy()
+    atoms.calc.compute_jacobian(atoms)
     jac_anl = atoms.calc.engine.jac_forces(atoms)
 
     dx = 1e-6

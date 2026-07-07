@@ -104,10 +104,14 @@ class MomentBasisData(ModeBase):
             self.dgdcs = np.full((spc, spc, rfc, rbs, natoms, 3), np.nan)
             self.dsdcs = np.full((spc, spc, rfc, rbs, 3, 3), np.nan)
 
-    def clean(self) -> None:
-        """Clean up moment basis properties."""
+    def clean(self, *, jac: bool = True) -> None:
+        """Clean up moment basis properties.
+
+        ``jac`` (default True) also zeros the derivative arrays; pass False for
+        an ``efs`` pass, which does not touch them.
+        """
         self.vatoms[...] = 0.0
-        if "train" in self.mode:
+        if jac and "train" in self.mode:
             self.dbdris[...] = 0.0
             self.dbdeps[...] = 0.0
             self.dvdcs[...] = 0.0
@@ -144,9 +148,9 @@ class RadialBasisData(ModeBase):
             self.dqdris = np.full((spc, spc, rbs, natoms, 3), np.nan)
             self.dqdeps = np.full((spc, spc, rbs, 3, 3), np.nan)
 
-    def clean(self) -> None:
-        """Clean up radial basis properties."""
-        if "train" in self.mode:
+    def clean(self, *, jac: bool = True) -> None:
+        """Clean up radial basis properties (``jac=False`` skips the arrays)."""
+        if jac and "train" in self.mode:
             self.values[...] = 0.0
             self.dqdris[...] = 0.0
             self.dqdeps[...] = 0.0
@@ -181,9 +185,16 @@ class Jacobian:
 class EngineWithNeighborlist(ModeBase):
     """Class for getting interatomic vectors and hanling neighbor list."""
 
+    static_geometry: bool = False
+
     def __init__(self) -> None:
         self.neighbor_list: PrimitiveNeighborList | None = None
         self.mtp_data: MTPData = MTPData()
+
+    @property
+    def geometry_frozen(self) -> bool:
+        """True once the static-geometry vectors have been cached (frozen)."""
+        return self.static_geometry and hasattr(self, "_interatomic_vectors")
 
     def _initiate_neighbor_list(self, atoms: Atoms) -> None:
         """Initialize the ASE `PrimitiveNeighborList` object."""
@@ -201,12 +212,11 @@ class EngineWithNeighborlist(ModeBase):
 
         Notes
         -----
-        If in training mode, only the interatomic vectors are computed once, and
-        the neighborlist then discarded.
+        With ``static_geometry`` the interatomic vectors are computed once and
+        the neighborlist then discarded (the geometry is assumed fixed).
 
         """
-        # Special handling if in train mode
-        if "train" in self.mode:
+        if self.static_geometry:
             if not hasattr(self, "_interatomic_vectors"):
                 self._initiate_neighbor_list(atoms)
                 self._interatomic_vectors = self._get_interatomic_vectors(atoms)
@@ -224,7 +234,7 @@ class EngineWithNeighborlist(ModeBase):
         return False
 
     def _get_interatomic_vectors(self, atoms: Atoms) -> np.ndarray:
-        if "train" in self.mode and hasattr(self, "_interatomic_vectors"):
+        if self.static_geometry and hasattr(self, "_interatomic_vectors"):
             return self._interatomic_vectors
         max_dist = self.mtp_data.radial_basis.max
         positions = atoms.positions
@@ -273,16 +283,20 @@ class EngineBase(EngineWithNeighborlist):
         mtp_data: MTPData,
         *,
         mode: str = "run",
+        static_geometry: bool = False,
     ) -> None:
-        """MLIP-2 MTP.
+        """Moment tensor potential (MTP) engine.
 
         Parameters
         ----------
         mtp_data : :class:`motep.potentials.mtp.data.MTPData`
-            Parameters in the MLIP .mtp file.
+            Parameters of the MTP.
         mode : {'run', 'train'}, default 'run'
-            Mode of operation. `'train'` computes and stores basis data for
-            training; `'run'` is the default mode suitable for MD.
+            Capability of the engine. ``'train'`` allocates the parameter-
+            Jacobian basis data so that :meth:`jac` may be called; ``'run'``
+            allocates only what :meth:`efs` needs and forbids :meth:`jac`.
+        static_geometry : bool, default False
+            If True, the atomic geometry is assumed fixed across calls.
 
         """
         self._last_state: tuple | None = None
@@ -290,11 +304,10 @@ class EngineBase(EngineWithNeighborlist):
         self.results = {}
         self.neighbor_list = None
         self.mode = mode
+        self.static_geometry = static_geometry
+        self._jac_valid = False
 
-        # moment basis data
         self.mbd = MomentBasisData(mode=mode)
-
-        # used for `Level2MTPOptimizer`
         self.rbd = RadialBasisData(mode=mode)
 
     def update(self, mtp_data: MTPData) -> bool:
@@ -315,6 +328,8 @@ class EngineBase(EngineWithNeighborlist):
         state = mtp_data.basis_state()
         changed = not mtp_data.basis_state_equal(state, self._last_state)
         self._last_state = state
+        if changed:
+            self._jac_valid = False
         return changed
 
     def check_species(self, atoms: Atoms) -> None:
@@ -348,37 +363,56 @@ class EngineBase(EngineWithNeighborlist):
         self.rbd.initialize(natoms, self.mtp_data)
 
     @abstractmethod
-    def _calculate(self, atoms: Atoms) -> tuple: ...
+    def _calculate(self, atoms: Atoms, *, jac: bool) -> tuple: ...
 
-    def calculate(self, atoms: Atoms) -> dict:
-        """Calculate properties of the given system.
+    def _require_train(self) -> None:
+        if "train" not in self.mode:
+            msg = f"jac() requires a train-mode engine, got mode={self.mode!r}."
+            raise RuntimeError(msg)
 
-        Returns
-        -------
-        Dictionary with energies, energy, forces and stress.
+    def efs(self, atoms: Atoms) -> dict:
+        """Compute energies, forces, and stress."""
+        return self._run(atoms, jac=False)
 
+    def jac(self, atoms: Atoms) -> dict:
+        """Compute results and populate the parameter-Jacobian basis data.
+
+        Requires a ``train``-mode engine; the data are then readable via
+        :meth:`get_mbd` / :meth:`get_rbd` / ``jac_*`` until the next ``efs``.
         """
+        self._require_train()
+        return self._run(atoms, jac=True)
+
+    def _run(self, atoms: Atoms, *, jac: bool) -> dict:
         self.check_species(atoms)
         if self.update_neighbor_list(atoms):
             self.initialize_basis_data(atoms)
 
-        energies, forces, stress = self._calculate(atoms)
+        energies, forces, stress = self._calculate(atoms, jac=jac)
 
-        self._symmetrize_stress(atoms, stress)
+        self._symmetrize_stress(atoms, stress, jac=jac)
 
+        self.results = {}
         self.results["energies"] = energies
         self.results["energy"] = self.results["energies"].sum()
         self.results["forces"] = forces
         self.results["stress"] = stress.flat[[0, 4, 8, 5, 2, 1]]
 
+        self._jac_valid = jac
         return self.results
 
-    def _symmetrize_stress(self, atoms: Atoms, stress: np.ndarray) -> None:
+    def _symmetrize_stress(
+        self,
+        atoms: Atoms,
+        stress: np.ndarray,
+        *,
+        jac: bool,
+    ) -> None:
         if atoms.cell.rank == 3:  # noqa: PLR2004
             volume = atoms.get_volume()
             stress += stress.T
             stress *= 0.5 / volume
-            if "train" in self.mode:
+            if jac:
                 self.mbd.dbdeps += self.mbd.dbdeps.transpose(0, 2, 1)
                 self.mbd.dbdeps *= 0.5 / volume
                 self.mbd.dsdcs += self.mbd.dsdcs.swapaxes(-2, -1)
@@ -388,9 +422,28 @@ class EngineBase(EngineWithNeighborlist):
                 self.rbd.dqdeps *= 0.5 / volume
         else:
             stress[:, :] = np.nan
-            if "train" in self.mode:
+            if jac:
                 self.mbd.dbdeps[:, :, :] = np.nan
                 self.rbd.dqdeps[:, :, :] = np.nan
+
+    def _require_jac(self) -> None:
+        if not self._jac_valid:
+            msg = (
+                "basis-Jacobian data is stale: efs() ran after the last jac() "
+                "(or no jac() has run); call jac() before reading basis "
+                "derivatives."
+            )
+            raise RuntimeError(msg)
+
+    def get_mbd(self) -> "MomentBasisData":
+        """Return the moment basis data, asserting the Jacobian is current."""
+        self._require_jac()
+        return self.mbd
+
+    def get_rbd(self) -> "RadialBasisData":
+        """Return the radial basis data, asserting the Jacobian is current."""
+        self._require_jac()
+        return self.rbd
 
     def jac_energy(self, atoms: Atoms) -> MTPData:
         """Calculate the Jacobian of the energy with respect to the MTP parameters.
@@ -401,6 +454,8 @@ class EngineBase(EngineWithNeighborlist):
             Placeholder of the Jacobian of the energy with respect tothe MTP parameters.
 
         """
+        if "radial_coeffs" in self.mtp_data.optimized:
+            self._require_jac()  # only the radial part reads jac-only data
         sps = self.mtp_data.species
         nbs = list(atoms.numbers)
 
@@ -410,7 +465,7 @@ class EngineBase(EngineWithNeighborlist):
             species_coeffs=np.fromiter((nbs.count(s) for s in sps), dtype=float),
             radial_coeffs=self.mbd.dedcs.copy(),
             optimized=self.mtp_data.optimized,
-        )  # placeholder of the Jacobian with respect to the parameters
+        )
 
     def jac_energies(self, atoms: Atoms) -> Jacobian:
         """Calculate the Jacobian of local energies with respect to the MTP parameters.
@@ -421,6 +476,8 @@ class EngineBase(EngineWithNeighborlist):
             Jacobian whose ``parameters`` have the shape of `(nparams, natoms)`.
 
         """
+        if "radial_coeffs" in self.mtp_data.optimized:
+            self._require_jac()  # only the radial part reads jac-only data
         number_of_atoms = len(atoms)
         spicies_coeffs = np.full((self.mtp_data.species_count, number_of_atoms), np.nan)
         for i, s in enumerate(self.mtp_data.species):
@@ -443,6 +500,7 @@ class EngineBase(EngineWithNeighborlist):
             Jacobian whose ``parameters`` have the shape of `(nparams, natoms, 3)`.
 
         """
+        self._require_jac()
         spc = self.mtp_data.species_count
         number_of_atoms = len(atoms)
 
@@ -452,7 +510,7 @@ class EngineBase(EngineWithNeighborlist):
             species_coeffs=np.zeros((spc, number_of_atoms, 3)),
             radial_coeffs=self.mbd.dgdcs * -1.0,
             optimized=self.mtp_data.optimized,
-        )  # placeholder of the Jacobian with respect to the parameters
+        )
 
     def jac_stress(self, atoms: Atoms) -> Jacobian:
         """Calculate the Jacobian of the forces with respect to the MTP parameters.
@@ -463,6 +521,7 @@ class EngineBase(EngineWithNeighborlist):
             Jacobian whose ``parameters`` have the shape of `(nparams, 3, 3)`.
 
         """
+        self._require_jac()
         spc = self.mtp_data.species_count
 
         return Jacobian(
@@ -471,4 +530,4 @@ class EngineBase(EngineWithNeighborlist):
             species_coeffs=np.zeros((spc, 3, 3)),
             radial_coeffs=self.mbd.dsdcs.copy(),
             optimized=self.mtp_data.optimized,
-        )  # placeholder of the Jacobian with respect to the parameters
+        )

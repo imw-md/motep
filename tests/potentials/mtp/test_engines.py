@@ -27,6 +27,17 @@ except ImportError:
     JaxMTPEngine = None  # type: ignore[assignment,misc]
     _jax_available = False
 
+_NO_JAC = (JaxMTPEngine,) if _jax_available else ()
+
+
+def _evaluate(engine: EngineBase, atoms) -> dict:
+    if "train" in engine.mode:
+        if isinstance(engine, _NO_JAC):
+            pytest.skip("engine has no jacobian path")
+        return engine.jac(atoms)
+    return engine.efs(atoms)
+
+
 _numba_param = pytest.param(
     NumbaMTPEngine,
     marks=pytest.mark.skipif(not _numba_available, reason="numba not available"),
@@ -59,7 +70,7 @@ def test_molecules(
     mtp = engine(mtp_data, mode=mode)
     images = [read_cfg(path / "out.cfg", index=0)]
 
-    results_all = [mtp.calculate(atoms) for atoms in images]
+    results_all = [_evaluate(mtp, atoms) for atoms in images]
 
     energies_ref = np.array([_.get_potential_energy() for _ in images])
     energies = np.array([_["energy"] for _ in results_all]).reshape(-1)
@@ -91,7 +102,7 @@ def test_crystals(
     mtp = engine(mtp_data, mode=mode)
     images = [read_cfg(path / "out.cfg", index=-1)]
 
-    results_all = [mtp.calculate(atoms) for atoms in images]
+    results_all = [_evaluate(mtp, atoms) for atoms in images]
 
     energies_ref = np.array([_.get_potential_energy() for _ in images])
     energies = np.array([_["energy"] for _ in results_all]).reshape(-1)
@@ -126,17 +137,17 @@ def test_forces(
     mtp = engine(mtp_data)
     atoms_ref = read_cfg(path / "out.cfg", index=-1)
 
-    forces_ref = mtp.calculate(atoms_ref)["forces"]
+    forces_ref = _evaluate(mtp, atoms_ref)["forces"]
 
     dx = 1e-6
 
     atoms = atoms_ref.copy()
     atoms.positions[0, 0] += dx
-    ep = mtp.calculate(atoms)["energy"]
+    ep = _evaluate(mtp, atoms)["energy"]
 
     atoms = atoms_ref.copy()
     atoms.positions[0, 0] -= dx
-    em = mtp.calculate(atoms)["energy"]
+    em = _evaluate(mtp, atoms)["energy"]
 
     f = -1.0 * (ep - em) / (2.0 * dx)
 
@@ -169,7 +180,7 @@ def test_stress(
     mtp_data = read_mtp(path / "pot.mtp")
     mtp = engine(mtp_data)
     atoms_ref = read_cfg(path / "out.cfg", index=-1)
-    stress_ref = mtp.calculate(atoms_ref)["stress"]
+    stress_ref = _evaluate(mtp, atoms_ref)["stress"]
 
     stress = np.zeros((3, 3), dtype=float)
     eps = 1e-6
@@ -180,12 +191,12 @@ def test_stress(
         x[i, i] = 1.0 + eps
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
-        eplus = mtp.calculate(atoms)["energy"]
+        eplus = _evaluate(mtp, atoms)["energy"]
 
         x[i, i] = 1.0 - eps
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
-        eminus = mtp.calculate(atoms)["energy"]
+        eminus = _evaluate(mtp, atoms)["energy"]
 
         stress[i, i] = (eplus - eminus) / (2.0 * eps * volume)
         x[i, i] = 1.0
@@ -194,12 +205,12 @@ def test_stress(
         x[i, j] = x[j, i] = +0.5 * eps
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
-        eplus = mtp.calculate(atoms)["energy"]
+        eplus = _evaluate(mtp, atoms)["energy"]
 
         x[i, j] = x[j, i] = -0.5 * eps
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
-        eminus = mtp.calculate(atoms)["energy"]
+        eminus = _evaluate(mtp, atoms)["energy"]
 
         stress[i, j] = stress[j, i] = (eplus - eminus) / (2 * eps * volume)
 
@@ -229,8 +240,8 @@ def test_basis_data(
     images = [read_cfg(path / "out.cfg", index=-1)]
 
     for atoms in images:
-        ref.calculate(atoms)
-        mtp.calculate(atoms)
+        _evaluate(ref, atoms)
+        _evaluate(mtp, atoms)
 
         mbd = mtp.mbd
         mbd_ref = ref.mbd
