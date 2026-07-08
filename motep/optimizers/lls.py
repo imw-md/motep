@@ -285,7 +285,7 @@ class LLSOptimizer(LLSOptimizerBase):
         callback = self.callback = Callback(self.loss)
 
         # Calculate basis functions of `loss.images`
-        loss_value = self.rank0_loss(parameters)
+        loss_value = self.rank0_basis(parameters)
         self.rank0_gather_data()
 
         # Print the value of the loss function.
@@ -348,7 +348,7 @@ class LLSOptimizer(LLSOptimizerBase):
 
     def _calc_matrix_energy(self) -> np.ndarray:
         images = self.loss.images
-        matrix = np.array([atoms.calc.engine.mbd.values for atoms in images])
+        matrix = np.array([atoms.calc.engine.get_mbd().values for atoms in images])
         if self.loss.setting.energy_per_atom:
             matrix *= self.loss.loss_energy.inverse_numbers_of_atoms[:, None]
         if self.loss.setting.energy_per_conf:
@@ -363,14 +363,17 @@ class LLSOptimizer(LLSOptimizerBase):
         if self.loss.setting.forces_per_atom:
             matrix = np.vstack(
                 [
-                    images[i].calc.engine.mbd.dbdris.transpose(1, 2, 0)
+                    images[i].calc.engine.get_mbd().dbdris.transpose(1, 2, 0)
                     * sqrt(self.loss.loss_forces.inverse_numbers_of_atoms[i])
                     for i in idcs_frc
                 ],
             )
         else:
             matrix = np.vstack(
-                [images[i].calc.engine.mbd.dbdris.transpose(1, 2, 0) for i in idcs_frc],
+                [
+                    images[i].calc.engine.get_mbd().dbdris.transpose(1, 2, 0)
+                    for i in idcs_frc
+                ],
             )
         if self.loss.setting.forces_per_conf:
             matrix /= sqrt(len(images))
@@ -379,7 +382,7 @@ class LLSOptimizer(LLSOptimizerBase):
     def _calc_matrix_stress(self) -> np.ndarray:
         images = self.loss.images
         idcs_str = self.loss.loss_stress.idcs_str
-        matrix = np.array([images[i].calc.engine.mbd.dbdeps.T for i in idcs_str])
+        matrix = np.array([images[i].calc.engine.get_mbd().dbdeps.T for i in idcs_str])
         if self.loss.setting.stress_times_volume:
             matrix = (matrix.T * self.loss.loss_stress.volumes[idcs_str]).T
             if self.loss.setting.energy_per_atom:
@@ -398,14 +401,17 @@ class LLSOptimizer(LLSOptimizerBase):
         if self.loss.setting.forces_per_atom:
             matrix = np.vstack(
                 [
-                    images[i].calc.engine.mbd.dbdmis.transpose(1, 0)
+                    images[i].calc.engine.get_mbd(mgrad=True).dbdmis.transpose(1, 0)
                     * sqrt(self.loss.loss_mgrad.inverse_numbers_of_atoms[i])
                     for i in idcs_mmg
                 ],
             )
         else:
             matrix = np.vstack(
-                [images[i].calc.engine.mbd.dbdmis.transpose(1, 0) for i in idcs_mmg],
+                [
+                    images[i].calc.engine.get_mbd(mgrad=True).dbdmis.transpose(1, 0)
+                    for i in idcs_mmg
+                ],
             )
         if self.loss.setting.forces_per_conf:
             matrix /= sqrt(len(images))

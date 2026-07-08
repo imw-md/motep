@@ -9,7 +9,7 @@ import numba as nb
 import numpy as np
 from ase import Atoms
 
-from motep.calculator import MTP
+from motep.calculator import make_calculator
 from motep.io.mlip.cfg import read_cfg
 from motep.io.mlip.mtp import read_mtp
 from motep.parallel import world
@@ -22,20 +22,26 @@ fmt = "{:20s}"
 setup_map = {
     "numpy": {"engine": "numpy"},
     "numba": {"engine": "numba"},
-    "numba_train": {"engine": "numba", "mode": "train"},
+    "numba_train": {"engine": "numba", "jac": True},
     "numba_mag": {"engine": "numba", "magnetic": True},
-    "numba_mag_train": {"engine": "numba", "mode": "train", "magnetic": True},
+    "numba_mag_train": {"engine": "numba", "jac": True, "magnetic": True},
     "numba_mag_train_mgrad": {
         "engine": "numba",
-        "mode": "train_mgrad",
+        "jac": True,
+        "mgrad": True,
         "magnetic": True,
     },
     "jax": {"engine": "jax"},
     "cext": {"engine": "cext"},
-    "cext_train": {"engine": "cext", "mode": "train"},
+    "cext_train": {"engine": "cext", "jac": True},
     "cext_mag": {"engine": "cext", "magnetic": True},
-    "cext_mag_train": {"engine": "cext", "mode": "train", "magnetic": True},
-    "cext_mag_train_mgrad": {"engine": "cext", "mode": "train_mgrad", "magnetic": True},
+    "cext_mag_train": {"engine": "cext", "jac": True, "magnetic": True},
+    "cext_mag_train_mgrad": {
+        "engine": "cext",
+        "jac": True,
+        "mgrad": True,
+        "magnetic": True,
+    },
 }
 
 all_setups = [
@@ -112,7 +118,8 @@ def _time_mtp(
     images: list[Atoms],
     *,
     engine: str,
-    mode: str = "run",
+    jac: bool = False,
+    mgrad: bool = False,
     magnetic: bool = False,
 ) -> np.ndarray:
     mtp_data = read_mtp(pot_path)
@@ -128,18 +135,30 @@ def _time_mtp(
         if atomic_number not in species:
             species.append(atomic_number)
     mtp_data.species = species
-    calc = MTP(mtp_data, engine=engine, mode=mode)
+    # The Jacobian pass requires a train-mode engine; ``mgrad`` needs train_mgrad.
+    mode = ("train_mgrad" if mgrad else "train") if jac else "run"
+    calc = make_calculator(mtp_data, engine=engine, mode=mode)
     calc.use_cache = False
 
-    suffix = f" ({'mag, ' if magnetic else ''}{mode})"
+    label = ("jac_mgrad" if mgrad else "jac") if jac else "efs"
+    suffix = f" ({'mag, ' if magnetic else ''}{label})"
+
+    def run_one(atoms: Atoms) -> float:
+        if not jac:
+            return calc.get_potential_energy(atoms)
+        if magnetic:
+            calc.compute_jacobian(atoms, mgrad=mgrad)
+        else:
+            calc.compute_jacobian(atoms)
+        return calc.results["energy"]
 
     # Make initial calc to not time things like compile time and things that are cachable
     with Timer(fmt.format(engine + suffix + " (0th)")):
-        calc.get_potential_energy(images[-1])
+        run_one(images[-1])
 
     comm.barrier()
     with Timer(fmt.format(engine + suffix)):
-        energies = [calc.get_potential_energy(_) for _ in images]
+        energies = [run_one(_) for _ in images]
         comm.barrier()
     return np.array(energies)
 

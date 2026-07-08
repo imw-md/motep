@@ -22,6 +22,12 @@ except ImportError:
     NumbaMagMTPEngine = None  # type: ignore[assignment,misc]
     _numba_available = False
 
+def _evaluate(engine: MagEngineBase, atoms, magmoms=None) -> dict:
+    if "train" in engine.mode:
+        return engine.jac(atoms, magmoms, mgrad=engine.mode == "train_mgrad")
+    return engine.efs(atoms, magmoms)
+
+
 _numba_mag_param = pytest.param(
     NumbaMagMTPEngine,
     marks=pytest.mark.skipif(not _numba_available, reason="numba not available"),
@@ -47,7 +53,7 @@ class TestCollinearMagmoms:
     def test_2d_all_zero_columns_accepted(self, mag_engine_and_atoms) -> None:
         engine, atoms = mag_engine_and_atoms
         magmoms_2d = np.zeros((len(atoms), 3))
-        result = engine.calculate(atoms, magmoms=magmoms_2d)
+        result = _evaluate(engine, atoms, magmoms=magmoms_2d)
         assert "energy" in result
 
     def test_2d_noncollinear_raises(self, mag_engine_and_atoms) -> None:
@@ -56,7 +62,7 @@ class TestCollinearMagmoms:
         magmoms_2d[:, 0] = 1.0
         magmoms_2d[:, 2] = 1.0
         with pytest.raises(ValueError, match="Non-collinear"):
-            engine.calculate(atoms, magmoms=magmoms_2d)
+            _evaluate(engine, atoms, magmoms=magmoms_2d)
 
 
 @pytest.mark.parametrize("level", [2, 4, 6, 8, 10])
@@ -97,8 +103,8 @@ def test_mmtp_energies_forces_stress(
     atoms.set_initial_magnetic_moments(atoms.get_magnetic_moments())
 
     # Calculate with both engines
-    result = engine.calculate(atoms)
-    ref_result = ref_engine.calculate(atoms)
+    result = _evaluate(engine, atoms)
+    ref_result = _evaluate(ref_engine, atoms)
 
     # Compare energies
     np.testing.assert_allclose(
@@ -162,17 +168,17 @@ def test_mgrad(
     atoms_ref = read_cfg(path / "mag.cfg", index=-1)
     atoms_ref.set_initial_magnetic_moments(atoms_ref.get_magnetic_moments())
 
-    mag_grad_ref = engine.calculate(atoms_ref)["mgrad"]
+    mag_grad_ref = _evaluate(engine, atoms_ref)["mgrad"]
 
     dx = 1e-6
 
     atoms = atoms_ref.copy()
     atoms.arrays["initial_magmoms"][0] += dx
-    ep = engine.calculate(atoms)["energy"]
+    ep = _evaluate(engine, atoms)["energy"]
 
     atoms = atoms_ref.copy()
     atoms.arrays["initial_magmoms"][0] -= dx
-    em = engine.calculate(atoms)["energy"]
+    em = _evaluate(engine, atoms)["energy"]
 
     t = +1.0 * (ep - em) / (2.0 * dx)
 
@@ -202,17 +208,17 @@ def test_forces(
     atoms_ref = read_cfg(path / "mag.cfg", index=-1)
     atoms_ref.set_initial_magnetic_moments(atoms_ref.get_magnetic_moments())
 
-    forces_ref = engine.calculate(atoms_ref)["forces"]
+    forces_ref = _evaluate(engine, atoms_ref)["forces"]
 
     dx = 1e-6
 
     atoms = atoms_ref.copy()
     atoms.positions[0, 0] += dx
-    ep = engine.calculate(atoms)["energy"]
+    ep = _evaluate(engine, atoms)["energy"]
 
     atoms = atoms_ref.copy()
     atoms.positions[0, 0] -= dx
-    em = engine.calculate(atoms)["energy"]
+    em = _evaluate(engine, atoms)["energy"]
 
     f = -1.0 * (ep - em) / (2.0 * dx)
 
@@ -243,7 +249,7 @@ def test_stress(
     magmoms = atoms_ref.get_magnetic_moments().copy()
     atoms_ref.set_initial_magnetic_moments(magmoms)
 
-    stress_ref = mtp.calculate(atoms_ref)["stress"]
+    stress_ref = _evaluate(mtp, atoms_ref)["stress"]
 
     stress = np.zeros((3, 3), dtype=float)
     eps = 1e-6
@@ -255,13 +261,13 @@ def test_stress(
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
         atoms.set_initial_magnetic_moments(magmoms)
-        eplus = mtp.calculate(atoms)["energy"]
+        eplus = _evaluate(mtp, atoms)["energy"]
 
         x[i, i] = 1.0 - eps
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
         atoms.set_initial_magnetic_moments(magmoms)
-        eminus = mtp.calculate(atoms)["energy"]
+        eminus = _evaluate(mtp, atoms)["energy"]
 
         stress[i, i] = (eplus - eminus) / (2.0 * eps * volume)
         x[i, i] = 1.0
@@ -271,13 +277,13 @@ def test_stress(
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
         atoms.set_initial_magnetic_moments(magmoms)
-        eplus = mtp.calculate(atoms)["energy"]
+        eplus = _evaluate(mtp, atoms)["energy"]
 
         x[i, j] = x[j, i] = -0.5 * eps
         atoms = atoms_ref.copy()
         atoms.set_cell(cell @ x, scale_atoms=True)
         atoms.set_initial_magnetic_moments(magmoms)
-        eminus = mtp.calculate(atoms)["energy"]
+        eminus = _evaluate(mtp, atoms)["energy"]
 
         stress[i, j] = stress[j, i] = (eplus - eminus) / (2 * eps * volume)
 
@@ -315,8 +321,8 @@ def test_basis_data(
     atoms = read_cfg(path / "mag.cfg", index=-1)
     atoms.set_initial_magnetic_moments(atoms.get_magnetic_moments())
 
-    ref.calculate(atoms)
-    mtp.calculate(atoms)
+    _evaluate(ref, atoms)
+    _evaluate(mtp, atoms)
 
     mbd = mtp.mbd
     mbd_ref = ref.mbd

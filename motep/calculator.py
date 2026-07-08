@@ -1,5 +1,8 @@
 """ASE Calculators."""
 
+import importlib
+from typing import ClassVar
+
 import numpy as np
 from ase import Atoms
 from ase.calculators.calculator import Calculator, all_changes
@@ -36,17 +39,22 @@ def make_mtp_engine(
     magnetic : bool
         If True, return the magnetic variant of the engine.
 
-    """
-    import importlib
+    Raises
+    ------
+    ValueError
+        If the engine name is unknown or does not support magnetic potentials.
 
+    """
     registry = _MAGNETIC_ENGINES if magnetic else _ENGINES
     if engine not in registry:
         if magnetic:
-            raise ValueError(
+            msg = (
                 f"Engine {engine!r} does not support magnetic potentials. "
                 f"Supported: {sorted(_MAGNETIC_ENGINES)}"
             )
-        raise ValueError(f"Unknown engine {engine!r}. Supported: {sorted(_ENGINES)}")
+            raise ValueError(msg)
+        msg = f"Unknown engine {engine!r}. Supported: {sorted(_ENGINES)}"
+        raise ValueError(msg)
     module_path, _, class_name = registry[engine].rpartition(".")
     return getattr(importlib.import_module(module_path), class_name)
 
@@ -57,6 +65,7 @@ def make_calculator(
     mode: str = "run",
     *,
     relax_magmoms: bool | None = None,
+    static_geometry: bool = False,
     **kwargs: dict,
 ) -> "MTP | MMTP":
     """Create the appropriate calculator based on data type.
@@ -73,6 +82,8 @@ def make_calculator(
     relax_magmoms : bool or None
         Whether to relax magnetic moments.  ``None`` (default) resolves to
         ``True`` for ``mode="run"`` with magnetic data, ``False`` otherwise.
+    static_geometry : bool, default False
+        If True, the atomic geometry is assumed fixed across calls.
     **kwargs
         Forwarded to the calculator constructor (e.g. ``warm_start_magmoms``).
 
@@ -86,9 +97,20 @@ def make_calculator(
         if relax_magmoms is None:
             relax_magmoms = mode == "run"
         return MMTP(
-            mtp_data, engine=engine, mode=mode, relax_magmoms=relax_magmoms, **kwargs
+            mtp_data,
+            engine=engine,
+            mode=mode,
+            relax_magmoms=relax_magmoms,
+            static_geometry=static_geometry,
+            **kwargs,
         )
-    return MTP(mtp_data, engine=engine, mode=mode, **kwargs)
+    return MTP(
+        mtp_data,
+        engine=engine,
+        mode=mode,
+        static_geometry=static_geometry,
+        **kwargs,
+    )
 
 
 class MTP(Calculator):
@@ -102,23 +124,49 @@ class MTP(Calculator):
         "stress",
     )
 
+    # System changes that invalidate the frozen static-geometry vectors.
+    _geometry_changes: ClassVar[frozenset] = frozenset(
+        {"positions", "numbers", "cell", "pbc"},
+    )
+
     def __init__(
         self,
         mtp_data: MTPData,
         *args: tuple,
         engine: str = "cext",
         mode: str = "run",
+        static_geometry: bool = False,
         **kwargs: dict,
     ) -> None:
         super().__init__(*args, **kwargs)
         magnetic = isinstance(mtp_data, MagMTPData)
         engine_cls = make_mtp_engine(engine, magnetic=magnetic)
-        self.engine: EngineBase = engine_cls(mtp_data, mode=mode)
+        self.engine: EngineBase = engine_cls(
+            mtp_data,
+            mode=mode,
+            static_geometry=static_geometry,
+        )
 
     def update_parameters(self, mtp_data: MTPData) -> None:
         """Update MTP parameters."""
         if self.engine.update(mtp_data):
             self.results = {}
+
+    def _store(self, atoms: Atoms, results: dict) -> None:
+        self.results = results
+        self.results["free_energy"] = self.results["energy"]
+        if atoms.cell.rank != 3 and "stress" in self.results:  # noqa: PLR2004
+            del self.results["stress"]
+
+    def _guard_static_geometry(self, system_changes: list[str]) -> None:
+        if self.engine.geometry_frozen and self._geometry_changes.intersection(
+            system_changes,
+        ):
+            msg = (
+                "Atomic geometry changes not allowed when initialized with "
+                "static_geometry=True."
+            )
+            raise RuntimeError(msg)
 
     def calculate(
         self,
@@ -127,14 +175,15 @@ class MTP(Calculator):
         system_changes: list[str] = all_changes,
     ) -> None:
         """Calculate."""
+        self._guard_static_geometry(system_changes)
         super().calculate(atoms, properties, system_changes)
+        self._store(self.atoms, self.engine.efs(self.atoms))
 
-        self.results = self.engine.calculate(self.atoms)
-
-        self.results["free_energy"] = self.results["energy"]
-
-        if self.atoms.cell.rank != 3 and "stress" in self.results:
-            del self.results["stress"]
+    def compute_jacobian(self, atoms: Atoms) -> None:
+        """Run a Jacobian pass, populating engine basis data and results."""
+        self._guard_static_geometry(self.check_state(atoms))
+        Calculator.calculate(self, atoms)
+        self._store(atoms, self.engine.jac(atoms))
 
 
 class MMTP(MTP):
@@ -162,7 +211,7 @@ class MMTP(MTP):
 
     """
 
-    implemented_properties = (
+    implemented_properties: ClassVar[tuple] = (
         "energy",
         "free_energy",
         "energies",
@@ -172,7 +221,7 @@ class MMTP(MTP):
         "magmoms",
     )
 
-    default_parameters = {
+    default_parameters: ClassVar[dict] = {
         "relax_magmoms": False,
         "warm_start_magmoms": True,
     }
@@ -183,13 +232,18 @@ class MMTP(MTP):
         *args,
         engine: str = "cext",
         mode: str = "run",
+        static_geometry: bool = False,
         **kwargs,
     ) -> None:
         if not isinstance(mtp_data, MagMTPData):
             mtp_data = MagMTPData.from_base(mtp_data)
         Calculator.__init__(self, *args, **kwargs)
         engine_cls = make_mtp_engine(engine, magnetic=True)
-        self.engine: MagEngineBase = engine_cls(mtp_data, mode=mode)
+        self.engine: MagEngineBase = engine_cls(
+            mtp_data,
+            mode=mode,
+            static_geometry=static_geometry,
+        )
         self._relaxed_magmoms: np.ndarray | None = None
 
     def update_parameters(self, mtp_data: MagMTPData) -> None:
@@ -207,6 +261,7 @@ class MMTP(MTP):
         properties: list[str] = ["energy"],
         system_changes: list[str] = all_changes,
     ) -> None:
+        self._guard_static_geometry(system_changes)
         Calculator.calculate(self, atoms, properties, system_changes)
 
         relax = self.parameters.get("relax_magmoms", False)
@@ -223,14 +278,17 @@ class MMTP(MTP):
             else:
                 magmoms_init = None  # engine will read from atoms
 
-            self.results = self.engine.relax_magnetic_moments(
-                self.atoms, magmoms_init=magmoms_init
+            results = self.engine.relax_magnetic_moments(
+                self.atoms,
+                magmoms_init=magmoms_init,
             )
-            self._relaxed_magmoms = self.results["magmoms"].copy()
+            self._relaxed_magmoms = results["magmoms"].copy()
+            self._store(self.atoms, results)
         else:
-            self.results = self.engine.calculate(self.atoms)
+            self._store(self.atoms, self.engine.efs(self.atoms))
 
-        self.results["free_energy"] = self.results["energy"]
-
-        if self.atoms.cell.rank != 3 and "stress" in self.results:
-            del self.results["stress"]
+    def compute_jacobian(self, atoms: Atoms, *, mgrad: bool = False) -> None:
+        """Run a Jacobian pass, populating engine basis data and results."""
+        self._guard_static_geometry(self.check_state(atoms))
+        Calculator.calculate(self, atoms)  # refresh self.atoms baseline (copy)
+        self._store(atoms, self.engine.jac(atoms, mgrad=mgrad))

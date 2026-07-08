@@ -52,7 +52,7 @@ class NumpyMTPEngine(EngineBase):
         moment_basis = MomentBasis(self.mtp_data)
         return moment_basis.calculate(itype, jtypes, r_ijs, r_abs, self.rb)
 
-    def _calculate(self, atoms: Atoms) -> tuple:
+    def _calculate(self, atoms: Atoms, *, jac: bool) -> tuple:
         itypes = get_types(atoms, self.mtp_data.species)
         energies = self.mtp_data.species_coeffs[itypes]
 

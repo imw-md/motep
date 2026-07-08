@@ -115,12 +115,10 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
         callback = self.callback = Callback(self.loss)
         callback(OptimizeResult(x=parameters, fun=self.rank0_loss(parameters)))
 
-        kwargs["jac"] = kwargs.get("jac", True)
-        if kwargs["jac"]:
-            if "scaling" in self.optimized:
-                msg = "`jac` cannot (so far) be used to optimize `scaling`."
-                raise ValueError(msg)
-            kwargs["jac"] = self.rank0_jac
+        use_jac = kwargs.get("jac", True)
+        if use_jac and "scaling" in self.optimized:
+            msg = "`jac` cannot (so far) be used to optimize `scaling`."
+            raise ValueError(msg)
         if kwargs.get("method", "").lower() in {
             "cg",
             "bfgs",
@@ -132,8 +130,11 @@ class ScipyMinimizeOptimizer(ScipyOptimizerBase):
         }:
             bounds = None
 
+        kwargs["jac"] = use_jac
+        fun = self.rank0_loss_and_jac if use_jac else self.rank0_loss
+
         result = minimize(
-            self.rank0_loss,
+            fun,
             parameters,
             bounds=bounds,
             callback=callback,
