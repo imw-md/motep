@@ -94,7 +94,7 @@ class CExtMTPEngine(EngineBase):
 
         moment_coeffs = mtp_data.moment_coeffs
 
-        forces = np.sum(moment_coeffs * self.mbd.dbdris.T, axis=-1).T * -1.0
-        stress = np.sum(moment_coeffs * self.mbd.dbdeps.T, axis=-1).T
+        forces = -np.tensordot(moment_coeffs, self.mbd.dbdris, axes=(0, 0))
+        stress = np.tensordot(moment_coeffs, self.mbd.dbdeps, axes=(0, 0))
 
         return energies, forces, stress
