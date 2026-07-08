@@ -184,10 +184,13 @@ def _time_mlp_per_iter(
 
 
 def _species_of(images) -> list[int]:
+    if not images:
+        raise ValueError("no configurations to benchmark (cfg file is empty)")
     species: list[int] = []
-    for z in images[0].numbers:
-        if z not in species:
-            species.append(z)
+    for img in images:
+        for z in img.numbers:
+            if z not in species:
+                species.append(int(z))
     return species
 
 
