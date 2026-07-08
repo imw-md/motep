@@ -42,8 +42,10 @@ Prepare a small subset cfg (keeps the sweep fast).
 """
 
 import argparse
+import atexit
 import os
 import pathlib
+import shutil
 import subprocess
 import tempfile
 from time import perf_counter
@@ -177,6 +179,8 @@ def _time_mlp_per_iter(
         return perf_counter() - t0
 
     k1, k2 = iters
+    if k2 <= k1:
+        raise ValueError(f"mlp iters must satisfy K2 > K1, got {iters!r}")
     t1 = run(k1)
     t2 = run(k2)
     per_iter = (t2 - t1) / (k2 - k1) * 1000.0
@@ -229,6 +233,7 @@ def main(
     print(header)
 
     tmpdir = tempfile.mkdtemp(prefix="motep_crossover_")
+    atexit.register(shutil.rmtree, tmpdir, ignore_errors=True)
 
     for level in levels:
         pot_path = data_path / f"fitting/crystals/{crystal}/{level:02d}/pot.mtp"
@@ -248,7 +253,7 @@ def main(
                 c.compute_jacobian(a)
 
         t_motep = _time(motep_pass, n_repeat)
-        norm_us = t_motep * 1e3 / (natoms * len(images) * n_basic)
+        norm_us = t_motep * 1e3 / (sum(len(img) for img in images) * n_basic)
 
         if mlp_cfg is not None:
             t_ref = _time_mlp_per_iter(
