@@ -207,7 +207,7 @@ class EngineWithNeighborlist(ModeBase):
         self.neighbor_list.update(atoms.pbc, atoms.cell, atoms.positions)
         self._neighbors, self._offsets = self._get_neighbors_and_offsets(atoms)
 
-    def update_neighbor_list(self, atoms: Atoms) -> None:
+    def update_neighbor_list(self, atoms: Atoms) -> bool:
         """Update the ASE `PrimitiveNeighborList` object.
 
         Notes
