@@ -1,19 +1,16 @@
 """ASE Calculators."""
 
 import importlib
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar
 
+import numpy as np
 from ase import Atoms
 from ase.calculators.calculator import Calculator, all_changes
 
+from motep.potentials.mmtp.base import MagEngineBase
 from motep.potentials.mmtp.data import MagMTPData
 from motep.potentials.mtp.base import EngineBase
 from motep.potentials.mtp.data import MTPData
-
-if TYPE_CHECKING:
-    import numpy as np
-
-    from motep.potentials.mmtp.base import MagEngineBase
 
 _ENGINES = {
     "numpy": "motep.potentials.mtp.numpy.engine.NumpyMTPEngine",

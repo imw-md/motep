@@ -11,7 +11,7 @@ from ase import Atoms
 from ase.stress import voigt_6_to_full_3x3_stress
 from scipy.constants import eV
 
-from motep.calculator import MMTP, make_calculator
+from motep.calculator import MMTP, MTP, make_calculator
 from motep.parallel import DummyMPIComm, world
 from motep.potentials.mmtp.data import MagMTPData
 from motep.potentials.mtp.data import MTPData
@@ -514,20 +514,24 @@ class LossFunctionBase(ABC):
             for i in range(ncnf):
                 root = i % size
                 if root != 0 and hasattr(self.images[i].calc, "engine"):
-                    engine = self.images[i].calc.engine
+                    calc: MTP = self.images[i].calc
+                    engine = calc.engine
                     engine.mbd = self.comm.recv(source=root, tag=i + ncnf)
                     engine.rbd = self.comm.recv(source=root, tag=i + 2 * ncnf)
-                    # received data were produced by a jac pass on ``root``
-                    engine._jac_valid = True
-                    if isinstance(self.images[i].calc, MMTP):
-                        engine._mgrad_valid = True
+                    cache = self.comm.recv(source=root, tag=i + 3 * ncnf)
+                    for name, value in cache.items():
+                        setattr(engine, name, value)
         else:
             for i in range(rank, ncnf, size):
                 if hasattr(self.images[i].calc, "engine"):
-                    self.comm.send(self.images[i].calc.engine.mbd, dest=0, tag=i + ncnf)
-                    self.comm.send(
-                        self.images[i].calc.engine.rbd, dest=0, tag=i + 2 * ncnf
-                    )
+                    calc: MTP = self.images[i].calc
+                    engine = calc.engine
+                    self.comm.send(engine.mbd, dest=0, tag=i + ncnf)
+                    self.comm.send(engine.rbd, dest=0, tag=i + 2 * ncnf)
+                    cache = {"_jac_valid": engine._jac_valid}
+                    if hasattr(engine, "_mgrad_valid"):
+                        cache["_mgrad_valid"] = engine._mgrad_valid
+                    self.comm.send(cache, dest=0, tag=i + 3 * ncnf)
 
     def _sum_loss(self) -> float:
         return (
