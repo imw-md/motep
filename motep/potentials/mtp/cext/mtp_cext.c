@@ -284,19 +284,6 @@ void calc_train(
                            m, m_jac);
 
         /* ====================================================================
-         * Step 5b: Compute jacobians of basic moments w.r.t. radial coefficients
-         * ==================================================================== */
-        double *moment_jac_cs = (double *)calloc(n_basic * species_count * radial_funcs_count * rbs, sizeof(double));
-        double *moment_jac_rc = (double *)calloc(n_basic * species_count * radial_funcs_count * rbs * n_neighbors * 3, sizeof(double));
-
-        calc_basic_moments_jac_radial_coeffs(
-            n_neighbors, r_abs, r_unit, radial_basis, drb_drs,
-            alpha_index_basic, n_basic,
-            species_count, jtype_i,
-            radial_funcs_count, rbs,
-            moment_jac_cs, moment_jac_rc);
-
-        /* ====================================================================
          * Step 6: Contract moments through alpha_index_times
          * ==================================================================== */
         /* Contract moment values */
@@ -307,6 +294,8 @@ void calc_train(
 
         /* ====================================================================
          * Step 6a: Compute dedmb and dgdmb (backprop through moment contractions)
+         * Reordered before the radial-coeff Jacobian so the fused kernel below
+         * can fold dedmb in on the fly (dedmb does not depend on moment_jac_rc).
          * ==================================================================== */
         double *dedmb = (double *)calloc(alpha_moments_count, sizeof(double));
         double *dgdmb = (double *)calloc(alpha_moments_count * n_neighbors * 3, sizeof(double));
@@ -324,6 +313,22 @@ void calc_train(
             dgdmb);
 
         /* ====================================================================
+         * Step 5b: Jacobian of basic moments w.r.t. radial coefficients.
+         * Only moment_jac_cs is materialized; the large per-neighbor buffer
+         * moment_jac_rc (up to 16 MB/atom) is skipped by passing NULL — the
+         * fused kernel in Step 6c recomputes those derivatives and folds dedmb
+         * in directly, so the 16 MB scratch is never streamed through RAM.
+         * ==================================================================== */
+        double *moment_jac_cs = (double *)calloc(n_basic * species_count * radial_funcs_count * rbs, sizeof(double));
+
+        calc_basic_moments_jac_radial_coeffs(
+            n_neighbors, r_abs, r_unit, radial_basis, drb_drs,
+            alpha_index_basic, n_basic,
+            species_count, jtype_i,
+            radial_funcs_count, rbs,
+            moment_jac_cs, NULL);
+
+        /* ====================================================================
          * Step 6b: Accumulate dvdcs from basic moment jacobians
          * ==================================================================== */
         accumulate_mbd_dvdcs(
@@ -339,28 +344,32 @@ void calc_train(
             mbd->dvdcs);
 
         /* ====================================================================
-         * Step 6c: Accumulate dgdcs from basic moment jacobians
+         * Step 6c: Accumulate dgdcs/dsdcs (fused radial-coeff Jacobian)
          * ==================================================================== */
-        accumulate_mbd_dgdcs_dsdcs(
+        accumulate_dgdcs_dsdcs_fused(
             i,
             itype,
             n_atoms,
             n_neighbors,
             js_i,
             rs_i,
+            r_abs,
+            r_unit,
+            radial_basis,
+            drb_drs,
+            alpha_index_basic,
             n_basic,
             species_count,
+            jtype_i,
             radial_funcs_count,
             rbs,
             moment_jac_cs,
-            moment_jac_rc,
             dedmb,
             dgdmb,
             mbd->dgdcs,
             mbd->dsdcs);
 
         free(moment_jac_cs);
-        free(moment_jac_rc);
         free(dedmb);
         free(dgdmb);
 
