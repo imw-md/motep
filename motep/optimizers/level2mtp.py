@@ -162,7 +162,12 @@ class Level2MTPOptimizer(LLSOptimizerBase):
         nrb = self.loss.mtp_data.radial_coeffs.shape[3]
         size = species_count * species_count * nrb
 
-        matrix = np.array([images[i].calc.engine.get_rbd().dqdeps.T for i in idcs])
+        matrix = np.array(
+            [
+                images[i].calc.engine.get_rbd().dqdeps.transpose(3, 4, 0, 1, 2)
+                for i in idcs
+            ]
+        )
         if self.loss.setting.stress_times_volume:
             matrix = (matrix.T * self.loss.loss_stress.volumes[idcs]).T
             if self.loss.setting.energy_per_atom:
