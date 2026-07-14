@@ -406,12 +406,10 @@ static inline void compute_dedmb_dgdmb(
  * Accumulate dgdcs/dsdcs — FUSED radial-coeff Jacobian.
  *
  * Replaces the old two-pass scheme (materialize the 16 MB/atom `moment_jac_rc`
- * then contract it against `dedmb`). Instead we recompute each per-neighbor
- * radial-coeff derivative `der0/der1/der2` exactly as
  * `calc_basic_moments_jac_radial_coeffs` did and immediately fold in
- * `dedmb[i_aib]`, accumulating straight into the cache-resident `tmp_dgdcs`
- * (~80 KB). Only the live `(jtype[k], mu)` slot is touched, so the old dense
- * consumer's `species_count * radial_funcs_count` wasted zero-reads vanish too.
+ * `dedmb[i_aib]`, accumulating straight into the per-atom scratch `tmp_dgdcs`
+ * (size: `species_count * radial_funcs_count * radial_basis_size * n_neighbors * 3` doubles). Only the live
+ * `(jtype[k], mu)` slot is touched, so the old dense
  *
  * Loops 2 (moment_jac_cs * dgdmb) and 3 (neighbor scatter into dgdcs/dsdcs) are
  * unchanged from the previous consumer — neither ever touched moment_jac_rc.
