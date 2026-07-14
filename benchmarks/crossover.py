@@ -1,44 +1,34 @@
-"""Locate the level where motep's parameter-Jacobian pass goes bandwidth bound.
+"""Time motep's parameter-Jacobian ("train") pass across MTP levels.
 
-The cext ``train`` engine builds, per atom, a ``moment_jac_rc`` scratch buffer
-of size ``n_basic * species * radial_funcs * radial_basis * n_neighbors * 3``
-doubles. Once this no longer fits in cache the kernel becomes memory-bandwidth
-bound and its per-level cost climbs steeply. This script sweeps levels and times
-the motep Jacobian pass (``calc.compute_jacobian``) against a reference to find
-that crossover.
+Sweeps a range of levels and times the motep Jacobian pass
+(``calc.compute_jacobian``) against a reference, to see how the per-level cost
+scales -- e.g. to spot where the training kernel's per-work cost starts to climb.
 
 Two references are supported:
 
 * ``--mlp-cfg FILE``: times the real ``mlp train`` CLI and motep on the same
   configurations. ``mlp train`` is timed by two-point subtraction -- run at two
   iteration limits and divide the time difference by the iteration delta -- so
-  all fixed startup cost cancels, leaving milliseconds per BFGS iteration. Both
-  the MLIP-2 (``--max-iter``, ``--trained-pot-name``) and MLIP-3 / spin-MLIP
-  (``--iteration_limit``, ``--save_to``) dialects are supported and auto-detected
-  from ``mlp help train``; override with ``--mlp-flavor``. The trained potential
-  is always written to a temp file (MLIP-3 ``--save_to`` overwrites otherwise).
-
-  One BFGS iteration includes a line search, so it spans *several* EFS+gradient
-  evaluations over the set -- not one -- whereas the motep column times a single
-  Jacobian pass. Pass ``--mlp-evals-per-iter N`` to divide the mlp time by ``N``
-  and compare per-evaluation; the column is then labelled ``mlp/eval``. Note the
-  two-point subtraction cancels fixed cost but does not normalise the
-  line-search count, so ``N`` is an estimate of its average over iterations
-  ``K1..K2``.
+  fixed startup cost cancels, leaving milliseconds per BFGS iteration. The MLIP-2
+  and MLIP-3 CLI dialects are auto-detected from ``mlp help train``; override
+  with ``--mlp-flavor``. One BFGS iteration includes a line search (several
+  EFS+gradient sweeps), so pass ``--mlp-evals-per-iter N`` to divide by that
+  count and compare per-evaluation.
 
 * no ``--mlp-cfg``: uses motep ``run`` mode (EFS only, no parameter Jacobian) as
   the reference.
 
-The ``norm`` column is the motep Jacobian time per atom-image per unit of
-``n_basic``. It is ~flat while the buffer is cache resident and rises once the
-kernel goes bandwidth bound; the level where it starts climbing is the crossover.
+Columns:
+
+* ``scratch/atom`` -- per-atom size of the fused radial-coeff Jacobian working
+  set (``species * radial_funcs * radial_basis * n_neighbors * 3`` doubles); a
+  proxy for how much hot scratch the kernel touches.
+* ``norm(us)`` -- Jacobian time per atom-image per unit of ``n_basic``; roughly
+  flat while the kernel stays compute/cache bound and rises if it does not.
 
 Run::
 
-    python -m benchmarks.crossover --mlp-cfg /path/to/subset.cfg \
-        --levels 8 10 12 14 16 18 20
-
-Prepare a small subset cfg (keeps the sweep fast).
+    python -m benchmarks.crossover --levels 8 10 12 14 16 18 20
 """
 
 import argparse
@@ -68,12 +58,12 @@ def _time(fn, n_repeat: int) -> float:
     return best * 1000.0
 
 
-def _moment_jac_rc_bytes(mtp_data, n_neighbors: int) -> int:
-    n_basic = len(mtp_data.alpha_index_basic)
+def _tmp_dgdcs_bytes(mtp_data, n_neighbors: int) -> int:
+    """Per-atom size of the fused radial-coeff Jacobian scratch (``tmp_dgdcs``)."""
     rfc = mtp_data.radial_funcs_count
     rbs = mtp_data.radial_basis.size
     spc = mtp_data.species_count
-    return n_basic * spc * rfc * rbs * n_neighbors * 3 * 8
+    return spc * rfc * rbs * n_neighbors * 3 * 8
 
 
 def _make_calc(pot_path: pathlib.Path, species: list[int], *, mode: str) -> MTP:
@@ -227,7 +217,7 @@ def main(
     ref_desc = f"{ref_label} ({mlp_flavor})" if mlp_cfg is not None else ref_label
     print(f"=== {len(images)} configs x {natoms} atoms | reference = {ref_desc} ===")
     header = (
-        f"{'lvl':>3} {'n_basic':>7} {'mjac_rc/atom':>12} "
+        f"{'lvl':>3} {'n_basic':>7} {'scratch/atom':>12} "
         f"{'motep(ms)':>10} {ref_label:>10} {'motep/ref':>10} {'norm(us)':>9}"
     )
     print(header)
@@ -246,7 +236,7 @@ def main(
         train_calc = _make_calc(pot_path, species, mode="train")
         train_calc.compute_jacobian(images[-1])  # warm up
         nn = train_calc.engine._neighbors.shape[1]
-        mjrc_kb = _moment_jac_rc_bytes(mtp_data, nn) / 1024.0
+        scratch_kb = _tmp_dgdcs_bytes(mtp_data, nn) / 1024.0
 
         def motep_pass(c=train_calc):
             for a in images:
@@ -276,7 +266,7 @@ def main(
             t_ref = _time(run_pass, n_repeat)
 
         print(
-            f"{level:>3} {n_basic:>7} {mjrc_kb:>10.1f}K "
+            f"{level:>3} {n_basic:>7} {scratch_kb:>10.1f}K "
             f"{t_motep:>10.1f} {t_ref:>10.1f} {t_motep / t_ref:>10.2f} {norm_us:>9.3f}",
             flush=True,
         )
