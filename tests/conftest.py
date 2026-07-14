@@ -1,5 +1,6 @@
 """Common setting for pytest."""
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -27,3 +28,15 @@ def doc_path() -> Path:
 
     """
     return Path(__file__).parents[1] / "docs"
+
+
+def pytest_configure(config) -> None:
+    """Configure pytest."""
+    logging.getLogger("motep").setLevel(logging.DEBUG)
+
+
+def pytest_collection_modifyitems(items) -> None:
+    """Set DEBUG level on all test_* loggers after collection."""
+    for name in logging.root.manager.loggerDict:
+        if name.startswith("test_"):
+            logging.getLogger(name).setLevel(logging.DEBUG)
