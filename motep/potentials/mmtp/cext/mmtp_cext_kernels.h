@@ -457,64 +457,130 @@ static inline void accumulate_mbd_dbdmis(
 }
 
 /* ==========================================================================
- * Helper: Accumulate mbd.dgmdcs for train_mgrad
+ * Accumulate mbd.dgmdcs — FUSED magnetic radial-coeff Jacobian.
+ *
+ * Replaces the two-pass scheme that materialized the large per-neighbor buffers
+ * moment_jac_mic / moment_jac_mjc (each ~n_basic*species*rfc*nrb*n_neighbors)
+ * and contracted them against dedmb. Here we recompute drb_dm{i,j}*angular
+ * exactly as calc_mag_basic_moments_jac_radial_coeffs did and fold dedmb in on
+ * the fly (Term A), accumulating into cache-resident tmp buffers; the kept small
+ * moment_jac_cs is contracted against dgm{i,j}dmb as before (Term B); then a
+ * single scatter writes mbd_dgmdcs. Numerically equal to the old dense scheme.
  * ========================================================================== */
-static inline void accumulate_mbd_dgmdcs(
+static inline void accumulate_dgmdcs_fused(
     int i,
     int itype,
     int n_atoms,
     int n_neighbors,
     const int *js_i,
+    const double *r_unit,
+    const double *drb_dmis,
+    const double *drb_dmjs,
+    const int *alpha_index_basic,
     int n_basic,
     int species_count,
+    const int *jtypes,
     int radial_funcs_count,
-    int radial_basis_size,
+    int nrb,
     const double *moment_jac_cs,
-    const double *moment_jac_mic,
-    const double *moment_jac_mjc,
     const double *dedmb,
     const double *dgmidmb,
     const double *dgmjdmb,
     double *mbd_dgmdcs)
 {
     int rfc = radial_funcs_count;
-    int rbs = radial_basis_size;
 
+    int tmp_size = species_count * rfc * nrb * n_neighbors;
+    double *tmp_i = (double *)calloc(tmp_size, sizeof(double));
+    double *tmp_j = (double *)calloc(tmp_size, sizeof(double));
+
+    /* Term A: (drb_dm{i,j} * angular) * dedmb[i_aib] -> tmp, live (jtype[k], mu). */
+    for (int i_aib = 0; i_aib < n_basic; i_aib++)
+    {
+        double v1 = dedmb[i_aib];
+        if (v1 == 0.0)
+            continue;
+
+        int mu = alpha_index_basic[i_aib * 4 + 0];
+        int xpow = alpha_index_basic[i_aib * 4 + 1];
+        int ypow = alpha_index_basic[i_aib * 4 + 2];
+        int zpow = alpha_index_basic[i_aib * 4 + 3];
+
+        for (int k = 0; k < n_neighbors; k++)
+        {
+            int jtype = jtypes[k];
+
+            double rx_pow = 1.0, ry_pow = 1.0, rz_pow = 1.0;
+            for (int p = 0; p < xpow; p++)
+                rx_pow *= r_unit[k * 3 + 0];
+            for (int p = 0; p < ypow; p++)
+                ry_pow *= r_unit[k * 3 + 1];
+            for (int p = 0; p < zpow; p++)
+                rz_pow *= r_unit[k * 3 + 2];
+
+            double angular = rx_pow * ry_pow * rz_pow;
+
+            for (int i_rb = 0; i_rb < nrb; i_rb++)
+            {
+                int base = (((jtype * rfc + mu) * nrb + i_rb) * n_neighbors + k);
+                tmp_i[base] += drb_dmis[i_rb * n_neighbors + k] * angular * v1;
+                tmp_j[base] += drb_dmjs[i_rb * n_neighbors + k] * angular * v1;
+            }
+        }
+    }
+
+    /* Term B: moment_jac_cs * dgm{i,j}dmb -> tmp (over the cs nonzeros). */
     for (int iamc = 0; iamc < n_basic; iamc++)
     {
-        double v1 = dedmb[iamc];
-
         for (int ispc = 0; ispc < species_count; ispc++)
         {
             for (int irf = 0; irf < rfc; irf++)
             {
-                for (int irb = 0; irb < rbs; irb++)
+                for (int irb = 0; irb < nrb; irb++)
                 {
-                    int idx_cs = ((iamc * species_count + ispc) * rfc + irf) * rbs + irb;
+                    int idx_cs = ((iamc * species_count + ispc) * rfc + irf) * nrb + irb;
                     double v3 = moment_jac_cs[idx_cs];
 
-                    if (v1 == 0.0 && v3 == 0.0)
+                    if (v3 == 0.0)
                         continue;
 
-                    int base_mic = (((iamc * species_count + ispc) * rfc + irf) * rbs + irb) * n_neighbors;
-                    int base_atom = ((((itype * species_count + ispc) * rfc + irf) * rbs + irb) * n_atoms);
+                    int base_tmp = ((ispc * rfc + irf) * nrb + irb) * n_neighbors;
 
                     for (int k = 0; k < n_neighbors; k++)
                     {
-                        int j = js_i[k];
-                        double vmi = moment_jac_mic[base_mic + k] * v1 + v3 * dgmidmb[iamc * n_neighbors + k];
-                        double vmj = moment_jac_mjc[base_mic + k] * v1 + v3 * dgmjdmb[iamc * n_neighbors + k];
-
-                        mbd_dgmdcs[base_atom + i] += vmi;
-                        if (j >= 0 && j < n_atoms)
-                        {
-                            mbd_dgmdcs[base_atom + j] += vmj;
-                        }
+                        tmp_i[base_tmp + k] += v3 * dgmidmb[iamc * n_neighbors + k];
+                        tmp_j[base_tmp + k] += v3 * dgmjdmb[iamc * n_neighbors + k];
                     }
                 }
             }
         }
     }
+
+    /* Scatter tmp -> mbd_dgmdcs (self atom i from tmp_i, neighbor j from tmp_j). */
+    for (int ispc = 0; ispc < species_count; ispc++)
+    {
+        for (int irf = 0; irf < rfc; irf++)
+        {
+            for (int irb = 0; irb < nrb; irb++)
+            {
+                int base_tmp = ((ispc * rfc + irf) * nrb + irb) * n_neighbors;
+                int base_atom = ((((itype * species_count + ispc) * rfc + irf) * nrb + irb) * n_atoms);
+
+                for (int k = 0; k < n_neighbors; k++)
+                {
+                    int j = js_i[k];
+                    mbd_dgmdcs[base_atom + i] += tmp_i[base_tmp + k];
+                    if (j >= 0 && j < n_atoms)
+                    {
+                        mbd_dgmdcs[base_atom + j] += tmp_j[base_tmp + k];
+                    }
+                }
+            }
+        }
+    }
+
+    free(tmp_i);
+    free(tmp_j);
 }
 
 /* ==========================================================================
@@ -573,13 +639,23 @@ static inline void calc_mag_basic_moments_jac_radial_coeffs(
                 int idx_cs = ((i_aib * species_count + jtype) * rfc + mu) * nrb + i_rb;
                 moment_jac_cs[idx_cs] += rb_val * angular;
 
-                int idx_mic = ((i_aib * species_count + jtype) * rfc + mu) * nrb * n_neighbors + i_rb * n_neighbors + k;
-                moment_jac_mic[idx_mic] += drb_dmi * angular;
+                /* rc/mic/mjc are optional: when NULL (fused path) the caller folds
+                 * these derivatives directly into tmp buffers via
+                 * accumulate_dgdcs_dsdcs_fused / accumulate_dgmdcs_fused, so the
+                 * large per-neighbor scratch buffers are never built. */
+                if (moment_jac_mic)
+                {
+                    int idx_mic = ((i_aib * species_count + jtype) * rfc + mu) * nrb * n_neighbors + i_rb * n_neighbors + k;
+                    moment_jac_mic[idx_mic] += drb_dmi * angular;
+                }
 
-                int idx_mjc = ((i_aib * species_count + jtype) * rfc + mu) * nrb * n_neighbors + i_rb * n_neighbors + k;
-                moment_jac_mjc[idx_mjc] += drb_dmj * angular;
+                if (moment_jac_mjc)
+                {
+                    int idx_mjc = ((i_aib * species_count + jtype) * rfc + mu) * nrb * n_neighbors + i_rb * n_neighbors + k;
+                    moment_jac_mjc[idx_mjc] += drb_dmj * angular;
+                }
 
-                if (r_abs[k] > 1e-10)
+                if (moment_jac_rc && r_abs[k] > 1e-10)
                 {
                     double der0 = r_unit[k * 3 + 0] * angular * (rb_der - xyzpow * rb_val / r_abs[k]);
                     double der1 = r_unit[k * 3 + 1] * angular * (rb_der - xyzpow * rb_val / r_abs[k]);

@@ -232,7 +232,10 @@ static inline void calc_basic_moments_jac_radial_coeffs(
                 int idx_cs = ((i_aib * species_count + jtype) * rfc + mu) * rbs + i_rb;
                 moment_jac_cs[idx_cs] += rb_val * angular;
 
-                if (r_abs[k] > 1e-10)
+                /* moment_jac_rc is optional: when NULL (fused path) the caller
+                 * folds these derivatives directly into tmp_dgdcs via
+                 * accumulate_dgdcs_dsdcs_fused, so the 16 MB buffer is never built. */
+                if (moment_jac_rc && r_abs[k] > 1e-10)
                 {
                     double rb_der = rb_derivs[i_rb * n_neighbors + k];
 
@@ -400,21 +403,35 @@ static inline void compute_dedmb_dgdmb(
 }
 
 /* ==========================================================================
- * Accumulate dgdcs from moment_jac_cs/moment_jac_rc and dedmb/dgdmb
+ * Accumulate dgdcs/dsdcs — FUSED radial-coeff Jacobian.
+ *
+ * Replaces the old two-pass scheme (materialize the 16 MB/atom `moment_jac_rc`
+ * `calc_basic_moments_jac_radial_coeffs` did and immediately fold in
+ * `dedmb[i_aib]`, accumulating straight into the per-atom scratch `tmp_dgdcs`
+ * (size: `species_count * radial_funcs_count * radial_basis_size * n_neighbors * 3` doubles). Only the live
+ * `(jtype[k], mu)` slot is touched, so the old dense
+ *
+ * Loops 2 (moment_jac_cs * dgdmb) and 3 (neighbor scatter into dgdcs/dsdcs) are
+ * unchanged from the previous consumer — neither ever touched moment_jac_rc.
  * ========================================================================== */
-static inline void accumulate_mbd_dgdcs_dsdcs(
+static inline void accumulate_dgdcs_dsdcs_fused(
     int i,
     int itype,
     int n_atoms,
     int n_neighbors,
     const int *js_i,
     const double *rs_i,
+    const double *r_abs,
+    const double *r_unit,
+    const double *rb_vals,
+    const double *rb_derivs,
+    const int *alpha_index_basic,
     int n_basic,
     int species_count,
+    const int *jtypes,
     int radial_funcs_count,
     int radial_basis_size,
     const double *moment_jac_cs,
-    const double *moment_jac_rc,
     const double *dedmb,
     const double *dgdmb,
     double *dgdcs,
@@ -426,28 +443,72 @@ static inline void accumulate_mbd_dgdcs_dsdcs(
     int tmp_size = species_count * rfc * rbs * n_neighbors * 3;
     double *tmp_dgdcs = (double *)calloc(tmp_size, sizeof(double));
 
-    for (int iamc = 0; iamc < n_basic; iamc++)
+    /* Loop 1 (fused + sparse): der{0,1,2} * dedmb[i_aib] -> tmp_dgdcs.
+     * Mirrors calc_basic_moments_jac_radial_coeffs' derivative block. */
+    for (int i_aib = 0; i_aib < n_basic; i_aib++)
     {
-        double v1 = dedmb[iamc];
+        int mu = alpha_index_basic[i_aib * 4 + 0];
+        int xpow = alpha_index_basic[i_aib * 4 + 1];
+        int ypow = alpha_index_basic[i_aib * 4 + 2];
+        int zpow = alpha_index_basic[i_aib * 4 + 3];
+        int xyzpow = xpow + ypow + zpow;
+        double v1 = dedmb[i_aib];
 
-        for (int ispc = 0; ispc < species_count; ispc++)
+        for (int k = 0; k < n_neighbors; k++)
         {
-            for (int irf = 0; irf < rfc; irf++)
-            {
-                for (int irb = 0; irb < rbs; irb++)
-                {
-                    int base_tmp = (((ispc * rfc + irf) * rbs + irb) * n_neighbors) * 3;
-                    int base_rc = ((((iamc * species_count + ispc) * rfc + irf) * rbs + irb) * n_neighbors) * 3;
+            if (r_abs[k] <= 1e-10)
+                continue;
 
-                    for (int j = 0; j < n_neighbors; j++)
-                    {
-                        for (int ixyz = 0; ixyz < 3; ixyz++)
-                        {
-                            tmp_dgdcs[base_tmp + j * 3 + ixyz] +=
-                                moment_jac_rc[base_rc + j * 3 + ixyz] * v1;
-                        }
-                    }
+            int jtype = jtypes[k];
+
+            double rx_pow = 1.0, ry_pow = 1.0, rz_pow = 1.0;
+            for (int p = 0; p < xpow; p++)
+                rx_pow *= r_unit[k * 3 + 0];
+            for (int p = 0; p < ypow; p++)
+                ry_pow *= r_unit[k * 3 + 1];
+            for (int p = 0; p < zpow; p++)
+                rz_pow *= r_unit[k * 3 + 2];
+
+            double angular = rx_pow * ry_pow * rz_pow;
+
+            for (int i_rb = 0; i_rb < rbs; i_rb++)
+            {
+                double rb_val = rb_vals[i_rb * n_neighbors + k];
+                double rb_der = rb_derivs[i_rb * n_neighbors + k];
+
+                double der0 = r_unit[k * 3 + 0] * angular *
+                              (rb_der - xyzpow * rb_val / r_abs[k]);
+                double der1 = r_unit[k * 3 + 1] * angular *
+                              (rb_der - xyzpow * rb_val / r_abs[k]);
+                double der2 = r_unit[k * 3 + 2] * angular *
+                              (rb_der - xyzpow * rb_val / r_abs[k]);
+
+                if (xpow > 0)
+                {
+                    double rx_prev = 1.0;
+                    for (int p = 0; p < xpow - 1; p++)
+                        rx_prev *= r_unit[k * 3 + 0];
+                    der0 += rb_val * xpow * rx_prev * ry_pow * rz_pow / r_abs[k];
                 }
+                if (ypow > 0)
+                {
+                    double ry_prev = 1.0;
+                    for (int p = 0; p < ypow - 1; p++)
+                        ry_prev *= r_unit[k * 3 + 1];
+                    der1 += rb_val * rx_pow * ypow * ry_prev * rz_pow / r_abs[k];
+                }
+                if (zpow > 0)
+                {
+                    double rz_prev = 1.0;
+                    for (int p = 0; p < zpow - 1; p++)
+                        rz_prev *= r_unit[k * 3 + 2];
+                    der2 += rb_val * rx_pow * ry_pow * zpow * rz_prev / r_abs[k];
+                }
+
+                int base_tmp = (((jtype * rfc + mu) * rbs + i_rb) * n_neighbors + k) * 3;
+                tmp_dgdcs[base_tmp + 0] += der0 * v1;
+                tmp_dgdcs[base_tmp + 1] += der1 * v1;
+                tmp_dgdcs[base_tmp + 2] += der2 * v1;
             }
         }
     }
