@@ -49,7 +49,7 @@ from motep.parallel import world
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--data-path", type=pathlib.Path, default="tests/data_path")
+    p.add_argument("--data-path", type=pathlib.Path, default=pathlib.Path("tests/data_path"))
     p.add_argument("--crystal", default="multi")
     p.add_argument("--level", type=int, default=10)
     p.add_argument("--engine", default="cext")
