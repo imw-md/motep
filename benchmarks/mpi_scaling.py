@@ -46,10 +46,13 @@ from motep.io.mlip.mtp import read_mtp
 from motep.loss import LossFunction, LossSetting
 from motep.parallel import world
 
+# Anchor the default dataset to the repo, so the script runs from any CWD.
+_DEFAULT_DATA_PATH = (pathlib.Path(__file__).parent / "../tests/data_path").resolve()
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--data-path", type=pathlib.Path, default=pathlib.Path("tests/data_path"))
+    p.add_argument("--data-path", type=pathlib.Path, default=_DEFAULT_DATA_PATH)
     p.add_argument("--crystal", default="multi")
     p.add_argument("--level", type=int, default=10)
     p.add_argument("--engine", default="cext")
