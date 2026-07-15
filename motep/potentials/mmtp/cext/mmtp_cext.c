@@ -348,16 +348,8 @@ void calc_mag_train(
             moment_values,
             moment_jac_rs);
 
-        double *moment_jac_cs = (double *)calloc(n_basic * species_count * radial_funcs_count * nrb, sizeof(double));
-        double *moment_jac_rc = (double *)calloc(n_basic * species_count * radial_funcs_count * nrb * n_neighbors * 3, sizeof(double));
-
-        calc_basic_moments_jac_radial_coeffs(
-            n_neighbors, r_abs, r_unit, basis, dbdrs,
-            alpha_index_basic, n_basic,
-            species_count, jtype_i,
-            radial_funcs_count, nrb,
-            moment_jac_cs, moment_jac_rc);
-
+        /* Contract + backprop first so the fused radial-coeff Jacobian below can
+         * fold dedmb in on the fly (see mtp cext calc_train for the rationale). */
         contract_moments_forward(moment_values, alpha_index_times, n_times);
 
         contract_moment_jacobians_forward(moment_values, moment_jac_rs, alpha_index_times, n_times, n_neighbors);
@@ -377,6 +369,17 @@ void calc_mag_train(
             dedmb,
             dgdmb);
 
+        /* Only moment_jac_cs is materialized; moment_jac_rc (up to 16 MB/atom) is
+         * skipped by passing NULL and folded in by accumulate_dgdcs_dsdcs_fused. */
+        double *moment_jac_cs = (double *)calloc(n_basic * species_count * radial_funcs_count * nrb, sizeof(double));
+
+        calc_basic_moments_jac_radial_coeffs(
+            n_neighbors, r_abs, r_unit, basis, dbdrs,
+            alpha_index_basic, n_basic,
+            species_count, jtype_i,
+            radial_funcs_count, nrb,
+            moment_jac_cs, NULL);
+
         accumulate_mbd_dvdcs(
             i,
             itype,
@@ -389,26 +392,30 @@ void calc_mag_train(
             dedmb,
             mbd_dvdcs);
 
-        accumulate_mbd_dgdcs_dsdcs(
+        accumulate_dgdcs_dsdcs_fused(
             i,
             itype,
             n_atoms,
             n_neighbors,
             js_i,
             rs_i,
+            r_abs,
+            r_unit,
+            basis,
+            dbdrs,
+            alpha_index_basic,
             n_basic,
             species_count,
+            jtype_i,
             radial_funcs_count,
             nrb,
             moment_jac_cs,
-            moment_jac_rc,
             dedmb,
             dgdmb,
             mbd_dgdcs,
             mbd_dsdcs);
 
         free(moment_jac_cs);
-        free(moment_jac_rc);
         free(dedmb);
         free(dgdmb);
 
@@ -590,18 +597,8 @@ void calc_mag_train_mgrad(
             moment_jac_mis,
             moment_jac_mjs);
 
-        double *moment_jac_cs = (double *)calloc(n_basic * species_count * radial_funcs_count * nrb, sizeof(double));
-        double *moment_jac_rc = (double *)calloc(n_basic * species_count * radial_funcs_count * nrb * n_neighbors * 3, sizeof(double));
-        double *moment_jac_mic = (double *)calloc(n_basic * species_count * radial_funcs_count * nrb * n_neighbors, sizeof(double));
-        double *moment_jac_mjc = (double *)calloc(n_basic * species_count * radial_funcs_count * nrb * n_neighbors, sizeof(double));
-
-        calc_mag_basic_moments_jac_radial_coeffs(
-            n_neighbors, r_abs, r_unit, basis, dbdrs, dbdmis, dbdmjs,
-            alpha_index_basic, n_basic,
-            species_count, jtype_i,
-            radial_funcs_count, nrb,
-            moment_jac_cs, moment_jac_rc, moment_jac_mic, moment_jac_mjc);
-
+        /* Contract + backprop first so the fused radial-coeff Jacobians below can
+         * fold dedmb / dgm{i,j}dmb in on the fly. */
         contract_moments_forward(moment_values, alpha_index_times, n_times);
 
         contract_moment_jacobians_forward(moment_values, moment_jac_rs, alpha_index_times, n_times, n_neighbors);
@@ -630,6 +627,18 @@ void calc_mag_train_mgrad(
             dgmidmb,
             dgmjdmb);
 
+        /* Only moment_jac_cs is materialized; the large per-neighbor buffers
+         * moment_jac_rc/mic/mjc are skipped (NULL) and folded in by the fused
+         * kernels below. */
+        double *moment_jac_cs = (double *)calloc(n_basic * species_count * radial_funcs_count * nrb, sizeof(double));
+
+        calc_mag_basic_moments_jac_radial_coeffs(
+            n_neighbors, r_abs, r_unit, basis, dbdrs, dbdmis, dbdmjs,
+            alpha_index_basic, n_basic,
+            species_count, jtype_i,
+            radial_funcs_count, nrb,
+            moment_jac_cs, NULL, NULL, NULL);
+
         accumulate_mbd_dvdcs(
             i,
             itype,
@@ -642,46 +651,51 @@ void calc_mag_train_mgrad(
             dedmb,
             mbd_dvdcs);
 
-        accumulate_mbd_dgdcs_dsdcs(
+        accumulate_dgdcs_dsdcs_fused(
             i,
             itype,
             n_atoms,
             n_neighbors,
             js_i,
             rs_i,
+            r_abs,
+            r_unit,
+            basis,
+            dbdrs,
+            alpha_index_basic,
             n_basic,
             species_count,
+            jtype_i,
             radial_funcs_count,
             nrb,
             moment_jac_cs,
-            moment_jac_rc,
             dedmb,
             dgdmb,
             mbd_dgdcs,
             mbd_dsdcs);
 
-        accumulate_mbd_dgmdcs(
+        accumulate_dgmdcs_fused(
             i,
             itype,
             n_atoms,
             n_neighbors,
             js_i,
+            r_unit,
+            dbdmis,
+            dbdmjs,
+            alpha_index_basic,
             n_basic,
             species_count,
+            jtype_i,
             radial_funcs_count,
             nrb,
             moment_jac_cs,
-            moment_jac_mic,
-            moment_jac_mjc,
             dedmb,
             dgmidmb,
             dgmjdmb,
             mbd_dgmdcs);
 
         free(moment_jac_cs);
-        free(moment_jac_rc);
-        free(moment_jac_mic);
-        free(moment_jac_mjc);
         free(dedmb);
         free(dgdmb);
         free(dgmidmb);
